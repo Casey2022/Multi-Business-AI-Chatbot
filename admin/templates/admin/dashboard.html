@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Businesses</h1>
+  <div class="subtitle">All registered businesses on this server</div>
+</div>
+
+<div class="card">
+  {% if businesses %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Business</th>
+        <th>Slug</th>
+        <th>Twilio number</th>
+        <th>Config</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for b in businesses %}
+      <tr>
+        <td style="color:#a0aec0">{{ b.id }}</td>
+        <td><strong>{{ b.name }}</strong></td>
+        <td><code style="font-size:12px;color:#553c9a">{{ b.slug }}</code></td>
+        <td><code style="font-size:12px">{{ b.twilio_number or '—' }}</code></td>
+        <td style="color:#718096;font-size:12px">{{ b.config_path }}</td>
+        <td>
+          {% if b.active %}
+          <span class="badge badge-green">Active</span>
+          {% else %}
+          <span class="badge badge-gray">Inactive</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="/admin/business/{{ b.id }}/conversations">Conversations</a>
+          <span style="color:#cbd5e0; margin: 0 6px;">·</span>
+          <a href="/admin/business/{{ b.id }}/appointments">Appointments</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    <p>No businesses registered yet.</p>
+    <p style="margin-top:8px;font-size:13px">Run <code>python3 seed_businesses.py</code> to add businesses.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

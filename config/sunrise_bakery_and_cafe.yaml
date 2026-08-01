@@ -1,0 +1,95 @@
+# config/sunrise_bakery_and_cafe.yaml — Sunrise Bakery & Café
+
+business:
+  name: "Sunrise Bakery & Café"
+  phone: "(585) 555-0188"
+  address: "47 Park Ave, Rochester NY"
+  hours: "Tue-Sun, 7am-3pm (closed Mondays)"
+  service_area: "Pickup at the shop, delivery within 5 miles for orders over $50"
+
+services:
+  - "custom birthday cakes"
+  - "wedding cakes"
+  - "cupcake orders (dozen minimum)"
+  - "pastry trays for events"
+
+bot:
+  persona: |
+    Warm, friendly, a little playful. You love food and treat every
+    customer like a neighbor. Use plain language, never corporate-speak.
+    A well-placed 🥐 or 🎂 is welcome but don't overdo it.
+  guardrails:
+    universal: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      flavors, ingredients, allergens, or policies you don't see here.
+      Never apply a fact from one service to a different service —
+      notice periods, prices, and policies are service-specific. If a
+      policy isn't stated for a specific service, say you're not sure
+      and give the phone number.
+      If unsure, give the phone number and stop — do not speculate.
+      For custom cake orders, always direct them to call to discuss
+      flavor, size, design, and dietary needs.
+      You cannot cancel, modify, or look up existing orders. If a
+      customer asks to cancel or change an order that's already been
+      placed, tell them to call {phone} — never confirm a cancellation
+      or change yourself.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+faq:
+  - question: "Do you have gluten-free options?"
+    answer: "We have a few gluten-free pastries each day, and gluten-free cakes by special order. Call to discuss!"
+  - question: "How much notice do you need for a custom cake?"
+    answer: "We ask for at least 72 hours' notice on custom cakes, and 2 weeks for wedding cakes."
+  - question: "Do you deliver?"
+    answer: "We deliver custom cake orders over $50 within 5 miles. Pickup is free anytime during open hours."
+
+rules:
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey", "yo"]
+    match: "exact"
+    reply: "Hi there! 👋 Welcome to {business_name}. How can I help?"
+
+  - name: "hours"
+    keywords: ["hours", "open", "closed", "close"]
+    match: "any"
+    reply: "We're open {hours}."
+
+  - name: "location"
+    keywords: ["where", "location", "address", "directions"]
+    match: "any"
+    reply: "We're at {address}. Stop in for a 🥐!"
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "You're welcome! 😊"
+
+  - name: "cancel_existing"
+    keywords: ["cancel my order", "change my order", "cancel my appointment"]
+    match: "any"
+    reply: "To cancel or change an existing order, please call us at {phone} and we'll take care of it right away."
+
+booking:
+  noun: "order"
+  noun_plural: "orders"
+  greeting: "Happy to help you place an order! What would you like? (e.g. {services_examples})"
+  service_confirmation: "Got it — {service}."
+  ask_datetime: "When would you like it ready? (e.g. 'Tuesday at 3pm' or 'next Friday morning')"
+  final_confirmation: "Perfect! Order placed: {service} on {datetime}. We'll call to confirm. To change or cancel, just give us a call at {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 3pm' or 'June 5 at 10am'."
+  cancel_reply: "No problem — order cancelled. Text 'order' anytime to start again."
+  extra_questions:
+    - key: "customization"
+      prompt: "Any customization details? (e.g. 'Happy Birthday Carl', colors, theme — or reply 'none')"
+    - key: "notes"
+      prompt: "Anything else we should know? (allergies, pickup person — or reply 'none')"

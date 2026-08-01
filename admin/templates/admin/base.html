@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin{% endblock %} — SMS Chatbot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      background: #f0f2f5;
+      color: #1a202c;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Top nav ---- */
+    .topnav {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topnav a { color: #e2e8f0; text-decoration: none; }
+    .topnav .brand { font-weight: 600; font-size: 15px; letter-spacing: 0.02em; }
+    .topnav .nav-links { display: flex; gap: 20px; align-items: center; }
+    .topnav .nav-links a:hover { color: #fff; }
+    .topnav .logout {
+      background: #e53e3e;
+      color: #fff;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+    }
+    .topnav .logout:hover { background: #c53030; color: #fff; }
+
+    /* ---- Page content ---- */
+    .page { flex: 1; padding: 28px 32px; max-width: 1400px; width: 100%; margin: 0 auto; }
+
+    /* ---- Cards ---- */
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #2d3748;
+    }
+
+    /* ---- Tables ---- */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      background: #f7fafc;
+      border-bottom: 2px solid #e2e8f0;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    td { padding: 12px 14px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f7fafc; }
+
+    /* ---- Badges ---- */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-green { background: #c6f6d5; color: #276749; }
+    .badge-gray  { background: #e2e8f0; color: #4a5568; }
+    .badge-blue  { background: #bee3f8; color: #2b6cb0; }
+
+    /* ---- Links ---- */
+    a { color: #3182ce; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---- Page header ---- */
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; color: #2d3748; }
+    .page-header .subtitle { color: #718096; margin-top: 4px; font-size: 13px; }
+
+    /* ---- Breadcrumb ---- */
+    .breadcrumb { font-size: 13px; color: #718096; margin-bottom: 20px; }
+    .breadcrumb a { color: #718096; }
+    .breadcrumb a:hover { color: #3182ce; }
+    .breadcrumb span { margin: 0 6px; }
+
+    /* ---- Empty state ---- */
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: #a0aec0;
+    }
+    .empty p { font-size: 15px; }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="/admin/" class="brand">📱 SMS Chatbot Admin</a>
+  <div class="nav-links">
+    <a href="/admin/">Businesses</a>
+    <a href="/admin/logout" class="logout">Log out</a>
+  </div>
+</nav>
+
+<div class="page">
+  {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

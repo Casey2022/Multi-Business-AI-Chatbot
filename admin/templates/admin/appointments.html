@@ -1,0 +1,73 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Appointments — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a>
+  <span>›</span>
+  {{ business.name }}
+</div>
+
+<div class="page-header">
+  <h1>{{ business.name }}</h1>
+  <div class="subtitle">
+    {{ appointment_list | length }} appointment{% if appointment_list | length != 1 %}s{% endif %} on record
+  </div>
+</div>
+
+<div style="margin-top: 8px;">
+    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
+      View appointments →
+    </a>
+</div>
+
+<div class="card">
+  {% if appointment_list %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Customer phone</th>
+        <th>Service</th>
+        <th>Scheduled for</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for appt in appointment_list %}
+      <tr>
+        <td style="color:#a0aec0">{{ appt.id }}</td>
+        <td>
+          <a href="/admin/business/{{ business.id }}/conversations?phone={{ appt.phone | urlencode }}">
+            {{ appt.phone }}
+          </a>
+        </td>
+        <td><strong>{{ appt.service }}</strong></td>
+        <td>{{ appt.datetime | friendly_time }}</td>
+        <td>
+          {% if appt.status == 'booked' %}
+          <span class="badge badge-green">Booked</span>
+          {% elif appt.status == 'cancelled' %}
+          <span class="badge badge-gray">Cancelled</span>
+          {% else %}
+          <span class="badge badge-blue">{{ appt.status | title }}</span>
+          {% endif %}
+        </td>
+        <td style="font-size:12px; color:#718096;">
+          {% if appt.details and appt.details != '{}' %}
+            {{ appt.details }}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    <p>No appointments yet for {{ business.name }}.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

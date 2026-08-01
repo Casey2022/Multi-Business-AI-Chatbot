@@ -1,0 +1,122 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Conversations — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a>
+  <span>›</span>
+  {{ business.name }}
+  {% if selected_phone %}
+  <span>›</span>
+  {{ selected_phone }}
+  {% endif %}
+</div>
+
+<div class="page-header">
+  <h1>{{ business.name }}</h1>
+  <div class="subtitle">
+    {% if selected_phone %}
+      Conversation with {{ selected_phone }}
+    {% else %}
+      {{ conversation_list | length }} unique conversation{% if conversation_list | length != 1 %}s{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div style="margin-top: 8px;">
+  <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
+    View appointments →
+  </a>
+</div>
+
+<div style="display: flex; gap: 20px; align-items: flex-start;">
+
+  <!-- Left panel: conversation list -->
+  <div style="width: 300px; flex-shrink: 0;">
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 14px 18px; border-bottom: 1px solid #edf2f7; font-weight: 600; font-size: 13px; color: #4a5568; text-transform: uppercase; letter-spacing: 0.05em;">
+        Customers
+      </div>
+
+      {% if conversation_list %}
+      {% for convo in conversation_list %}
+        {% set is_selected = selected_phone == convo.phone %}
+        <a href="?phone={{ convo.phone | urlencode }}"
+           style="display:block; padding: 14px 18px; border-bottom: 1px solid #edf2f7; text-decoration: none; background: {{ '#f0f7ff' if is_selected else '#fff' }}; border-left: 3px solid {{ '#3182ce' if is_selected else 'transparent' }};">
+          <div style="font-weight: 600; color: #2d3748; margin-bottom: 4px; font-size: 13px;">
+            {{ convo.phone }}
+          </div>
+          <div style="color: #a0aec0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            {{ convo.last_content[:60] }}{% if convo.last_content | length > 60 %}…{% endif %}
+          </div>
+          <div style="color: #cbd5e0; font-size: 11px; margin-top: 4px;">
+            {{ convo.message_count }} messages · {{ convo.last_message_time | friendly_time }}
+          </div>
+        </a>
+      {% endfor %}
+      {% else %}
+      <div class="empty" style="padding: 32px 18px;">
+        <p style="font-size:13px">No conversations yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Right panel: message thread -->
+  <div style="flex: 1; min-width: 0;">
+    {% if thread %}
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 14px 18px; border-bottom: 1px solid #edf2f7; font-weight: 600; font-size: 13px; color: #4a5568;">
+        {{ selected_phone }}
+        <span class="badge badge-blue" style="margin-left: 8px;">{{ thread | length }} messages</span>
+      </div>
+
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 10px; max-height: 620px; overflow-y: auto;">
+        {% for msg in thread %}
+        <div style="display: flex; {% if msg.role == 'user' %}justify-content: flex-start{% else %}justify-content: flex-end{% endif %}">
+          <div style="
+            max-width: 72%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            {% if msg.role == 'user' %}
+              background: #f0f4f8;
+              color: #2d3748;
+              border-bottom-left-radius: 3px;
+            {% else %}
+              background: #3182ce;
+              color: #fff;
+              border-bottom-right-radius: 3px;
+            {% endif %}
+          ">
+            {{ msg.content }}
+            <div style="font-size: 10px; margin-top: 5px; opacity: 0.6; text-align: right;">
+              {{ msg.timestamp | friendly_time }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% elif selected_phone %}
+    <div class="card">
+      <div class="empty">
+        <p>No messages found for {{ selected_phone }}.</p>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card">
+      <div class="empty" style="padding: 80px 24px;">
+        <p style="font-size:16px; margin-bottom: 8px;">👈 Select a conversation</p>
+        <p style="font-size:13px">Choose a customer from the left to view their full message thread.</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

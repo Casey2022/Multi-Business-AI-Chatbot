@@ -1,0 +1,98 @@
+# config/bobs_plumbing.yaml — Bob's Plumbing
+
+business:
+  name: "Bob's Plumbing"
+  phone: "(585) 555-0123"
+  address: "123 Main St, Rochester NY"
+  hours: "Mon-Fri, 9am-5pm"
+  service_area: "Greater Rochester, within 20 miles"
+
+services:
+  - "drain cleaning"
+  - "leak repair"
+  - "water heater installation"
+  - "emergency service (24/7)"
+
+bot:
+  persona: |
+    Friendly, professional, brief. Plain language, never slang.
+    Treat customers with courtesy and get to the point.
+  guardrails:
+    universal: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      times, or policies you don't see here.
+      Never apply a fact from one service to a different service —
+      notice periods, prices, and policies are service-specific. If a
+      policy isn't stated for a specific service, say you're not sure
+      and give the phone number.
+      You cannot cancel, modify, or look up existing appointments. If a
+      customer asks to cancel or change an appointment or service call that's already been
+      placed, tell them to call {phone} — never confirm a cancellation
+      or change yourself.
+      If unsure, give the phone number and stop — do not speculate
+      about after-hours systems or what customers will hear when they call.
+      Emergency service is available 24/7; the after-hours line connects
+      to our on-call dispatcher.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+faq:
+  - question: "Do you offer free estimates?"
+    answer: "Yes, all estimates are free."
+  - question: "Do you accept credit cards?"
+    answer: "Yes, we accept all major credit cards."
+  - question: "Are you licensed and insured?"
+    answer: "Yes, fully licensed and insured in New York State."
+
+rules:
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey", "yo"]
+    match: "exact"
+    reply: "Hello! 👋 Thanks for texting {business_name}. How can I help?"
+
+  - name: "hours"
+    keywords: ["hours", "open", "closed", "close"]
+    match: "any"
+    reply: "We're open {hours}. Emergency service available 24/7."
+
+  - name: "location"
+    keywords: ["where", "location", "address", "directions"]
+    match: "any"
+    reply: "We're based at {address}, serving {service_area}."
+
+  - name: "emergency"
+    keywords: ["emergency", "urgent", "flooding", "burst", "leak now"]
+    match: "any"
+    reply: "For emergencies, call {phone} immediately — we have 24/7 service and can typically be on-site within 90 minutes."
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "You're welcome! Don't hesitate to reach out if you need anything. 👍"
+
+  - name: "cancel_existing"
+    keywords: ["cancel my order", "change my order", "cancel my appointment"]
+    match: "any"
+    reply: "To cancel or change an existing order, please call us at {phone} and we'll take care of it right away."
+
+booking:
+  noun: "appointment"
+  noun_plural: "appointments"
+  greeting: "Happy to schedule an appointment! What service do you need? (e.g. {services_examples})"
+  service_confirmation: "Got it — {service}."
+  ask_datetime: "When works for you? (e.g. 'Tuesday at 2pm' or 'next Friday morning')"
+  final_confirmation: "Perfect! Appointment scheduled: {service} on {datetime}. We'll call to confirm. To change or cancel, just give us a call at {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 2pm' or 'June 5 at 10am'."
+  cancel_reply: "No problem — appointment cancelled. Text 'book' anytime to schedule again."
+  extra_questions:
+    - key: "problem_description"
+      prompt: "Briefly, what's the issue? (e.g. 'kitchen sink draining slowly')"
