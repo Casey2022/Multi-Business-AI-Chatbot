@@ -166,12 +166,20 @@ def ingest_documents(config):
         chunks = chunk_text(text)
         print(f"[rag] {md_file.name}: {len(chunks)} chunks")
 
-        for i, chunk in enumerate(chunks):
-            collection.add(
-                documents=[chunk],
-                ids=[f"{md_file.stem}_chunk_{i}"],
-                metadatas=[{"source": md_file.name, "chunk_index": i}]
-            )
+        if not chunks:
+            continue
+
+        # One API call for all chunks in this file, not one per chunk.
+        # With a hosted embedder, per-chunk calls burn rate limit and are
+        # far slower than a single batched request.
+        collection.add(
+            documents=chunks,
+            ids=[f"{md_file.stem}_chunk_{i}" for i in range(len(chunks))],
+            metadatas=[
+                {"source": md_file.name, "chunk_index": i}
+                for i in range(len(chunks))
+            ],
+        )
         total_chunks += len(chunks)
 
     print(f"[rag] Ingested {total_chunks} total chunks into '{collection_name}'.")
@@ -184,18 +192,30 @@ def ensure_ingested(config):
     fast no-op; on an ephemeral one (cloud free tiers) it rebuilds the vector
     store automatically after a restart.
     """
-    slug = _slugify(config["business"]["name"])
+    slug      = _slugify(config["business"]["name"])
+    docs_path = Path("documents") / slug
+
+    # Expected chunk count from the source documents. Comparing against this
+    # (rather than just count > 0) catches partially-ingested collections,
+    # which happen when ingestion fails midway — e.g. an embedding API rate limit.
+    expected = 0
+    if docs_path.exists():
+        for md_file in docs_path.glob("*.md"):
+            expected += len(chunk_text(md_file.read_text(encoding="utf-8")))
+
     try:
         collection = _chroma_client.get_collection(
             slug,
             embedding_function=_embedding_fn,
         )
         count = collection.count()
-        if count > 0:
-            print(f"[rag] Collection '{slug}' already has {count} chunks — skipping.")
+        if count == expected and count > 0:
+            print(f"[rag] Collection '{slug}' complete ({count} chunks) — skipping.")
             return
+        print(f"[rag] Collection '{slug}' has {count} chunks, expected {expected} "
+              f"— rebuilding.")
     except Exception:
-        pass  # Collection doesn't exist yet — fall through and build it.
+        pass
 
     ingest_documents(config)
 
