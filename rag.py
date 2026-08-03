@@ -223,31 +223,33 @@ def ensure_ingested(config):
 # Retrieval — called per-request from llm.py
 # ---------------------------------------------------------------------------
 
+    
 def retrieve(query, config):
-    """Return relevant document chunks for a query, scoped to the given business.
-
-    Derives the collection name from the business config, opens the collection
-    fresh (no cached handle), queries ChromaDB, and filters by distance
-    threshold. Returns [] if no chunks are close enough, or if the collection
-    doesn't exist yet (ingest hasn't been run for this business).
-
-    Returns a list of (chunk_text, distance) tuples, closest first.
-    """
+        """Return relevant document chunks for a query, scoped to the given business.
+        
+            Derives the collection name from the business config, opens the collection
+            fresh (no cached handle), queries ChromaDB, and filters by distance
+            threshold. Returns [] if no chunks are close enough, or if the collection
+            doesn't exist yet (ingest hasn't been run for this business).
+        
+            Returns a list of (chunk_text, distance) tuples, closest first.
+            """
     collection_name = _slugify(config["business"]["name"])
+    print(f"[rag] Opening collection '{collection_name}'...")
 
     try:
-        # get_collection (not get_or_create) — if ingest hasn't been run,
-        # we want to know rather than silently create an empty collection.
         collection = _chroma_client.get_collection(
             collection_name,
             embedding_function=_embedding_fn,
         )
-    except Exception:
-        print(f"[rag] WARNING: collection '{collection_name}' not found. "
-              f"Run 'python3 rag.py' to ingest documents for this business.")
+    except Exception as e:
+        print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
         return []
 
+    print(f"[rag] Collection opened. Embedding query and searching...")
     results   = collection.query(query_texts=[query], n_results=TOP_K)
+    print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
+
     documents = results["documents"][0]
     distances = results["distances"][0]
 
