@@ -18,6 +18,30 @@
 import re
 import chromadb
 from pathlib import Path
+import os
+import chromadb.utils.embedding_functions as embedding_functions
+
+# Embedding backend selection.
+#
+# Chroma's default embedder runs a local ONNX model — fine on a laptop,
+# unusable on a 0.1-CPU container (query embedding exceeded a 300s timeout
+# in production). Using a hosted embedding API turns that CPU-bound work
+# into a fast network call and removes ~200MB of runtime memory plus a
+# 79MB model download on every cold start.
+VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY")
+
+if VOYAGE_API_KEY:
+    _embedding_fn = embedding_functions.VoyageAIEmbeddingFunction(
+        api_key=VOYAGE_API_KEY,
+        model_name="voyage-3-large",
+    )
+    print("[rag] Using Voyage AI embeddings.")
+else:
+    # Fallback: Chroma's local default. Works locally; too slow to deploy.
+    _embedding_fn = None
+    print("[rag] WARNING: VOYAGE_API_KEY not set — falling back to local "
+          "ONNX embeddings. Slow, and NOT compatible with collections "
+          "built using Voyage (different vector dimensions).")
 
 # ---------------------------------------------------------------------------
 # Constants — not business-specific, safe at module level
@@ -132,7 +156,8 @@ def ingest_documents(config):
 
     collection = _chroma_client.get_or_create_collection(
         name=collection_name,
-        metadata={"hnsw:space": "cosine"}
+        metadata={"hnsw:space": "cosine"},
+        embedding_function=_embedding_fn,
     )
 
     total_chunks = 0
@@ -161,7 +186,10 @@ def ensure_ingested(config):
     """
     slug = _slugify(config["business"]["name"])
     try:
-        collection = _chroma_client.get_collection(slug)
+        collection = _chroma_client.get_collection(
+            slug,
+            embedding_function=_embedding_fn,
+        )
         count = collection.count()
         if count > 0:
             print(f"[rag] Collection '{slug}' already has {count} chunks — skipping.")
@@ -190,7 +218,10 @@ def retrieve(query, config):
     try:
         # get_collection (not get_or_create) — if ingest hasn't been run,
         # we want to know rather than silently create an empty collection.
-        collection = _chroma_client.get_collection(collection_name)
+        collection = _chroma_client.get_collection(
+            collection_name,
+            embedding_function=_embedding_fn,
+        )
     except Exception:
         print(f"[rag] WARNING: collection '{collection_name}' not found. "
               f"Run 'python3 rag.py' to ingest documents for this business.")
