@@ -234,38 +234,38 @@ def retrieve(query, config):
         
             Returns a list of (chunk_text, distance) tuples, closest first.
             """
-    collection_name = _slugify(config["business"]["name"])
-    print(f"[rag] Opening collection '{collection_name}'...")
+        collection_name = _slugify(config["business"]["name"])
+        print(f"[rag] Opening collection '{collection_name}'...")
 
-    try:
-        collection = _chroma_client.get_collection(
+        try:
+            collection = _chroma_client.get_collection(
             collection_name,
             embedding_function=_embedding_fn,
-        )
-    except Exception as e:
-        print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
-        return []
+            )
+        except Exception as e:
+            print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
+            return []
 
-    print(f"[rag] Collection opened. Embedding query and searching...")
-    results   = collection.query(query_texts=[query], n_results=TOP_K)
-    print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
+            print(f"[rag] Collection opened. Embedding query and searching...")
+            results   = collection.query(query_texts=[query], n_results=TOP_K)
+            print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
 
-    documents = results["documents"][0]
-    distances = results["distances"][0]
+            documents = results["documents"][0]
+            distances = results["distances"][0]
 
-    filtered = [
-        (doc, dist)
-        for doc, dist in zip(documents, distances)
-        if dist <= DISTANCE_THRESHOLD
-    ]
+            filtered = [
+            (doc, dist)
+            for doc, dist in zip(documents, distances)
+            if dist <= DISTANCE_THRESHOLD
+                ]
 
-    print(f"[rag] Query: {query!r} -> {len(filtered)} usable chunks "
+        print(f"[rag] Query: {query!r} -> {len(filtered)} usable chunks "
           f"(of {len(documents)} returned)")
-    for doc, dist in filtered:
-        preview = doc[:80] + ("..." if len(doc) > 80 else "")
-        print(f"        distance={dist:.4f}  {preview}")
+        for doc, dist in filtered:
+            preview = doc[:80] + ("..." if len(doc) > 80 else "")
+            print(f"        distance={dist:.4f}  {preview}")
 
-    return filtered
+        return filtered
 
 
 # ---------------------------------------------------------------------------
