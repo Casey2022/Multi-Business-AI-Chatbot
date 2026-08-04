@@ -62,11 +62,7 @@ def seed():
     for row in rows:
         print(f"  {row['id']:<4} {row['name']:<28} {str(row['twilio_number']):<16} {row['active']}")
 
-    print("\n[seed] Done. Next steps:")
-    print("  1. Run: python3 rag.py  (currently points to whichever business.yaml you have active)")
-    print("     Then temporarily swap config_path in rag.py __main__ to ingest the second business.")
-    print("  2. Start the server: python3 app.py")
-    print("  3. Test both businesses with curl using their respective To numbers.\n")
+
 
 if __name__ == "__main__":
     seed()

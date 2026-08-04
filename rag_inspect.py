@@ -8,7 +8,7 @@ config          = load_config("config/business.yaml")
 collection_name = rag._slugify(config["business"]["name"])
 
 try:
-    collection = rag._chroma_client.get_collection(collection_name)
+    collection = rag.get_chroma_client().get_collection(collection_name)
 except Exception:
     print(f"Collection '{collection_name}' not found. Run python3 rag.py first.")
     exit(1)

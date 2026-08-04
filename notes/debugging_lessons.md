@@ -349,3 +349,91 @@ Check terminal 1 first. Permanent fixes: disable AirPlay Receiver in System Sett
 Curls written with \ line continuations got mangled by the shell during paste — the commands appeared to run but never reached the server, and an entire round of "testing" was actually testing nothing. Confirmed by querying the messages table directly and finding no rows from that session.
 
 Default to single-line curls for anything you'll copy-paste. And when test results look ambiguous, check the database rather than trusting the terminal.
+
+## Fork-unsafe clients: the bug that produced no error at all
+
+Symptom. Every request that touched RAG hung until gunicorn killed the worker: [CRITICAL] WORKER TIMEOUT followed by Worker (pid:X) was sent SIGKILL! Perhaps out of memory?. No traceback. No error. Worked perfectly on localhost. Raising the timeout to 300s changed nothing — it just took longer to die.
+
+Cause. rag.py created the ChromaDB client at module import:
+
+python
+_chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+
+Gunicorn forks worker processes. ChromaDB is Rust-backed and holds internal locks and file handles; a client created before the fork gets copied into the child, where the thread holding those locks does not exist. The child waits on a lock nobody will ever release. Deadlock.
+
+Fix. Create the client lazily, so it is born inside whichever process actually uses it:
+
+python
+_chroma_client = None
+
+def get_chroma_client():
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+    return _chroma_client
+
+The generalisable rule. Anything holding OS-level resources — database connections, HTTP session pools, thread pools, native/Rust/C extension state — should be created per process, lazily, not at module import. Local dev servers are single-process, so this class of bug is invisible until you deploy behind a forking server.
+
+Misleading detail worth remembering: gunicorn's "Perhaps out of memory?" in the SIGKILL message is a guess, not a diagnosis. It sent us chasing the 512 MB limit for two rounds. Gunicorn prints that whenever a worker dies without explanation.
+
+When something hangs with no error, bisect it with print statements
+
+We spent rounds guessing (CPU limits? memory? rate limits?) and got nowhere. What actually cracked it was adding logging between every step of the suspect function:
+
+python
+print(f"[rag] Opening collection '{collection_name}'...")
+collection = get_chroma_client().get_collection(...)
+print("[rag] Collection opened. Embedding query and searching...")
+results = collection.query(...)
+print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
+
+The log stopped after "Opening collection" and never reached "Collection opened." That single fact eliminated CPU, embeddings, rate limits, and the LLM in one shot — the hang was in a call that should take milliseconds.
+
+Rule: a hang gives you no stack trace, so manufacture one. Add prints until the gap between the last line printed and the next line expected is a single call. That call is your bug.
+
+Prerequisite: set PYTHONUNBUFFERED=1 in any containerised Python environment. Without it Python buffers stdout when not attached to a terminal, and logs from a killed worker are lost entirely — which is why early attempts showed nothing at all.
+
+The deployment environment can make a correct design untenable
+
+The app ran fine locally with ChromaDB's default embedder (a local ONNX model). On a 0.1-CPU container it was hopeless: neural-net inference on a tenth of a core, plus a 79 MB model download on every cold start, on an ephemeral filesystem that discarded the cache each time.
+
+Fix: move embeddings to a hosted API (Voyage AI). Query embedding became a fast network call, ~200 MB of runtime memory disappeared, and cold starts dropped substantially.
+
+The lesson isn't "APIs are better." Local embedding is the right call in plenty of contexts — no per-query cost, no network dependency, full privacy. It was wrong for this deployment target. Adapting to the constraints of the environment you're shipping into, rather than fighting them, is most of what deployment work actually is.
+
+Migration gotcha: different embedding models produce different vector dimensions, so existing collections become unreadable. All collections must be rebuilt after a swap. Also: the embedding function must be passed when reading a collection, not just when creating it — miss it and Chroma silently falls back to its default embedder, producing query vectors that can't be compared to what's stored.
+
+Partial ingestion that reports success
+
+Symptom. Bot gave plausible answers, but ensure_ingested logged "Collection 'bobs_plumbing' already has 3 chunks — skipping" when the document produces 7. Less than half the knowledge base was loaded, and nothing complained.
+
+Three failures lined up:
+
+ingest_documents called collection.add() once per chunk — 7 chunks meant 7 API calls, and Voyage's unpaid free tier caps at 3 requests per minute. The fourth was rejected.
+bootstrap() caught the exception, logged a warning, and continued.
+ensure_ingested checked count > 0, so a partial collection looked healthy forever afterwards.
+
+Fixes:
+
+Batch the writes: one collection.add() per file, not per chunk.
+Check completeness, not existence — compare the stored count against the chunk count the source documents would produce, and rebuild on mismatch.
+
+Rule: a health check that asks "is there anything here?" will eventually bless corrupt data. Ask "is there everything that should be here?"
+
+Platform-specific deployment gotchas (Render)
+Bind to $PORT. Render assigns a port via environment variable and scans for a listener. Gunicorn defaults to 8000 → deploy fails with "no open ports detected." Use --bind 0.0.0.0:$PORT.
+runtime.txt is ignored. Render reads a PYTHON_VERSION environment variable instead. Without it we silently got Python 3.14 while developing against 3.13 — dangerous with compiled extensions like ChromaDB and ONNX.
+The filesystem is ephemeral. Anything written at runtime vanishes on restart or redeploy. This is why bootstrap() exists: the app must be able to rebuild its database and vector store from nothing on every boot.
+Free tier spins down after 15 minutes idle, ~30-60s to wake (longer if boot re-downloads or re-ingests anything). Fine for a casual link; wake it manually before a live demo, or keep it warm with an uptime pinger.
+Procfiles are a Heroku convention. Render uses the Build Command and Start Command fields in its UI.
+pip freeze captures your whole environment, not your dependencies
+
+requirements.txt picked up langchain-core, langsmith, pillow, uvicorn, uvloop, watchfiles and others — none of which this project imports. They came from unrelated experiments in the same venv, and they bloated every build and cold start.
+
+Rule: pip freeze is a snapshot of the environment, not a declaration of intent. For anything you deploy, write requirements.txt by hand with the packages you actually import, or use a tool that tracks direct dependencies separately from transitive ones.
+
+Meta-lesson: know when the environment is the problem
+
+Six rounds of debugging, and the recurring temptation was to assume the free tier's limits (0.1 CPU, 512 MB) were the cause. They were plausible, they were real constraints, and they were not the bug. Two of them (local embeddings, ephemeral filesystem) genuinely required design changes; the actual blocker was a one-line fork-safety issue that would have occurred on any tier.
+
+Worth separating, when deploying: "this environment is too small" versus "my code assumes a single process." The first is a spending decision. The second is a bug, and no amount of money fixes it.
