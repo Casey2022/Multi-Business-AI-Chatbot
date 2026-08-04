@@ -53,10 +53,18 @@ CHUNK_OVERLAP      = 50
 TOP_K              = 4
 DISTANCE_THRESHOLD = 0.85
 
-# One ChromaDB client for the whole server. Business-specific collections
-# are opened per-call — not cached here — so re-ingestion never causes
-# stale-handle crashes.
-_chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+# Created lazily rather than at import: gunicorn forks worker processes, and
+# ChromaDB's Rust-backed client is not fork-safe — a client created before the
+# fork deadlocks when the child first touches it.
+_chroma_client = None
+
+
+def get_chroma_client():
+    """Return the ChromaDB client, creating it in this process if needed."""
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+    return _chroma_client
 
 
 # ---------------------------------------------------------------------------
@@ -150,11 +158,11 @@ def ingest_documents(config):
 
     # Delete and recreate for a clean slate on every ingest run.
     try:
-        _chroma_client.delete_collection(collection_name)
+        get_chroma_client().delete_collection(collection_name)
     except Exception:
         pass  # Collection didn't exist yet — that's fine.
 
-    collection = _chroma_client.get_or_create_collection(
+    collection = get_chroma_client().get_or_create_collection(
         name=collection_name,
         metadata={"hnsw:space": "cosine"},
         embedding_function=_embedding_fn,
@@ -204,7 +212,7 @@ def ensure_ingested(config):
             expected += len(chunk_text(md_file.read_text(encoding="utf-8")))
 
     try:
-        collection = _chroma_client.get_collection(
+        collection = get_chroma_client().get_collection(
             slug,
             embedding_function=_embedding_fn,
         )
@@ -225,47 +233,44 @@ def ensure_ingested(config):
 
     
 def retrieve(query, config):
-        """Return relevant document chunks for a query, scoped to the given business.
-        
-            Derives the collection name from the business config, opens the collection
-            fresh (no cached handle), queries ChromaDB, and filters by distance
-            threshold. Returns [] if no chunks are close enough, or if the collection
-            doesn't exist yet (ingest hasn't been run for this business).
-        
-            Returns a list of (chunk_text, distance) tuples, closest first.
-            """
-        collection_name = _slugify(config["business"]["name"])
-        print(f"[rag] Opening collection '{collection_name}'...")
+    """Return relevant document chunks for a query, scoped to the given business.
 
-        try:
-            collection = _chroma_client.get_collection(
+    Returns a list of (chunk_text, distance) tuples, closest first, filtered by
+    DISTANCE_THRESHOLD. Returns [] if nothing is close enough or if the
+    collection hasn't been ingested yet.
+    """
+    collection_name = _slugify(config["business"]["name"])
+    print(f"[rag] Opening collection '{collection_name}'...")
+
+    try:
+        collection = get_chroma_client().get_collection(
             collection_name,
             embedding_function=_embedding_fn,
-            )
-        except Exception as e:
-            print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
-            return []
+        )
+    except Exception as e:
+        print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
+        return []
 
-            print(f"[rag] Collection opened. Embedding query and searching...")
-            results   = collection.query(query_texts=[query], n_results=TOP_K)
-            print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
+    print("[rag] Collection opened. Embedding query and searching...")
+    results = collection.query(query_texts=[query], n_results=TOP_K)
+    print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
 
-            documents = results["documents"][0]
-            distances = results["distances"][0]
+    documents = results["documents"][0]
+    distances = results["distances"][0]
 
-            filtered = [
-            (doc, dist)
-            for doc, dist in zip(documents, distances)
-            if dist <= DISTANCE_THRESHOLD
-                ]
+    filtered = [
+        (doc, dist)
+        for doc, dist in zip(documents, distances)
+        if dist <= DISTANCE_THRESHOLD
+    ]
 
-        print(f"[rag] Query: {query!r} -> {len(filtered)} usable chunks "
+    print(f"[rag] Query: {query!r} -> {len(filtered)} usable chunks "
           f"(of {len(documents)} returned)")
-        for doc, dist in filtered:
-            preview = doc[:80] + ("..." if len(doc) > 80 else "")
-            print(f"        distance={dist:.4f}  {preview}")
+    for doc, dist in filtered:
+        preview = doc[:80] + ("..." if len(doc) > 80 else "")
+        print(f"        distance={dist:.4f}  {preview}")
 
-        return filtered
+    return filtered
 
 
 # ---------------------------------------------------------------------------
