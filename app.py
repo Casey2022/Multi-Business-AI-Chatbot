@@ -73,7 +73,7 @@ def bootstrap():
     
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
-bootstrap()  # Prepare DB, register businesses, ingest docs
+init_db()          # tables only — no ChromaDB access before fork
 app.register_blueprint(admin_bp)
 
 # ---------------------------------------------------------------------------
