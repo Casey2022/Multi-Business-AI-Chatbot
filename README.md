@@ -14,7 +14,7 @@ Two fictional businesses running on the same server, from the same codebase:
 - **[Bob's Plumbing](https://simonai-q92o.onrender.com/demo/bobs_plumbing)** — a service business with emergency calls and job scheduling
 - **[Sunrise Bakery & Café](https://simonai-q92o.onrender.com/demo/sunrise_bakery_and_cafe)** — a retail bakery with custom orders and dietary questions
 
-- [Demo] <img width="437" height="577" alt="Bob&#39;s Plumbing" src="https://github.com/user-attachments/assets/110aa1d6-801e-4d55-80dc-c1651769ff20" />
+- [Demo] <img width="437" height="577" alt="Bob&#39;s Plumbing" src="https://github.com/user-attachments/assets/110aa1d6-801e-4d55-80dc-c1651769ff20" /> <img width="485" height="615" alt="Sunrise Bakery" src="https://github.com/user-attachments/assets/0f36852d-64b2-46f5-8633-371e44bbc2b3" />
 
 Try asking about prices, services they *don't* offer, or say "order" / "book"
 to start a booking. Notice that the two bots have different personalities,
