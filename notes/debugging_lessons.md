@@ -420,7 +420,7 @@ Check completeness, not existence — compare the stored count against the chunk
 
 Rule: a health check that asks "is there anything here?" will eventually bless corrupt data. Ask "is there everything that should be here?"
 
-Platform-specific deployment gotchas (Render)
+## Platform-specific deployment gotchas (Render)
 Bind to $PORT. Render assigns a port via environment variable and scans for a listener. Gunicorn defaults to 8000 → deploy fails with "no open ports detected." Use --bind 0.0.0.0:$PORT.
 runtime.txt is ignored. Render reads a PYTHON_VERSION environment variable instead. Without it we silently got Python 3.14 while developing against 3.13 — dangerous with compiled extensions like ChromaDB and ONNX.
 The filesystem is ephemeral. Anything written at runtime vanishes on restart or redeploy. This is why bootstrap() exists: the app must be able to rebuild its database and vector store from nothing on every boot.
@@ -432,8 +432,55 @@ requirements.txt picked up langchain-core, langsmith, pillow, uvicorn, uvloop, w
 
 Rule: pip freeze is a snapshot of the environment, not a declaration of intent. For anything you deploy, write requirements.txt by hand with the packages you actually import, or use a tool that tracks direct dependencies separately from transitive ones.
 
-Meta-lesson: know when the environment is the problem
+## Meta-lesson: know when the environment is the problem
 
 Six rounds of debugging, and the recurring temptation was to assume the free tier's limits (0.1 CPU, 512 MB) were the cause. They were plausible, they were real constraints, and they were not the bug. Two of them (local embeddings, ephemeral filesystem) genuinely required design changes; the actual blocker was a one-line fork-safety issue that would have occurred on any tier.
 
 Worth separating, when deploying: "this environment is too small" versus "my code assumes a single process." The first is a spending decision. The second is a bug, and no amount of money fixes it.
+
+## Prove an integration in isolation before wiring it in
+Before touching scheduler.py, the calendar write was tested with a standalone one-liner that loaded the config and called create_event() directly. Two failures surfaced there — a wrong file path and a malformed JSON credential — and each took about two minutes to fix.
+
+Had those been discovered through the booking flow instead, they would have arrived as a Flask traceback, several conversational turns deep, mixed in with RAG and LLM output.
+
+Rule: when adding a dependency on an external service, get it working in the smallest possible script first. The integration and the wiring are two separate problems; debugging them simultaneously is much harder than debugging them in sequence.
+
+## Reading JSON decode errors precisely
+JSONDecodeError: Extra data: line 1 column 2340 (char 2339) — the service account credential wouldn't parse.
+
+"Extra data" specifically means valid JSON followed by junk, and the column number is where the valid part ended. Slicing the string around that index showed a single extra } — one stray character from an overshot selection when copying a 2,000-character value.
+
+Distinguish the messages:
+
+"Extra data" — valid JSON, then trailing garbage
+"Expecting value" — malformed or empty from the start
+"Unterminated string" — truncated, often a newline in the middle
+
+A diagnostic worth reusing for any long environment variable:
+
+raw = os.environ.get('SOME_JSON', '')
+
+print('Length:', len(raw))
+
+print('Tail:', repr(raw[-40:]))
+
+## Multi-line secrets in environment variables
+A service account key is a multi-line JSON file, and environment variables are single-line. Collapse it first:
+
+python3 -c "import json; print(json.dumps(json.load(open('key.json'))))"
+
+Then paste the result as one line in .env. Turn off editor word wrap while doing this — soft wrapping looks identical to a real newline, and a real newline breaks the value silently.
+
+Delete the downloaded key file afterwards. A credential sitting on the Desktop eventually ends up in a screenshot or a backup.
+
+## Fork-safety applies to every client
+calendar_sync.py builds its Google API client lazily via _get_service(), for the same reason rag.py builds the ChromaDB client lazily: gunicorn forks workers, and clients created at import time are inherited across the fork along with whatever locks and connections they hold.
+
+Having paid for this lesson once with an errorless deadlock, the pattern is now applied by default to any new client object. A lesson learned is only worth what you apply it to next.
+
+## Test the failure path deliberately
+The success path was verified by watching an event appear in Google Calendar. The failure path was verified by corrupting the calendar ID, attempting a booking, and confirming the appointments table was unchanged.
+
+The second test is the one that proves the design. It's also the one that's easy to skip, because "nothing happened" doesn't feel like a result.
+
+Method: query the relevant table before and after, and compare. Log lines alone aren't sufficient — the absence of a [scheduler] Saved line suggests nothing was written, but the database is the actual source of truth.

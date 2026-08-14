@@ -371,3 +371,39 @@ Extraction cost. One extra Haiku call per mid-booking message. Negligible today;
 Confirmation fatigue. Every booking now ends with a read-back. If customers find it tedious for simple one-slot bookings, it could be skipped when nothing was ever corrected — though the safety argument for always confirming is strong.
 
 ## LLM-detected booking intent — replace the keyword trigger + word-count guard with an intent signal from the LLM path, handing off to the scheduler with any extracted slots already filled.
+
+## Google Calendar integration — status and remaining work
+Status: Phases 1 and 2 complete. Events write to a business's Google Calendar when a booking is finalized. Tested locally for the success path, the not-configured path, and the failure path.
+Decisions made
+### Service account, not per-business OAuth. 
+The service account has its own identity (...@...iam.gserviceaccount.com); each business shares its calendar with that address and grants "Make changes to events." No consent screen, no redirect handling, no refresh-token storage, no Google app verification process.
+
+Trade-off: onboarding is "share your calendar with this address" rather than a Connect button, and some Workspace domains restrict external sharing. Acceptable for a demo and early clients.
+
+The event-writing code is identical under either auth model — only credential acquisition differs. Swapping to OAuth later means changing one module and adding an admin page, not rewriting the integration.
+
+### Calendar ID lives in business config, not environment. It is per-business data and belongs with the rest of that business's configuration:
+
+calendar:
+
+  enabled: true
+
+  calendar_id: "...@group.calendar.google.com"
+
+  timezone: "America/New_York"
+
+  default_duration_minutes: 60
+
+The service account key stays in the environment (GOOGLE_SERVICE_ACCOUNT_JSON) because it is shared across all businesses and is a secret.
+
+Businesses without a calendar: block are unaffected. is_enabled(config) gates the whole path. Most clients won't have this on day one and the feature must not break them.
+## Remaining work
+Phase 3 — sync state tracking. Add external_event_id, external_calendar, sync_status, and sync_error to the appointments table. Surface sync status in the admin appointments view so the operator can see which bookings reached the calendar. Small.
+
+Deploy. GOOGLE_SERVICE_ACCOUNT_JSON needs adding to Render's environment variables. Note it is a long single-line JSON string.
+
+Phase 4 — availability checking. Query the calendar's busy times before confirming a slot, so two customers can't book the same time. This is where the real product value is, and it is larger than phases 1–3 combined. Design questions to settle: business hours vs. calendar free/busy as the source of truth, how to offer alternatives when a slot is taken, and whether to hold a slot during the confirmation step.
+
+Cancellation / rescheduling sync. When customer self-service cancellation exists, cancelled bookings must also be removed from the calendar. The external_event_id from Phase 3 is what makes that possible — worth adding before it's needed.
+
+Second calendar for the bakery. Currently only Bob's Plumbing has calendar sync configured. A second calendar shared with the same service account would demonstrate the multi-tenant story properly.

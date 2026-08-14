@@ -13,6 +13,12 @@ services:
   - "water heater installation"
   - "emergency service (24/7)"
 
+calendar:
+  enabled: true
+  calendar_id: "dda7cf71a4d53bbb6638fd74ca269e9e9b407179323cc24301f7fe2398c058a7@group.calendar.google.com"
+  timezone: "America/New_York"
+  default_duration_minutes: 60
+
 bot:
   persona: |
     Friendly, professional, brief. Plain language, never slang.

@@ -33,6 +33,7 @@
         <th>Scheduled for</th>
         <th>Status</th>
         <th>Details</th>
+        <th>Calendar</th>
       </tr>
     </thead>
     <tbody>
@@ -59,6 +60,15 @@
           {% if appt.details and appt.details != '{}' %}
             {{ appt.details }}
           {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if appt.sync_status == 'synced' %}
+          <span class="badge badge-green">Synced</span>
+          {% elif appt.sync_status == 'deleted' %}
+          <span class="badge badge-gray">Removed</span>
+          {% else %}
+          <span style="color:#cbd5e0">—</span>
+          {% endif %}
         </td>
       </tr>
     {% endfor %}

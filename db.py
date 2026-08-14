@@ -54,15 +54,20 @@ def init_db():
     """)
 
     # appointments — one row per booked appointment/order.
+    # The external_* fields record where this booking was mirrored (e.g. a
+    # Google Calendar event), so it can be updated or removed there later.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS appointments (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            business_id  INTEGER NOT NULL,
-            phone        TEXT    NOT NULL,
-            service      TEXT    NOT NULL,
-            datetime     TEXT    NOT NULL,
-            status       TEXT    DEFAULT 'booked',
-            details      TEXT    DEFAULT '{}',
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id        INTEGER NOT NULL,
+            phone              TEXT    NOT NULL,
+            service            TEXT    NOT NULL,
+            datetime           TEXT    NOT NULL,
+            status             TEXT    DEFAULT 'booked',
+            details            TEXT    DEFAULT '{}',
+            external_event_id  TEXT,
+            external_calendar  TEXT,
+            sync_status        TEXT    DEFAULT 'none',
             FOREIGN KEY (business_id) REFERENCES businesses(id)
         )
     """)
@@ -189,16 +194,25 @@ def get_recent_messages(phone, business_id, limit=10):
 # Appointments
 # ---------------------------------------------------------------------------
 
-def save_appointment(phone, service, when, business_id, details=None):
-    """Write a completed booking, including any extra-question answers."""
+def save_appointment(phone, service, when, business_id, details=None,
+                     external_event_id=None, external_calendar=None,
+                     sync_status="none"):
+    """Write a completed booking.
+
+    The external_* fields record where this booking was mirrored, so it can
+    be updated or removed there later (e.g. on cancellation).
+    """
     import json as _json
     conn = get_connection()
     conn.execute(
         """
-        INSERT INTO appointments (business_id, phone, service, datetime, status, details)
-        VALUES (?, ?, ?, ?, 'booked', ?)
+        INSERT INTO appointments
+            (business_id, phone, service, datetime, status, details,
+             external_event_id, external_calendar, sync_status)
+        VALUES (?, ?, ?, ?, 'booked', ?, ?, ?, ?)
         """,
-        (business_id, phone, service, when, _json.dumps(details or {}))
+        (business_id, phone, service, when, _json.dumps(details or {}),
+         external_event_id, external_calendar, sync_status)
     )
     conn.commit()
     conn.close()

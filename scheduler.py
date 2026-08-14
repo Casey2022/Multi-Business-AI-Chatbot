@@ -12,6 +12,7 @@
 # Config and business_id are passed explicitly per-request so the same
 # module can serve any business simultaneously.
 
+import calendar_sync
 from config import substitute
 from db import get_state, set_state, save_appointment, get_recent_messages
 from llm import parse_datetime
@@ -66,20 +67,50 @@ def is_mid_booking(phone, business_id):
     return get_state(phone, business_id)["state"] != "idle"
 
 def _finalize_booking(phone, business_id, pending, config):
-    """Save the booking and return the confirmation — the ONLY place a
-    confirmation is produced, and only after the write succeeds.
+    """Save the booking and return the confirmation.
+
+    Ordering matters: the calendar write happens FIRST. If it fails, nothing
+    is saved and no confirmation is produced — a booking the business owner
+    can't see on their calendar is worse than no booking at all.
     """
     from datetime import datetime as _dt
 
     BOOKING = config.get("booking", {})
     service = pending.get("service", "service")
-    parsed = pending.get("datetime_parsed") or pending.get("datetime")
+    parsed  = pending.get("datetime_parsed") or pending.get("datetime")
+
     extras = {
         k: v for k, v in pending.items()
         if k not in ("service", "datetime", "datetime_parsed")
     }
 
-    save_appointment(phone, service, parsed, business_id, details=extras)
+    # --- Calendar sync (only if this business has it configured) ---
+    event_id = None
+    calendar_id  = None
+    sync_status  = "none"
+
+    if calendar_sync.is_enabled(config):
+        try:
+            event_id = calendar_sync.create_event(
+                config,
+                service_name=service,
+                start_iso=parsed,
+                customer_id=phone,
+                details=extras,
+            )
+            calendar_id = config["calendar"]["calendar_id"]
+            sync_status = "synced"
+        except Exception as e:
+            print(f"[scheduler] Calendar write FAILED: {e}")
+            # Reset state so the customer isn't stuck mid-booking, and be
+            # honest that nothing was booked.
+            set_state(phone, business_id, "idle", pending={})
+            phone_number = config["business"].get("phone", "us")
+            return (f"Sorry — I couldn't complete that booking just now. "
+                    f"Please give us a call at {phone_number} and we'll "
+                    f"get you scheduled.")
+
+    save_appointment(phone, service, parsed, business_id, details=extras, external_event_id=event_id, external_calendar=calendar_id, sync_status=sync_status,)
 
     noun = BOOKING.get("noun", "appointment")
     print(f"[scheduler] Saved {noun}: {phone} | {service} | {parsed} | extras={extras}")

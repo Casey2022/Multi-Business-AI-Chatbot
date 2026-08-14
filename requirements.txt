@@ -13,3 +13,5 @@ python-dotenv==1.2.2
 PyYAML==6.0.3
 twilio==9.10.9
 voyageai==0.5.0
+google-api-python-client==2.198.0
+google-auth==2.56.3
