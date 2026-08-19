@@ -18,6 +18,22 @@ calendar:
   calendar_id: "dda7cf71a4d53bbb6638fd74ca269e9e9b407179323cc24301f7fe2398c058a7@group.calendar.google.com"
   timezone: "America/New_York"
   default_duration_minutes: 60
+  scheduling:
+    model: "exclusive"        # one job at a time
+    buffer_minutes: 45        # travel/cleanup between jobs
+    slot_granularity: 30      # offer alternatives on :00 and :30
+    max_alternatives: 3
+    business_hours:           # 0 = Monday ... 6 = Sunday; omit = closed
+      0: ["09:00", "17:00"]
+      1: ["09:00", "17:00"]
+      2: ["09:00", "17:00"]
+      3: ["09:00", "17:00"]
+      4: ["09:00", "17:00"]
+    blackout:
+      - days: [0, 1, 2, 3, 4]
+        start: "12:00"
+        end: "13:00"
+        reason: "lunch"
 
 bot:
   persona: |
@@ -102,3 +118,4 @@ booking:
   extra_questions:
     - key: "problem_description"
       prompt: "Briefly, what's the issue? (e.g. 'kitchen sink draining slowly')"
+

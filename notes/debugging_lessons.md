@@ -484,3 +484,56 @@ The success path was verified by watching an event appear in Google Calendar. Th
 The second test is the one that proves the design. It's also the one that's easy to skip, because "nothing happened" doesn't feel like a result.
 
 Method: query the relevant table before and after, and compare. Log lines alone aren't sufficient — the absence of a [scheduler] Saved line suggests nothing was written, but the database is the actual source of truth.
+
+## `.replace(tzinfo=None)` discards a timezone; `.astimezone(tz)` converts to one
+
+**Symptom.** Availability checking ran without error and cheerfully allowed
+two bookings at the same time. No exception, no warning — just wrong answers
+that looked right.
+
+**Cause.** Google's freeBusy API returns RFC3339 timestamps with an explicit
+offset: a 2pm Eastern event comes back as `2026-08-25T18:00:00Z`. The parsing
+code did:
+
+```python
+start = datetime.fromisoformat(b["start"]).replace(tzinfo=None)
+```
+
+`.replace(tzinfo=None)` **strips** the timezone without adjusting the clock
+time — so 18:00 UTC became a naive 18:00, and comparing it against a naive
+local 14:00 found no overlap. Every conflict check was silently off by the
+UTC offset.
+
+**Fix.** Convert first, then strip:
+
+```python
+start = datetime.fromisoformat(b["start"]).astimezone(tz).replace(tzinfo=None)
+```
+
+`.astimezone(tz)` recalculates the clock time for the target zone. Stripping
+tzinfo afterward is fine — by then the number is correct for the zone the
+rest of the app works in.
+
+**The general rule.** Any time an external API returns aware datetimes and
+your application works in naive ones, the boundary between them is a bug
+waiting to happen. Pick one convention (this project uses naive local time
+internally) and convert explicitly at the edge — the same "normalize at the
+boundary" principle already applied to phone numbers.
+
+**Diagnostic that found it in one step:** print the parsed busy periods
+directly rather than trusting the availability result.
+
+```python
+busy = _busy_periods(config, datetime(2026,8,25), datetime(2026,8,26))
+for s, e in busy:
+    print(s, '->', e)
+```
+
+Seeing `18:00 -> 19:00` for an event booked at 2pm made the four-hour shift
+obvious immediately. **When a boolean comes back wrong, print the values it
+was computed from.**
+
+**Related trap in the same function:** the query window was built with
+`.isoformat() + "Z"`, which asserts naive local datetimes are UTC — the
+mirror image of the same mistake. Fixed by attaching the real zone with
+`.replace(tzinfo=tz)` before serializing.

@@ -13,6 +13,25 @@ services:
   - "cupcake orders (dozen minimum)"
   - "pastry trays for events"
 
+calendar:
+  enabled: true
+  calendar_id: "2d9f6f7490b6cbdc8c6b25021ec393b12b21264b8d369861fbc6a45122c79a11@group.calendar.google.com"
+  timezone: "America/New_York"
+  default_duration_minutes: 30
+  scheduling:
+    model: "capacity"         # multiple pickups per slot
+    slots_per_time: 3
+    buffer_minutes: 0
+    slot_granularity: 30
+    max_alternatives: 3
+    business_hours:
+      1: ["07:00", "15:00"]   # Tue-Sun, closed Monday
+      2: ["07:00", "15:00"]
+      3: ["07:00", "15:00"]
+      4: ["07:00", "15:00"]
+      5: ["07:00", "15:00"]
+      6: ["07:00", "15:00"]
+
 bot:
   persona: |
     Warm, friendly, a little playful. You love food and treat every

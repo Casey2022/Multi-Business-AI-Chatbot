@@ -91,6 +91,11 @@ def _finalize_booking(phone, business_id, pending, config):
 
     if calendar_sync.is_enabled(config):
         try:
+            if not calendar_sync.is_slot_available(config, parsed):
+                set_state(phone, business_id, "idle", pending={})
+                return ("Sorry — that time was just taken while we were "
+                        "talking. Please start again and I'll find you "
+                        "another slot.")
             event_id = calendar_sync.create_event(
                 config,
                 service_name=service,
@@ -174,10 +179,25 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
             ),
             config
         )
-
+    
     pending["datetime_parsed"] = parsed
+    # Availability check before we offer to confirm.
+    if calendar_sync.is_enabled(config):
+        try:
+            if not calendar_sync.is_slot_available(config, parsed):
+                alts = calendar_sync.find_alternatives(config, parsed)
+                pending.pop("datetime", None)
+                pending.pop("datetime_parsed", None)
+                set_state(phone, business_id, "collecting", pending=pending)
+                return _unavailable_message(parsed, alts, config)
+        except Exception as e:
+            # Availability check failing shouldn't block a booking — the
+            # write itself will re-check and abort if there's a real conflict.
+            print(f"[calendar] Availability check failed (continuing): {e}")
+
     set_state(phone, business_id, "confirming", pending=pending)
     return _confirmation_question(pending, config)
+
 
 # Recognized responses in the confirming state. Kept deliberately small —
 # anything else is treated as a possible correction and run through extraction.
@@ -205,6 +225,24 @@ def _confirmation_question(pending, config):
         template.replace("{service}", service).replace("{datetime}", friendly),
         config
     )
+
+def _unavailable_message(desired_iso, alternatives, config):
+    """Tell the customer their slot is taken and offer nearby options."""
+    from datetime import datetime as _dt
+
+    def pretty(iso):
+        return _dt.strptime(iso, "%Y-%m-%d %H:%M").strftime("%A, %B %-d at %-I:%M %p")
+
+    desired = pretty(desired_iso)
+    if not alternatives:
+        phone_number = config["business"].get("phone", "us")
+        return (f"Sorry, {desired} isn't available, and I couldn't find a "
+                f"nearby opening. Give us a call at {phone_number} and "
+                f"we'll sort something out.")
+
+    options = " · ".join(pretty(a) for a in alternatives)
+    return (f"Sorry, {desired} is already booked. I have: {options}. "
+            f"Would any of those work?")
 
 def handle_booking(phone, message, config, business_id):
     """Advance the booking using slot extraction plus a fill-the-gaps loop.
