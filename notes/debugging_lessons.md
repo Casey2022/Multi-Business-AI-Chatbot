@@ -537,3 +537,102 @@ was computed from.**
 `.isoformat() + "Z"`, which asserts naive local datetimes are UTC — the
 mirror image of the same mistake. Fixed by attaching the real zone with
 `.replace(tzinfo=tz)` before serializing.
+
+.replace(tzinfo=None) discards a timezone; .astimezone(tz) converts to one
+
+Symptom. Availability checking ran without error and cheerfully allowed two bookings at the same time. No exception, no warning — just a wrong answer that looked right.
+
+Cause. Google's calendar API returns RFC3339 timestamps with an explicit offset: an event booked at 2pm Eastern comes back as 2026-08-25T18:00:00Z. The parsing code did:
+
+python
+start = datetime.fromisoformat(b["start"]).replace(tzinfo=None)
+
+.replace(tzinfo=None) strips the timezone without adjusting the clock time. So 18:00 UTC became a naive 18:00, was compared against a naive local 14:00, and found no overlap. Every conflict check was silently four hours off.
+
+Fix. Convert first, then strip:
+
+python
+start = datetime.fromisoformat(b["start"]).astimezone(tz).replace(tzinfo=None)
+
+.astimezone(tz) recalculates the clock time for the target zone. Dropping tzinfo afterwards is fine — by then the number is correct for the zone the rest of the application works in.
+
+The mirror-image mistake was in the same function: the query window was built with .isoformat() + "Z", which asserts that naive local datetimes are UTC. Fixed by attaching the real zone with .replace(tzinfo=tz) before serializing.
+
+General rule. When an external API returns timezone-aware datetimes and the application works in naive ones, that boundary is a bug waiting to happen. Pick one internal convention and convert explicitly at the edge — the same "normalize at the boundary" principle already applied to phone numbers.
+
+Diagnostic that found it in one step: print the parsed values rather than trusting the boolean computed from them.
+
+python
+busy = _busy_periods(config, datetime(2026,8,25), datetime(2026,8,26))
+for s, e in busy:
+    print(s, '->', e)
+
+Seeing 18:00 -> 19:00 for an event booked at 2pm made the four-hour shift immediately obvious. When a boolean comes back wrong, print the values it was computed from.
+
+Sorting before truncating silently undoes the work upstream
+
+Symptom. find_alternatives was rewritten to search forward and backward independently and interleave the results, so a customer would see options on both sides of the time they asked for. After the rewrite it returned three consecutive slots, all earlier — the exact behaviour the rewrite existed to fix. A separate diagnostic proved the forward search did find an available slot the next morning.
+
+Cause. The final two lines:
+
+python
+return sorted(set(mixed))[:wanted]
+
+The interleave produced [Wed 09:00, Tue 11:00, Tue 10:30, Tue 10:00] — correct, alternating sides. Then sorted() reordered it chronologically, putting all three Tuesday slots first, and [:3] kept those and discarded Wednesday. Sorting before truncating threw away everything the interleave had arranged.
+
+Fix. Truncate first, sort only for display:
+
+python
+seen = []
+for iso in mixed:
+    if iso not in seen:
+        seen.append(iso)
+    if len(seen) >= wanted:
+        break
+return sorted(seen)
+
+The list-based dedupe matters too: set() would have scrambled the interleave order before truncation even happened.
+
+The interesting part. Every individual component was correct. The forward search worked. The backward search worked. The interleave worked. The sort worked. The truncation worked. The composition was wrong, and only the end-to-end output revealed it — unit tests on each piece would all have passed.
+
+Rule: when a function chains transformations, the order of the last two operations is worth deliberate attention. Truncation destroys information; anything that decides which items matter must run before it.
+
+API scope errors name the endpoint that failed
+
+Symptom.
+
+403 ... /calendar/v3/freeBusy ... "Request had insufficient authentication scopes."
+
+Writing events worked fine; only availability checking failed.
+
+Cause. The service account was authorized with https://www.googleapis.com/auth/calendar.events — enough to create and modify events, but not to query free/busy across a calendar, which Google treats as a broader read.
+
+Fix. Request both scopes:
+
+python
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.readonly",
+]
+
+Rule. A 403 on one endpoint while others succeed is a scope problem, not a credentials problem. The URL in the error names exactly which capability is missing. Scope requirements are per-operation and rarely match intuition — "I can write events" does not imply "I can read the calendar."
+
+Know what an API actually returns before designing around it
+
+Symptom. Two events booked at the same time showed up as a single busy period. Fine for the exclusive scheduling model, fatal for the capacity model, which needs to count how many bookings occupy a slot.
+
+Cause. freebusy().query() answers "is this calendar busy?" — it merges overlapping intervals into contiguous blocks. It reports availability, not events. There is no way to recover a count from it.
+
+Fix. Switch to events().list(), which returns individual events. Three details that matter with it:
+
+singleEvents=True expands recurring events into instances; without it a weekly appointment returns as one entry with a recurrence rule
+Cancelled events remain in the response with status == 'cancelled' and must be filtered, or they falsely consume capacity
+All-day events have a date rather than a dateTime and need skipping (open question: an all-day "VACATION" event arguably should block bookings — currently it doesn't)
+
+Rule. Two API endpoints that look interchangeable often answer subtly different questions. This surfaced only because the diagnostic printed the raw periods — a summary count would have shown "1 busy period" and looked correct.
+
+Meta-note
+
+Three of these four bugs produced no error. The availability check returned True when it should have returned False; the alternatives function returned three valid slots that were merely the wrong three. Each was found by printing intermediate values rather than by anything failing.
+
+That is the recurring shape of bugs in this project — dates that looked plausible, retrieval that returned reasonable-but-wrong chunks, a language model confirming bookings that were never saved. The habit that catches them is checking outputs against what they should be, not merely against whether an error appeared.

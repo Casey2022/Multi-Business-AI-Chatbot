@@ -156,8 +156,7 @@ def _busy_periods(config, window_start, window_end):
         timeMax      = window_end.replace(tzinfo=tz).isoformat(),
         singleEvents = True,        # expand recurring events into instances
         orderBy      = "startTime",
-        maxResults   = 250,
-    ).execute()
+        maxResults   = 250,).execute()
 
     periods = []
     for event in result.get("items", []):
@@ -196,6 +195,12 @@ def is_slot_available(config, start_iso, busy=None):
 
     start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)
+
+    # Past times are the parser's most likely mistake ("Thursday" said on a
+    # Thursday). find_alternatives already skips past candidates; this makes
+    # the same guarantee for a directly requested time.
+    if start < datetime.now():
+        return False
 
     if not _within_business_hours(start, duration, sched):
         return False
@@ -274,3 +279,43 @@ def find_alternatives(config, desired_iso):
             break
 
     return sorted(seen)
+
+def slot_rejection_reason(config, start_iso, busy=None):
+    """Return why a slot is unavailable: 'past', 'closed', 'blackout',
+    'conflict', or None.
+    """
+    cal      = config["calendar"]
+    sched    = _sched(config)
+    duration = int(cal.get("default_duration_minutes", 60))
+
+    start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
+    end   = start + timedelta(minutes=duration)
+
+    # Past times are the parser's most likely mistake ("Thursday" said on a
+    # Thursday). find_alternatives already skips past candidates; this makes
+    # the same guarantee for a directly requested time.
+    if start < datetime.now():
+        return "past"
+
+    hours = sched["business_hours"]
+    day   = hours.get(start.weekday(), hours.get(str(start.weekday())))
+    if not day:
+        return "closed"
+
+    open_t  = datetime.strptime(day[0], "%H:%M").time()
+    close_t = datetime.strptime(day[1], "%H:%M").time()
+    if start.time() < open_t or end.time() > close_t or end.date() != start.date():
+        return "closed"
+
+    for window in sched["blackout"]:
+        if start.weekday() not in window.get("days", []):
+            continue
+        b_start = datetime.strptime(window["start"], "%H:%M").time()
+        b_end   = datetime.strptime(window["end"],   "%H:%M").time()
+        if start.time() < b_end and end.time() > b_start:
+            return "blackout"
+
+    if not is_slot_available(config, start_iso, busy=busy):
+        return "conflict"
+
+    return None

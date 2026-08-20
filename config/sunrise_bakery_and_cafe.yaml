@@ -17,15 +17,15 @@ calendar:
   enabled: true
   calendar_id: "2d9f6f7490b6cbdc8c6b25021ec393b12b21264b8d369861fbc6a45122c79a11@group.calendar.google.com"
   timezone: "America/New_York"
-  default_duration_minutes: 30
+  default_duration_minutes: 30      # a pickup, not a job
   scheduling:
-    model: "capacity"         # multiple pickups per slot
+    model: "capacity"               # several pickups can share a slot
     slots_per_time: 3
-    buffer_minutes: 0
+    buffer_minutes: 0               # no travel time — they're behind a counter
     slot_granularity: 30
     max_alternatives: 3
-    business_hours:
-      1: ["07:00", "15:00"]   # Tue-Sun, closed Monday
+    business_hours:                 # Tue-Sun 7am-3pm, closed Monday
+      1: ["07:00", "15:00"]
       2: ["07:00", "15:00"]
       3: ["07:00", "15:00"]
       4: ["07:00", "15:00"]

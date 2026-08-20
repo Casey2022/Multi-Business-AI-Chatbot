@@ -273,31 +273,59 @@ def get_llm_reply(message, history=None, config=None, channel="sms"):
 # Structured date extraction
 # ---------------------------------------------------------------------------
 
-def parse_datetime(user_input):
-    """Extract a datetime from a natural-language string using Claude.
+def parse_datetime(user_input, config=None):
+    """Extract a datetime from natural language using Claude.
 
-    CRITICAL: the prompt must state today's date. The API call has no clock —
-    without an explicit anchor, the model infers "today" from whatever dates
-    appear in the examples, which caused a real bug (booked June instead of
-    July because the examples were written in June).
+    `config` is optional but strongly recommended: knowing the business's
+    operating hours lets the model resolve ambiguous times correctly.
+    Without it, "7" is a coin flip between 07:00 and 19:00 — and the model
+    genuinely answered differently on identical input, producing a booking
+    that was silently rejected as outside hours.
     """
     from datetime import datetime, timedelta
 
-    now = datetime.now()
-    today_str = now.strftime("%A, %B %d, %Y")  # e.g. "Sunday, July 19, 2026"
+    now       = datetime.now()
+    today_str = now.strftime("%A, %B %d, %Y")
 
-    # Compute example dates dynamically so they can never go stale.
     tomorrow  = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-    # Next Tuesday: days until Tuesday (weekday 1), minimum 1 day ahead.
-    days_ahead = (1 - now.weekday()) % 7
-    if days_ahead == 0:
-        days_ahead = 7
+    days_ahead = (1 - now.weekday()) % 7 or 7
     next_tuesday = (now + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
 
+    # Build an hours hint so bare hours resolve sensibly.
+    hours_hint = ""
+    if config:
+        sched = config.get("calendar", {}).get("scheduling", {})
+        bh    = sched.get("business_hours", {})
+        if bh:
+            # Take the widest open/close across the week — enough to
+            # disambiguate morning vs. evening without per-day complexity.
+            opens  = sorted(v[0] for v in bh.values())
+            closes = sorted(v[1] for v in bh.values())
+            hours_hint = (
+                f"\nThis business operates between {opens[0]} and {closes[-1]}. "
+                f"When a time is ambiguous (e.g. \"7\" or \"3\" with no am/pm), "
+                f"choose the interpretation that falls within those hours. "
+                f"If neither interpretation falls within business hours, pick "
+                f"the more likely everyday interpretation and return it anyway — "
+                f"do not refuse, and do not explain your reasoning."
+            )
+        elif config.get("business", {}).get("hours"):
+            # No structured hours — fall back to the human-readable string.
+            hours_hint = (
+                f"\nThis business's hours are: {config['business']['hours']}. "
+                f"Resolve ambiguous times (e.g. \"7\" with no am/pm) to fall "
+                f"within them."
+            )
+
     prompt = f"""Today is {today_str}.
+{hours_hint}
 
 Extract the date and time from the user's message, interpreting relative
 dates ("tomorrow", "next Tuesday") against today's date above.
+Always resolve to a FUTURE date and time. A bare weekday name means the
+next occurrence of that weekday, not today — unless the user explicitly
+says "today". If a time today has already passed, use the next day that
+matches.
 Reply with ONLY a datetime in this exact format: YYYY-MM-DD HH:MM
 If no valid date/time can be determined, reply with exactly: NONE
 
@@ -312,13 +340,23 @@ User: "{user_input}"
         response = client.messages.create(
             model=MODEL,
             max_tokens=20,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
         result = response.content[0].text.strip()
         print(f"[llm] Date parse result: {result!r}")
 
-        if result == "NONE":
+        if result.startswith("NONE"):
             return None
+
+        # The model occasionally appends commentary despite instructions.
+        # Extract the first timestamp-shaped substring rather than trusting
+        # the whole response to be clean.
+        import re
+        match = re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", result)
+        if not match:
+            print("[llm] No timestamp found in response")
+            return None
+        result = match.group(0)
 
         datetime.strptime(result, "%Y-%m-%d %H:%M")
         return result

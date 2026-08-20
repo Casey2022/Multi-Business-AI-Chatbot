@@ -166,7 +166,7 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
         return prompt
 
     # All slots filled — parse the datetime before saving.
-    parsed = parse_datetime(pending["datetime"])
+    parsed = parse_datetime(pending["datetime"], config)
     if parsed is None:
         # Unparseable: clear it so the loop asks again next turn.
         pending.pop("datetime", None)
@@ -184,15 +184,14 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
     # Availability check before we offer to confirm.
     if calendar_sync.is_enabled(config):
         try:
-            if not calendar_sync.is_slot_available(config, parsed):
+            reason = calendar_sync.slot_rejection_reason(config, parsed)
+            if reason:
                 alts = calendar_sync.find_alternatives(config, parsed)
                 pending.pop("datetime", None)
                 pending.pop("datetime_parsed", None)
                 set_state(phone, business_id, "collecting", pending=pending)
-                return _unavailable_message(parsed, alts, config)
+                return _unavailable_message(parsed, alts, config, reason=reason)
         except Exception as e:
-            # Availability check failing shouldn't block a booking — the
-            # write itself will re-check and abort if there's a real conflict.
             print(f"[calendar] Availability check failed (continuing): {e}")
 
     set_state(phone, business_id, "confirming", pending=pending)
@@ -226,25 +225,78 @@ def _confirmation_question(pending, config):
         config
     )
 
-def _unavailable_message(desired_iso, alternatives, config):
-    """Tell the customer their slot is taken and offer nearby options."""
+def _unavailable_message(desired_iso, alternatives, config, reason=None):
+    """Explain why a slot doesn't work, and offer nearby openings.
+
+    The reason matters: "we're closed then" and "that time is taken" call
+    for different replies, and a customer told only "unavailable" will keep
+    guessing at times the business never works.
+    """
     from datetime import datetime as _dt
 
     def pretty(iso):
         return _dt.strptime(iso, "%Y-%m-%d %H:%M").strftime("%A, %B %-d at %-I:%M %p")
 
     desired = pretty(desired_iso)
+    hours   = config["business"].get("hours", "")
+
+    if reason == "past":
+        lead = f"{desired} has already passed."
+    elif reason == "closed":
+        lead = f"We're closed then — our hours are {hours}."
+    elif reason == "blackout":
+        lead = f"We're not available at {desired}."
+    else:
+        lead = f"Sorry, {desired} is already booked."
+
     if not alternatives:
         phone_number = config["business"].get("phone", "us")
-        return (f"Sorry, {desired} isn't available, and I couldn't find a "
-                f"nearby opening. Give us a call at {phone_number} and "
-                f"we'll sort something out.")
+        return (f"{lead} I couldn't find a nearby opening either — "
+                f"give us a call at {phone_number} and we'll sort something out.")
 
     options = " · ".join(pretty(a) for a in alternatives)
-    return (f"Sorry, {desired} is already booked. I have: {options}. "
-            f"Would any of those work?")
+    return f"{lead} I have: {options}. Would any of those work?"
+
+def _check_datetime_now(phone, business_id, pending, extracted, config):
+    """If a datetime was just supplied and it won't work, say so immediately.
+
+    Returns a rejection message, or None if the time is fine (or absent).
+    Called as soon as the datetime slot fills rather than after every other
+    slot — collecting details for a slot that can't happen wastes the
+    customer's time and reads as illogical.
+    """
+    if "datetime" not in extracted or not calendar_sync.is_enabled(config):
+        return None
+
+    candidate = parse_datetime(pending["datetime"], config)
+    if not candidate:
+        return None          # unparseable — the normal fallback handles it
+
+    try:
+        reason = calendar_sync.slot_rejection_reason(config, candidate)
+        if not reason:
+            return None
+        alts = calendar_sync.find_alternatives(config, candidate)
+        pending.pop("datetime", None)
+        set_state(phone, business_id, "collecting", pending=pending)
+        return _unavailable_message(candidate, alts, config, reason=reason)
+    except Exception as e:
+        print(f"[calendar] Early availability check failed: {e}")
+        return None
 
 def handle_booking(phone, message, config, business_id):
+    """Advance the booking flow and log the reply.
+
+    Wraps the real handler so every outgoing scheduler message is visible in
+    the logs, the way LLM replies already are. Without this, booking prompts,
+    rejections, and confirmations were the one part of the conversation you
+    couldn't see without opening a browser.
+    """
+    reply = _handle_booking_inner(phone, message, config, business_id)
+    print(f"[scheduler] Reply: {reply!r}")
+    return reply
+
+def _handle_booking_inner(phone, message, config, business_id):
     """Advance the booking using slot extraction plus a fill-the-gaps loop.
 
     Every message runs through extraction, so customers can volunteer or
@@ -276,10 +328,13 @@ def handle_booking(phone, message, config, business_id):
     if state == "idle":
         extracted = extract_booking_slots(message, slots, config)
         pending.update(extracted)
+
+        early = _check_datetime_now(phone, business_id, pending, extracted, config)
+        if early:
+            return early
+
         set_state(phone, business_id, "collecting", pending=pending)
-        return _ask_next_or_finalize(
-            phone, business_id, pending, config, slots, first_turn=True
-        )
+        return _ask_next_or_finalize(phone, business_id, pending, config, slots)
 
     # --- Mid-booking: extract from every message, then re-evaluate ---
     if state == "collecting":
@@ -298,6 +353,9 @@ def handle_booking(phone, message, config, business_id):
                       f"treating message as '{missing['key']}'")
 
         pending.update(extracted)
+        early = _check_datetime_now(phone, business_id, pending, extracted, config)
+        if early:
+            return early
         set_state(phone, business_id, "collecting", pending=pending)
         return _ask_next_or_finalize(phone, business_id, pending, config, slots)
     # --- Confirming: read-back accepted, rejected, or corrected ---
