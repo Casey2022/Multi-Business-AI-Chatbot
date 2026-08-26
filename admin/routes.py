@@ -1,9 +1,11 @@
 # admin/routes.py — dashboard and conversation viewer routes.
 
-from flask import render_template, request, abort
+from flask import render_template, request, abort, redirect, url_for, flash
 from admin import admin_bp
 from admin.auth import login_required
-from db import get_all_businesses, get_conversation_list, get_conversation, get_business_by_number, get_appointments
+from config import load_config
+import calendar_sync
+from db import (get_all_businesses, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
 
 
 @admin_bp.route("/")
@@ -62,3 +64,73 @@ def appointments(business_id):
         business         = business,
         appointment_list = appointment_list,
     )
+@admin_bp.route("/appointment/<int:appointment_id>/cancel", methods=["POST"])
+@login_required
+
+def cancel(appointment_id):
+    """Cancel an appointment: calendar first, then database.
+
+    Calendar-first because the owner acts on their calendar. A phantom
+    appointment they believe is cancelled is worse than a stale admin row.
+    """
+    appt = get_appointment(appointment_id)
+    if not appt:
+        abort(404)
+
+    business = next((b for b in get_all_businesses()
+                     if b["id"] == appt["business_id"]), None)
+    if not business:
+        abort(404)
+
+    config = load_config(business["config_path"])
+
+    if appt.get("external_event_id") and calendar_sync.is_enabled(config):
+        try:
+            calendar_sync.delete_event(config, appt["external_event_id"])
+        except Exception as e:
+            print(f"[admin] Calendar delete FAILED for appt {appointment_id}: {e}")
+            flash(f"Could not remove the calendar event: {e}. "
+                  f"Nothing was cancelled.", "error")
+            return redirect(url_for("admin.appointments",
+                                    business_id=appt["business_id"]))
+
+    cancel_appointment(appointment_id)
+    flash("Appointment cancelled.", "success")
+    return redirect(url_for("admin.appointments", business_id=appt["business_id"]))
+
+
+@admin_bp.route("/appointment/<int:appointment_id>/reschedule", methods=["POST"])
+@login_required
+def reschedule(appointment_id):
+    """Move an appointment to a new time: calendar first, then database."""
+    appt = get_appointment(appointment_id)
+    if not appt:
+        abort(404)
+
+    new_dt = (request.form.get("new_datetime") or "").strip()
+    # HTML datetime-local gives "2026-08-27T14:00"; we store "2026-08-27 14:00".
+    new_dt = new_dt.replace("T", " ")[:16]
+    if not new_dt:
+        flash("No new time provided.", "error")
+        return redirect(url_for("admin.appointments",
+                                business_id=appt["business_id"]))
+
+    business = next((b for b in get_all_businesses()
+                     if b["id"] == appt["business_id"]), None)
+    config = load_config(business["config_path"])
+
+    if appt.get("external_event_id") and calendar_sync.is_enabled(config):
+        try:
+            calendar_sync.update_event_time(
+                config, appt["external_event_id"], new_dt
+            )
+        except Exception as e:
+            print(f"[admin] Calendar update FAILED for appt {appointment_id}: {e}")
+            flash(f"Could not move the calendar event: {e}. "
+                  f"Nothing was changed.", "error")
+            return redirect(url_for("admin.appointments",
+                                    business_id=appt["business_id"]))
+
+    reschedule_appointment(appointment_id, new_dt)
+    flash(f"Appointment moved to {new_dt}.", "success")
+    return redirect(url_for("admin.appointments", business_id=appt["business_id"]))

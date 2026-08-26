@@ -636,3 +636,110 @@ Meta-note
 Three of these four bugs produced no error. The availability check returned True when it should have returned False; the alternatives function returned three valid slots that were merely the wrong three. Each was found by printing intermediate values rather than by anything failing.
 
 That is the recurring shape of bugs in this project — dates that looked plausible, retrieval that returned reasonable-but-wrong chunks, a language model confirming bookings that were never saved. The habit that catches them is checking outputs against what they should be, not merely against whether an error appeared.
+
+# An ambiguous prompt produces inconsistent answers, not consistent wrong ones
+
+Symptom. "Wednesday at 7" was booked successfully. The identical phrase, minutes later, was rejected as outside business hours.
+
+Cause. parse_datetime had no idea what hours the business kept. "7" with no am/pm is genuinely ambiguous, and the model resolved it as 07:00 on one call and 19:00 on the next. Both are defensible readings; nothing in the prompt preferred either. The bakery closes at 15:00, so the 19:00 reading was rejected — but for a reason that had nothing to do with what the customer meant.
+
+Fix. Give the parser the business's operating window and tell it to prefer the interpretation that fits:
+
+This business operates between 07:00 and 15:00. When a time is ambiguous
+(e.g. "7" or "3" with no am/pm), choose the interpretation that falls
+within those hours.
+
+The lesson. Non-determinism in a model's output is often a symptom of under-specification in the prompt, not randomness for its own sake. When the same input produces different answers, the first question is: does the prompt contain enough information to determine one answer? Here it didn't, and the model was effectively guessing.
+
+Note the diagnosis required comparing two runs. A single wrong answer looks like a bad model; two different answers to the same input point straight at ambiguity.
+
+# A constraint with no satisfiable answer makes the model hedge out loud
+
+Symptom. Shortly after adding the business-hours hint:
+
+[llm] Date parse result: '2026-08-20 08:00\n\nWait, let me reconsider.'
+[llm] Date parse error: unconverted data remains
+
+The model began answering, then started second-guessing itself in the output.
+
+Cause. The new hint said "choose the interpretation that falls within business hours." For "Thursday at 8" against Bob's 09:00–17:00, neither 08:00 nor 20:00 satisfies that. The instruction had no valid answer, and the model visibly wavered instead of committing.
+
+Fix, two parts. Give the constraint an escape hatch:
+
+If neither interpretation falls within business hours, pick the more likely
+everyday interpretation and return it anyway — do not refuse, and do not
+explain your reasoning.
+
+And stop trusting the output to be clean:
+
+python
+match = re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", result)
+if not match:
+    return None
+result = match.group(0)
+
+The lesson. Every constraint in a prompt needs a defined behaviour for the case where it can't be met, or the model will invent one — usually by talking. And any structured output should be extracted rather than assumed: the prompt discourages commentary, the regex survives it anyway.
+
+Worth noting the validation caught this. strptime rejected the trailing text, parse_datetime returned None, and the customer got the normal "I couldn't read that as a date" fallback rather than a garbage booking. Poor experience, but no bad data — which is what validation is for.
+
+# Sorting before truncating silently discards the work upstream
+
+Symptom. find_alternatives was rewritten to search forward and backward and interleave the results, so customers would see options on both sides of the time they requested. After the rewrite it returned three consecutive earlier slots — the exact behaviour the rewrite existed to fix. A separate diagnostic proved the forward search did find an available slot.
+
+Cause. The final line:
+
+python
+return sorted(set(mixed))[:wanted]
+
+The interleave produced [Wed 09:00, Tue 11:00, Tue 10:30, Tue 10:00] — correctly alternating. Then sorted() reordered chronologically, putting all three Tuesday slots first, and [:3] kept those and dropped Wednesday.
+
+Fix. Truncate first, sort only for display:
+
+python
+seen = []
+for iso in mixed:
+    if iso not in seen:
+        seen.append(iso)
+    if len(seen) >= wanted:
+        break
+return sorted(seen)
+
+The list-based dedupe matters too — set() would have scrambled the order before truncation even happened.
+
+The lesson. Every component was correct: the searches, the interleave, the sort, the truncation. The composition was wrong. Unit tests on each piece would all have passed.
+
+Rule: when a function chains transformations, the last two operations deserve deliberate attention. Truncation destroys information, so anything that decides which items matter must run before it.
+
+# Guards need to exist everywhere the condition matters
+
+Symptom. On a Thursday afternoon, "Thursday at 8" parsed to 08:00 that morning — a time eight hours in the past. It was rejected, but only because 8am is before the business opens. "Thursday at 2" would have produced a past time inside business hours, and nothing would have caught it.
+
+Cause. find_alternatives already skipped past candidates:
+
+python
+if candidate < datetime.now():
+    continue
+
+But is_slot_available and slot_rejection_reason — the functions that validate a directly requested time — had no such check. The guard existed in one place and not the two others that needed it.
+
+Fix. Add the same check to both, plus a "past" rejection reason so the customer gets an accurate explanation rather than a misleading one. Also instruct the parser to always resolve to a future date, since a bare weekday name almost always means the next occurrence.
+
+The lesson. When you write a guard, ask which other code paths reach the same decision. Here three functions answered variations of "is this slot usable" and only one knew about the past. The version that got the guard was the one where the bug happened to be noticed first.
+
+Related: this is the same shape as the earlier fork-safety fix, where a lesson learned about the ChromaDB client had to be deliberately applied to the Google API client as well. A lesson learned is only worth what you apply it to next.
+
+# Diagnostic note: log what the system says, not just what it computes
+
+For most of this project the logs showed LLM replies ([llm] Claude replied:) but not scheduler-generated ones — booking prompts, rejections, confirmations were invisible. Diagnosing messaging problems meant switching to the browser and reading the chat.
+
+Fixed by wrapping the handler so every exit path is logged:
+
+python
+def handle_booking(phone, message, config, business_id):
+    reply = _handle_booking_inner(phone, message, config, business_id)
+    print(f"[scheduler] Reply: {reply!r}")
+    return reply
+
+The wrapper pattern matters because the function has many return statements — a print before any single one would miss the others.
+
+Rule: if a component produces user-facing output, log that output. The internal state tells you what the code decided; only the output tells you what the customer actually experienced, and those can differ.

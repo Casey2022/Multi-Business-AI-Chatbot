@@ -353,3 +353,35 @@ def set_state(phone, business_id, state, pending=None):
     )
     conn.commit()
     conn.close()
+
+def get_appointment(appointment_id):
+    """Return a single appointment as a dict, or None."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM appointments WHERE id = ?", (appointment_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def cancel_appointment(appointment_id):
+    """Mark an appointment cancelled. Soft delete — the row stays for the record."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE appointments SET status = 'cancelled', sync_status = 'deleted' "
+        "WHERE id = ?",
+        (appointment_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def reschedule_appointment(appointment_id, new_datetime):
+    """Change an appointment's time."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE appointments SET datetime = ? WHERE id = ?",
+        (new_datetime, appointment_id)
+    )
+    conn.commit()
+    conn.close()

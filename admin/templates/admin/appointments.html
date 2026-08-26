@@ -34,6 +34,7 @@
         <th>Status</th>
         <th>Details</th>
         <th>Calendar</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -68,6 +69,32 @@
           <span class="badge badge-gray">Removed</span>
           {% else %}
           <span style="color:#cbd5e0">—</span>
+          {% endif %}
+        </td>
+        <td style="white-space: nowrap;">
+          {% if appt.status != 'cancelled' %}
+          <form method="POST"
+                action="/admin/appointment/{{ appt.id }}/reschedule"
+                style="display:inline; margin-right:8px;">
+            <input type="datetime-local" name="new_datetime"
+                   style="font-size:12px; padding:3px; border:1px solid #e2e8f0;
+                          border-radius:4px;">
+            <button type="submit"
+                    style="font-size:12px; padding:4px 10px; border:none;
+                           border-radius:4px; background:#3182ce; color:#fff;
+                           cursor:pointer;">Move</button>
+          </form>
+          <form method="POST"
+                action="/admin/appointment/{{ appt.id }}/cancel"
+                style="display:inline;"
+                onsubmit="return confirm('Cancel this appointment? This also removes it from the calendar.');">
+            <button type="submit"
+                    style="font-size:12px; padding:4px 10px; border:none;
+                           border-radius:4px; background:#e53e3e; color:#fff;
+                           cursor:pointer;">Cancel</button>
+          </form>
+          {% else %}
+          <span style="color:#a0aec0; font-size:12px;">—</span>
           {% endif %}
         </td>
       </tr>

@@ -319,3 +319,55 @@ def slot_rejection_reason(config, start_iso, busy=None):
         return "conflict"
 
     return None
+
+def delete_event(config, event_id):
+    """Remove an event from the business's calendar.
+
+    A 410 (Gone) means the event is already deleted — the desired end state
+    is already true, so that counts as success. The business owner may well
+    have deleted it on their phone before touching the admin.
+    """
+    from googleapiclient.errors import HttpError
+
+    cal = config["calendar"]
+    try:
+        _get_service().events().delete(
+            calendarId=cal["calendar_id"],
+            eventId=event_id,
+        ).execute()
+        print(f"[calendar] Deleted event {event_id}")
+    except HttpError as e:
+        # Only 410 Gone means "this event existed and is already deleted" —
+        # the desired end state is true, so treat it as success.
+        #
+        # 404 is NOT safe to forgive: it also fires when the CALENDAR itself
+        # can't be found (bad calendar_id), and swallowing that would report
+        # a successful cancellation while the real event stays on the owner's
+        # calendar.
+        if e.resp.status == 410:
+            print(f"[calendar] Event {event_id} already deleted — treating as success")
+            return
+        raise
+
+
+def update_event_time(config, event_id, new_start_iso):
+    """Move an existing event to a new time. Returns the updated event id."""
+    cal      = config["calendar"]
+    tz       = cal.get("timezone", "America/New_York")
+    duration = int(cal.get("default_duration_minutes", 60))
+
+    start = datetime.strptime(new_start_iso, "%Y-%m-%d %H:%M")
+    end   = start + timedelta(minutes=duration)
+
+    updated = _get_service().events().patch(
+        calendarId = cal["calendar_id"],
+        eventId    = event_id,
+        body = {
+            "start": {"dateTime": start.isoformat(), "timeZone": tz},
+            "end":   {"dateTime": end.isoformat(),   "timeZone": tz},
+        },
+    ).execute()
+
+    print(f"[calendar] Moved event {event_id} to {new_start_iso}")
+    return updated.get("id")
+
