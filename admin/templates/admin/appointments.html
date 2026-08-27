@@ -46,7 +46,14 @@
             {{ appt.phone }}
           </a>
         </td>
-        <td><strong>{{ appt.service }}</strong></td>
+       <td>
+          <strong>{{ appt.service }}</strong>
+          {% if appt.calendar_changed %}
+          <div style="font-size:11px; color:#b7791f; margin-top:4px;">
+            ⚠ {{ appt.calendar_changed }}
+          </div>
+          {% endif %}
+        </td>
         <td>{{ appt.datetime | friendly_time }}</td>
         <td>
           {% if appt.status == 'booked' %}

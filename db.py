@@ -33,7 +33,8 @@ def init_db():
             slug           TEXT    UNIQUE NOT NULL,
             twilio_number  TEXT    UNIQUE,
             config_path    TEXT    NOT NULL,
-            active         INTEGER DEFAULT 1
+            active         INTEGER DEFAULT 1,
+            calendar_sync_token TEXT
         )
     """)
 
@@ -68,6 +69,7 @@ def init_db():
             external_event_id  TEXT,
             external_calendar  TEXT,
             sync_status        TEXT    DEFAULT 'none',
+            calendar_changed   TEXT,
             FOREIGN KEY (business_id) REFERENCES businesses(id)
         )
     """)
@@ -375,6 +377,26 @@ def cancel_appointment(appointment_id):
     conn.commit()
     conn.close()
 
+def get_appointment_by_event_id(event_id):
+    """Find the appointment mirroring a given calendar event, or None."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM appointments WHERE external_event_id = ?", (event_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def mark_calendar_change(appointment_id, description):
+    """Record that this appointment was changed in the calendar, not the bot."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE appointments SET calendar_changed = ? WHERE id = ?",
+        (description, appointment_id)
+    )
+    conn.commit()
+    conn.close()
+
 
 def reschedule_appointment(appointment_id, new_datetime):
     """Change an appointment's time."""
@@ -382,6 +404,26 @@ def reschedule_appointment(appointment_id, new_datetime):
     conn.execute(
         "UPDATE appointments SET datetime = ? WHERE id = ?",
         (new_datetime, appointment_id)
+    )
+    conn.commit()
+    conn.close()
+
+def get_sync_token(business_id):
+    """Return the stored calendar sync token, or None for a full resync."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT calendar_sync_token FROM businesses WHERE id = ?", (business_id,)
+    ).fetchone()
+    conn.close()
+    return row["calendar_sync_token"] if row else None
+
+
+def set_sync_token(business_id, token):
+    """Store the sync token returned by the last calendar poll."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE businesses SET calendar_sync_token = ? WHERE id = ?",
+        (token, business_id)
     )
     conn.commit()
     conn.close()

@@ -49,6 +49,7 @@ def conversations(business_id):
 
 @admin_bp.route("/business/<int:business_id>/appointments")
 @login_required
+
 def appointments(business_id):
     """Show all appointments/orders for a business."""
     businesses = get_all_businesses()
@@ -57,6 +58,14 @@ def appointments(business_id):
     if not business:
         abort(404)
 
+    # Pull any owner-made calendar changes before rendering. Opportunistic
+    # rather than scheduled — Render's free tier has no cron. Sync-token
+    # polling makes this cheap: usually one API call returning nothing.
+    from reconcile import reconcile_business
+    try:
+        reconcile_business(business)
+    except Exception as e:
+        print(f"[reconcile] Failed for {business['name']}: {e}")
     appointment_list = get_appointments(business_id)
 
     return render_template(

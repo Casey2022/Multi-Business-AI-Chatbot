@@ -743,3 +743,71 @@ def handle_booking(phone, message, config, business_id):
 The wrapper pattern matters because the function has many return statements — a print before any single one would miss the others.
 
 Rule: if a component produces user-facing output, log that output. The internal state tells you what the code decided; only the output tells you what the customer actually experienced, and those can differ.
+
+## A forgiving error handler turned a real failure into a reported success
+
+**Symptom.** Testing the cancel failure path: the calendar ID was deliberately
+corrupted, then an appointment was cancelled from the admin portal. Expected a
+red error and the appointment left untouched. Got a **green success message**,
+the appointment marked cancelled, and this in the log:
+
+```
+[calendar] Event bjbb335sphukfdsip5031vv7e8 already gone — treating as deleted
+```
+
+The event was not gone. It was still on the owner's calendar.
+
+**Cause.** `delete_event` swallowed both 404 and 410:
+
+```python
+if e.resp.status in (404, 410):
+    print(f"[calendar] Event {event_id} already gone — treating as deleted")
+    return
+raise
+```
+
+The reasoning was sound in isolation — deletion is idempotent, so "it's
+already gone" should count as success rather than an error. The problem is
+that **404 has more than one meaning here**. Google returns it when the event
+can't be found *and* when the calendar can't be found. A bad `calendar_id`
+produces the same status as an already-deleted event, and the handler couldn't
+tell them apart.
+
+**Fix.** Forgive only 410:
+
+```python
+# Only 410 Gone means "this event existed and is already deleted" — the
+# desired end state is true, so treat it as success.
+#
+# 404 is NOT safe to forgive: it also fires when the CALENDAR itself can't
+# be found (bad calendar_id), and swallowing that reports a successful
+# cancellation while the real event stays on the owner's calendar.
+if e.resp.status == 410:
+    return
+raise
+```
+
+**Why this one is worth remembering.** Most silent bugs in this project
+produced *wrong answers* — a date four hours off, a chunk attributed to the
+wrong service, an availability check returning True for an occupied slot.
+This produced a **false success**: an operation reported as complete that
+never happened. That's worse, because there's nothing to notice. A wrong
+answer looks odd; a green checkmark looks finished.
+
+**The general rule.** When writing an `except` clause that treats a failure as
+acceptable, ask what *else* can produce that same error. HTTP status codes
+carry real precision, and grouping them throws it away:
+
+- `410 Gone` — this resource existed and is deleted. Specific. Safe to forgive
+  for an idempotent delete.
+- `404 Not Found` — something in the path doesn't exist. Could be the resource,
+  could be its container, could be a typo in a URL.
+
+Broad exception handling has the same hazard. `except Exception: pass` around
+an external call will happily swallow a config error, a network failure, and
+an authentication problem alongside the one benign case it was written for.
+
+**Testing note.** This was only caught because the failure path was tested
+deliberately — corrupting the calendar ID and checking that nothing changed.
+The happy path passed fine and would have shipped. **Error handlers need
+their own tests, and the assertion is usually that nothing happened.**

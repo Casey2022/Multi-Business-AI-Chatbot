@@ -371,3 +371,38 @@ def update_event_time(config, event_id, new_start_iso):
     print(f"[calendar] Moved event {event_id} to {new_start_iso}")
     return updated.get("id")
 
+def fetch_changes(config, sync_token=None):
+    """Fetch calendar changes since the last poll.
+
+    Returns (events, next_sync_token). With no token, returns all upcoming
+    events and a fresh token — that's the initial sync. With a token, returns
+    only what changed since it was issued, which is usually nothing.
+
+    A 410 means the token has expired (Google keeps them for about a week);
+    the caller should retry with sync_token=None for a full resync.
+    """
+    from googleapiclient.errors import HttpError
+
+    cal = config["calendar"]
+    tz  = ZoneInfo(cal.get("timezone", "America/New_York"))
+
+    params = {
+        "calendarId":   cal["calendar_id"],
+        "singleEvents": True,
+        "maxResults":   250,
+    }
+    if sync_token:
+        params["syncToken"] = sync_token
+    else:
+        # Initial sync: only care about events from now forward.
+        params["timeMin"] = datetime.now().replace(tzinfo=tz).isoformat()
+
+    try:
+        result = _get_service().events().list(**params).execute()
+    except HttpError as e:
+        if e.resp.status == 410:
+            print("[calendar] Sync token expired — full resync needed")
+            return None, None
+        raise
+
+    return result.get("items", []), result.get("nextSyncToken")
