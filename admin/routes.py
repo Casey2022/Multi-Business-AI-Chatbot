@@ -2,7 +2,7 @@
 
 from flask import render_template, request, abort, redirect, url_for, flash
 from admin import admin_bp
-from admin.auth import login_required
+from admin.auth import login_required, operator_required, require_business_access, current_user
 from config import load_config
 import calendar_sync
 from db import (get_all_businesses, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
@@ -11,7 +11,11 @@ from db import (get_all_businesses, get_conversation_list, get_conversation, get
 @admin_bp.route("/")
 @login_required
 def dashboard():
-    """Show all registered businesses."""
+    """Operators see all businesses; owners go straight to their own."""
+    user = current_user()
+    if not user["is_operator"]:
+        return redirect(url_for("admin.appointments",
+                                business_id=user["business_id"]))
     businesses = get_all_businesses()
     return render_template("admin/dashboard.html", businesses=businesses)
 
@@ -19,6 +23,7 @@ def dashboard():
 @admin_bp.route("/business/<int:business_id>/conversations")
 @login_required
 def conversations(business_id):
+    require_business_access(business_id)
     """Show conversation list or a specific conversation for a business.
 
     Without a `phone` query parameter: shows all unique phone numbers
@@ -49,8 +54,8 @@ def conversations(business_id):
 
 @admin_bp.route("/business/<int:business_id>/appointments")
 @login_required
-
 def appointments(business_id):
+    require_business_access(business_id)
     """Show all appointments/orders for a business."""
     businesses = get_all_businesses()
     business   = next((b for b in businesses if b["id"] == business_id), None)
@@ -75,16 +80,15 @@ def appointments(business_id):
     )
 @admin_bp.route("/appointment/<int:appointment_id>/cancel", methods=["POST"])
 @login_required
-
 def cancel(appointment_id):
     """Cancel an appointment: calendar first, then database.
-
     Calendar-first because the owner acts on their calendar. A phantom
     appointment they believe is cancelled is worse than a stale admin row.
     """
     appt = get_appointment(appointment_id)
     if not appt:
         abort(404)
+    require_business_access(appt["business_id"])
 
     business = next((b for b in get_all_businesses()
                      if b["id"] == appt["business_id"]), None)
@@ -115,6 +119,7 @@ def reschedule(appointment_id):
     appt = get_appointment(appointment_id)
     if not appt:
         abort(404)
+    require_business_access(appt["business_id"])
 
     new_dt = (request.form.get("new_datetime") or "").strip()
     # HTML datetime-local gives "2026-08-27T14:00"; we store "2026-08-27 14:00".

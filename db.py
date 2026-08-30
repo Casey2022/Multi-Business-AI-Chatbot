@@ -38,6 +38,22 @@ def init_db():
         )
     """)
 
+    # users — one row per person who can log into the admin.
+    # business_id is NULL for operators (us), who see every business.
+    # Owners have a business_id and are scoped to that one business.
+    # Passwords are stored as bcrypt hashes, never plaintext.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            email          TEXT    UNIQUE NOT NULL,
+            password_hash  TEXT    NOT NULL,
+            business_id    INTEGER,
+            is_operator    INTEGER DEFAULT 0,
+            active         INTEGER DEFAULT 1,
+            created_at     TEXT    NOT NULL,
+            FOREIGN KEY (business_id) REFERENCES businesses(id)
+        )
+    """)
     # messages — append-only log of every turn per (phone, business).
     # business_id scopes history so Bob's customers never appear in the
     # bakery's conversation window and vice versa.
@@ -427,3 +443,60 @@ def set_sync_token(business_id, token):
     )
     conn.commit()
     conn.close()
+
+def create_user(email, password, business_id=None, is_operator=False):
+    """Create a user with a bcrypt-hashed password.
+    business_id=None + is_operator=True → operator, sees all businesses.
+    business_id=N   + is_operator=False → owner, scoped to that business.
+    """
+    import bcrypt
+    from datetime import datetime as _dt
+
+    pw_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+    conn = get_connection()
+    cursor = conn.execute(
+        """
+        INSERT INTO users (email, password_hash, business_id, is_operator, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (email.lower().strip(), pw_hash.decode("utf-8"), business_id,
+            1 if is_operator else 0, _dt.now().isoformat())
+    )
+    user_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    print(f"[db] Created user {email} (id={user_id}, operator={is_operator})")
+    return user_id
+
+
+def get_user_by_email(email):
+    """Return an active user by email, or None."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM users WHERE email = ? AND active = 1",
+        (email.lower().strip(),)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def verify_password(email, password):
+    """Return the user dict if credentials are valid, else None.
+
+    Always runs a bcrypt check even when the user doesn't exist, so the
+    response time doesn't reveal which emails are registered — a timing
+    attack that's cheap to prevent and awkward to retrofit.
+    """
+    import bcrypt
+
+    user = get_user_by_email(email)
+    if not user:
+        # Dummy hash to keep timing consistent.
+        bcrypt.checkpw(b"dummy", bcrypt.hashpw(b"dummy", bcrypt.gensalt()))
+        return None
+
+    if bcrypt.checkpw(password.encode("utf-8"),
+                      user["password_hash"].encode("utf-8")):
+        return user
+    return None

@@ -68,9 +68,14 @@
 
     <form method="POST">
       <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email"
+               placeholder="you@example.com" autofocus required>
+      </div>
+      <div class="form-group">
         <label for="password">Password</label>
         <input type="password" id="password" name="password"
-               placeholder="Enter admin password" autofocus required>
+               placeholder="Enter admin password" required>
       </div>
       <button class="btn" type="submit">Sign in</button>
     </form>

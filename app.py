@@ -43,9 +43,10 @@ def bootstrap():
     """Prepare everything the app needs to serve requests.
 
     Idempotent by design: safe to run on every boot. Creates tables, registers
-    businesses if the registry is empty, and ingests each business's documents
-    if their vector collection is missing. This is what makes deployment to an
-    ephemeral filesystem work without manual setup steps.
+    businesses if the registry is empty, seeds an operator account if no users
+    exist, and ingests each business's documents if their vector collection is
+    missing. This is what makes deployment to an ephemeral filesystem work
+    without manual setup steps.
     """
     init_db()
 
@@ -57,6 +58,25 @@ def bootstrap():
         from seed_businesses import seed
         seed()
         businesses = get_all_businesses()
+
+    # Seed a default operator if no users exist. The deployed filesystem is
+    # ephemeral, so the database is rebuilt on every boot — without this the
+    # admin portal would have no accounts and be unreachable.
+    from db import get_connection, create_user
+    conn = get_connection()
+    user_count = conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    conn.close()
+
+    if user_count == 0:
+        email    = os.environ.get("ADMIN_EMAIL")
+        password = os.environ.get("ADMIN_PASSWORD")
+        if email and password:
+            create_user(email, password, business_id=None, is_operator=True)
+            print(f"[bootstrap] Seeded operator account: {email}")
+        else:
+            print("[bootstrap] WARNING: no users exist and ADMIN_EMAIL / "
+                  "ADMIN_PASSWORD are not set — the admin portal is "
+                  "unreachable.")
 
     from rag import ensure_ingested
     for b in businesses:
