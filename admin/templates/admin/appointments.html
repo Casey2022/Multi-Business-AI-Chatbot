@@ -17,10 +17,14 @@
 </div>
 
 <div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
-      View appointments →
+    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
+      View conversations →
     </a>
-</div>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">
+      Settings →
+    </a>
+  </div>
 
 <div class="card">
   {% if appointment_list %}

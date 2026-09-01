@@ -95,7 +95,7 @@ def cancel(appointment_id):
     if not business:
         abort(404)
 
-    config = load_config(business["config_path"])
+    config = load_config(business["config_path"], business["id"])
 
     if appt.get("external_event_id") and calendar_sync.is_enabled(config):
         try:
@@ -131,7 +131,7 @@ def reschedule(appointment_id):
 
     business = next((b for b in get_all_businesses()
                      if b["id"] == appt["business_id"]), None)
-    config = load_config(business["config_path"])
+    config = load_config(business["config_path"], business["id"])
 
     if appt.get("external_event_id") and calendar_sync.is_enabled(config):
         try:
@@ -148,3 +148,72 @@ def reschedule(appointment_id):
     reschedule_appointment(appointment_id, new_dt)
     flash(f"Appointment moved to {new_dt}.", "success")
     return redirect(url_for("admin.appointments", business_id=appt["business_id"]))
+
+
+@admin_bp.route("/business/<int:business_id>/settings", methods=["GET", "POST"])
+@login_required
+def settings(business_id):
+    """Let an owner edit the safe subset of their configuration."""
+    require_business_access(business_id)
+
+    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    if not business:
+        abort(404)
+
+    from config import EDITABLE_FIELDS, load_personas, load_config
+    from db import set_config_override
+    from admin.auth import current_user
+
+    if request.method == "POST":
+        user     = current_user()
+        personas = load_personas()
+
+        # Load the YAML WITHOUT overrides — this is the baseline we compare
+        # against. Storing a value identical to the file would pin the field,
+        # so it stops inheriting future YAML improvements for no reason.
+        from config import get_nested
+        from db import clear_config_override
+        base = load_config(business["config_path"])
+
+        for field, spec in EDITABLE_FIELDS.items():
+            raw = request.form.get(field)
+            if raw is None:
+                continue
+
+            if spec["type"] == "list":
+                value = [line.strip() for line in raw.splitlines() if line.strip()]
+            elif spec["type"] == "faq":
+                value = []
+                for line in raw.splitlines():
+                    if "|" not in line:
+                        continue
+                    q, a = line.split("|", 1)
+                    if q.strip() and a.strip():
+                        value.append({"question": q.strip(), "answer": a.strip()})
+            elif spec["type"] == "choice":
+                if raw not in personas:
+                    flash(f"Unknown personality: {raw}", "error")
+                    continue
+                value = raw
+            else:
+                value = raw.strip()
+
+            if value == get_nested(base, field):
+                # Matches the file — drop any override so the field goes back
+                # to inheriting from YAML.
+                clear_config_override(business_id, field)
+            else:
+                set_config_override(business_id, field, value,
+                                    updated_by=user["email"])
+
+        flash("Settings saved.", "success")
+        return redirect(url_for("admin.settings", business_id=business_id))
+
+    config = load_config(business["config_path"], business_id)
+    return render_template(
+        "admin/settings.html",
+        business = business,
+        config   = config,
+        fields   = EDITABLE_FIELDS,
+        personas = load_personas(),
+    )

@@ -1,0 +1,96 @@
+{% extends "admin/base.html" %}
+{% block title %}Settings — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a> <span>›</span> {{ business.name }}
+</div>
+
+<div class="page-header">
+  <h1>{{ business.name }}</h1>
+  <div class="subtitle">Settings</div>
+</div>
+
+<form method="POST">
+<div class="card">
+  <div class="card-title">Business details</div>
+
+  {% for field in ['business.name', 'business.phone', 'business.address',
+                   'business.hours', 'business.service_area'] %}
+  {% set parts = field.split('.') %}
+  <div style="margin-bottom:16px;">
+    <label style="display:block; font-size:13px; font-weight:600;
+                  color:#4a5568; margin-bottom:6px;">
+      {{ fields[field].label }}
+    </label>
+    <input type="text" name="{{ field }}"
+           value="{{ config[parts[0]][parts[1]] or '' }}"
+           style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
+                  border-radius:6px; font-size:14px;">
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-title">Bot personality</div>
+  <select name="bot.persona_preset"
+          style="padding:9px 12px; border:1px solid #e2e8f0;
+                 border-radius:6px; font-size:14px; min-width:220px;">
+    {% for key, text in personas.items() %}
+    <option value="{{ key }}"
+            {% if config.bot.persona_preset == key %}selected{% endif %}>
+      {{ key | title }}
+    </option>
+    {% endfor %}
+  </select>
+  <div style="margin-top:12px; font-size:12px; color:#718096;">
+    {% for key, text in personas.items() %}
+    <div style="margin-bottom:6px;"><strong>{{ key | title }}:</strong>
+      {{ text.split('\n')[0] }}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Services offered</div>
+  <div style="font-size:12px; color:#718096; margin-bottom:8px;">One per line.</div>
+  <textarea name="services" rows="6"
+            style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
+                   border-radius:6px; font-size:14px; font-family:inherit;"
+  >{{ config.services | join('\n') }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Frequently asked questions</div>
+  <div style="font-size:12px; color:#718096; margin-bottom:8px;">
+    One per line, as <code>Question | Answer</code>.
+  </div>
+  <textarea name="faq" rows="8"
+            style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
+                   border-radius:6px; font-size:14px; font-family:inherit;"
+  >{% for item in config.faq %}{{ item.question }} | {{ item.answer }}
+{% endfor %}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Booking</div>
+  <label style="display:block; font-size:13px; font-weight:600;
+                color:#4a5568; margin-bottom:6px;">
+    {{ fields['booking.noun'].label }}
+  </label>
+  <input type="text" name="booking.noun"
+         value="{{ config.booking.noun }}"
+         style="padding:9px 12px; border:1px solid #e2e8f0;
+                border-radius:6px; font-size:14px; max-width:240px;">
+  <div style="font-size:12px; color:#718096; margin-top:6px;">
+    e.g. "appointment", "order", "reservation"
+  </div>
+</div>
+
+<button type="submit"
+        style="padding:10px 24px; background:#3182ce; color:#fff; border:none;
+               border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;">
+  Save settings
+</button>
+</form>
+{% endblock %}

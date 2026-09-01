@@ -9,18 +9,80 @@ import yaml
 from pathlib import Path
 
 
-def load_config(config_path):
-    """Load and return a business config dict from the given YAML file path.
+# Fields an owner may edit. Anything not listed is operator-only —
+# guardrails, keyword rules, booking templates, and calendar config all
+# stay out of reach because breaking them has consequences an owner has
+# no way to anticipate.
+EDITABLE_FIELDS = {
+    "business.name":        {"label": "Business name",   "type": "text"},
+    "business.phone":       {"label": "Phone",           "type": "text"},
+    "business.address":     {"label": "Address",         "type": "text"},
+    "business.hours":       {"label": "Hours (as shown to customers)",
+                             "type": "text"},
+    "business.service_area":{"label": "Service area",    "type": "text"},
+    "services":             {"label": "Services offered","type": "list"},
+    "faq":                  {"label": "Frequently asked questions",
+                             "type": "faq"},
+    "booking.noun":         {"label": "What you call a booking",
+                             "type": "text"},
+    "bot.persona_preset":   {"label": "Bot personality", "type": "choice"},
+}
 
-    Called once per incoming request (not at module import) so the server
-    can serve different businesses on different requests simultaneously.
-    The returned dict is a plain Python object — no special class needed.
+
+def _set_nested(config, dotted_field, value):
+    """Set a dotted path into a nested dict: 'business.phone' → config['business']['phone']."""
+    parts = dotted_field.split(".")
+    target = config
+    for part in parts[:-1]:
+        target = target.setdefault(part, {})
+    target[parts[-1]] = value
+
+
+def load_personas():
+    """Load the shared persona presets."""
+    with open("config/personas.yaml", "r") as f:
+        return yaml.safe_load(f) or {}
+
+
+def load_config(config_path, business_id=None):
+    """Load a business config: YAML as the base, database overrides on top.
+
+    YAML is the initial state from onboarding; the config_overrides table is
+    the current state after any owner edits. Overrides win.
+
+    business_id is optional so scripts that only need the file (ingestion,
+    seeding) can skip the database entirely.
     """
     path = Path(config_path)
     with open(path, "r") as f:
         config = yaml.safe_load(f)
+
+    if business_id is not None:
+        from db import get_config_overrides
+        for field, value in get_config_overrides(business_id).items():
+            if field in EDITABLE_FIELDS:      # ignore anything stale or unexpected
+                _set_nested(config, field, value)
+
+    # Resolve the persona preset into actual persona text.
+    preset = config.get("bot", {}).get("persona_preset")
+    if preset:
+        personas = load_personas()
+        config.setdefault("bot", {})["persona"] = personas.get(
+            preset, personas.get("warm", "")
+        )
+
     print(f"[config] Loaded config for: {config['business']['name']}")
     return config
+
+def get_nested(config, dotted_field, default=None):
+    """Read a dotted path from a nested dict: 'business.phone'."""
+    target = config
+    for part in dotted_field.split("."):
+        if not isinstance(target, dict) or part not in target:
+            return default
+        target = target[part]
+    return target
+
 
 
 def substitute(text, config):

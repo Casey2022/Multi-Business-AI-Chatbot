@@ -36,9 +36,7 @@ calendar:
         reason: "lunch"
 
 bot:
-  persona: |
-    Friendly, professional, brief. Plain language, never slang.
-    Treat customers with courtesy and get to the point.
+  persona_preset: "direct" 
   guardrails:
     universal: |
       Only state facts explicitly listed in this config or in the

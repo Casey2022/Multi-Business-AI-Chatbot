@@ -33,10 +33,7 @@ calendar:
       6: ["07:00", "15:00"]
 
 bot:
-  persona: |
-    Warm, friendly, a little playful. You love food and treat every
-    customer like a neighbor. Use plain language, never corporate-speak.
-    A well-placed 🥐 or 🎂 is welcome but don't overdo it.
+  persona_preset: "warm" 
   guardrails:
     universal: |
       Only state facts explicitly listed in this config or in the

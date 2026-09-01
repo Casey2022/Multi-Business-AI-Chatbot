@@ -106,6 +106,26 @@ def init_db():
         )
     """)
 
+    # config_overrides — owner-editable settings that override the YAML.
+    # YAML is the initial state (onboarding); this table is the current state.
+    # Storing overrides rather than a full config copy means a business
+    # inherits any YAML improvements it hasn't explicitly overridden, and
+    # keeps the diff between "as onboarded" and "as edited" visible.
+    # `field` is a dotted path into the config: "business.phone",
+    # "bot.persona_preset". `value` is JSON so lists (services, faq) work
+    # alongside plain strings.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS config_overrides (
+            business_id  INTEGER NOT NULL,
+            field        TEXT    NOT NULL,
+            value        TEXT    NOT NULL,
+            updated_at   TEXT    NOT NULL,
+            updated_by   TEXT,
+            PRIMARY KEY (business_id, field),
+            FOREIGN KEY (business_id) REFERENCES businesses(id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("[db] Database ready.")
@@ -163,6 +183,16 @@ def add_business(name, slug, config_path, twilio_number=None):
     conn.close()
     print(f"[db] Registered business: '{name}' (id={business_id}, slug={slug})")
     return business_id
+
+def clear_config_override(business_id, field):
+    """Remove an override so the field falls back to the YAML value."""
+    conn = get_connection()
+    conn.execute(
+        "DELETE FROM config_overrides WHERE business_id = ? AND field = ?",
+        (business_id, field)
+    )
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +304,36 @@ def get_all_businesses():
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def get_config_overrides(business_id):
+    """Return {dotted_field: value} of owner edits for this business."""
+    import json as _json
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT field, value FROM config_overrides WHERE business_id = ?",
+        (business_id,)
+    ).fetchall()
+    conn.close()
+    return {r["field"]: _json.loads(r["value"]) for r in rows}
+
+
+def set_config_override(business_id, field, value, updated_by=None):
+    """Store an owner edit. Upsert — one row per (business, field)."""
+    import json as _json
+    from datetime import datetime as _dt
+
+    conn = get_connection()
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO config_overrides
+            (business_id, field, value, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (business_id, field, _json.dumps(value), _dt.now().isoformat(), updated_by)
+    )
+    conn.commit()
+    conn.close()
+    print(f"[config] {updated_by or 'unknown'} set {field} for business {business_id}")
 
 
 def get_conversation_list(business_id):

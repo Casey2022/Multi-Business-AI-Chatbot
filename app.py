@@ -224,7 +224,7 @@ def sms_reply():
         print(f"[app] WARNING: no business registered for {to_number}")
         return "Forbidden", 404
 
-    config      = load_config(business["config_path"])
+    config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
 
     print(f"[app] Serving: {business['name']} (id={business_id})")
@@ -266,7 +266,7 @@ def webchat_reply(slug):
     if len(message) > 1000:
         return {"error": "Message too long"}, 400
 
-    config      = load_config(business["config_path"])
+    config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
 
     print(f"[webchat] {business['name']} <- {session_id}: {message!r}")
@@ -283,7 +283,7 @@ def demo_page(slug):
     business = get_business_by_slug(slug)
     if not business:
         return "Unknown business", 404
-    config = load_config(business["config_path"])
+    config = load_config(business["config_path"], business["id"])
     return render_template(
         "demo.html",
         business=business,
