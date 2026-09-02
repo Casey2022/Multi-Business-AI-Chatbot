@@ -206,7 +206,14 @@ NEGATIVE    = {"no", "n", "nope", "nah", "wrong", "incorrect"}
 
 
 def _confirmation_question(pending, config):
-    """Read the booking back to the customer and ask them to confirm."""
+    """Read the booking back to the customer — every slot, not just two.
+
+    Confirming a subset means the customer approves details they can't see.
+    A real transcript showed this failing: the customer specified frosting,
+    a filling, a design and writing, all of which were captured correctly —
+    but the read-back listed only the cake and the time, so they asked twice
+    what happened to the frosting before confirming anyway.
+    """
     from datetime import datetime as _dt
 
     BOOKING = config.get("booking", {})
@@ -216,14 +223,24 @@ def _confirmation_question(pending, config):
     friendly = _dt.strptime(parsed, "%Y-%m-%d %H:%M").strftime(
         "%A, %B %-d at %-I:%M %p"
     )
-    template = BOOKING.get(
-        "confirm_prompt",
-        "Just to confirm: {service} on {datetime}. Is that right?"
-    )
-    return substitute(
-        template.replace("{service}", service).replace("{datetime}", friendly),
-        config
-    )
+
+    lines = [f"Just to confirm: {service} on {friendly}."]
+
+    # Every extra slot that was actually filled. Skip the bookkeeping keys
+    # and skip "none"-style answers, which add nothing for the customer.
+    skip_keys   = {"service", "datetime", "datetime_parsed"}
+    skip_values = {"none", "n/a", "no", "nothing", "-"}
+
+    for key, value in pending.items():
+        if key in skip_keys:
+            continue
+        if not value or str(value).strip().lower() in skip_values:
+            continue
+        label = key.replace("_", " ").capitalize()
+        lines.append(f"{label}: {value}.")
+
+    lines.append("Is that right?")
+    return substitute(" ".join(lines), config)
 
 def _unavailable_message(desired_iso, alternatives, config, reason=None):
     """Explain why a slot doesn't work, and offer nearby openings.
