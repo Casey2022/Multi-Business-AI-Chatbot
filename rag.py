@@ -51,7 +51,11 @@ CHROMA_DB_PATH     = Path("chroma_db")
 CHUNK_SIZE         = 500
 CHUNK_OVERLAP      = 50
 TOP_K              = 4
-DISTANCE_THRESHOLD = 0.85
+# Tuned against real queries after switching to Voyage embeddings, which
+# compress the distance range compared to the previous local model — the
+# old 0.85 threshold let everything through. Measured separation on Bob's
+# Plumbing: answerable queries 0.23–0.41, irrelevant 0.48–0.58.
+DISTANCE_THRESHOLD = 0.50
 
 # Created lazily rather than at import: gunicorn forks worker processes, and
 # ChromaDB's Rust-backed client is not fork-safe — a client created before the

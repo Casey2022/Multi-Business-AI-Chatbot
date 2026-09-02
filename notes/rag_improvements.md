@@ -71,3 +71,17 @@ Come back to this list when:
 
 Don't preemptively add complexity. Each technique above adds latency,
 cost, or maintenance burden. Measure the failure first.
+
+## Distance thresholds are model-specific
+
+The 0.85 threshold was tuned against ChromaDB's default local embedder.
+After switching to Voyage, it admitted essentially everything — Voyage
+compresses the similarity range, so both good and bad matches shifted
+downward.
+
+Retuned to 0.50 by measuring the actual distribution rather than guessing:
+answerable queries landed at 0.23–0.41, irrelevant ones at 0.48–0.58.
+
+**If the embedding model ever changes again, re-measure.** A threshold
+carried over from a different model is not a filter — it's a number that
+looks like one.
