@@ -10,7 +10,19 @@
   <h1>{{ business.name }}</h1>
   <div class="subtitle">Settings</div>
 </div>
-
+<div style="margin-top: 8px;">
+    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
+      Conversations →
+    </a>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
+      Appointments →
+    </a>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">
+      Knowledge base →
+    </a>
+  </div>
 <form method="POST">
 <div class="card">
   <div class="card-title">Business details</div>

@@ -34,7 +34,8 @@ def init_db():
             twilio_number  TEXT    UNIQUE,
             config_path    TEXT    NOT NULL,
             active         INTEGER DEFAULT 1,
-            calendar_sync_token TEXT
+            calendar_sync_token TEXT,
+            documents_dirty INTEGER DEFAULT 0
         )
     """)
 
@@ -110,9 +111,9 @@ def init_db():
     # YAML is the initial state (onboarding); this table is the current state.
     # Storing overrides rather than a full config copy means a business
     # inherits any YAML improvements it hasn't explicitly overridden, and
-    # keeps the diff between "as onboarded" and "as edited" visible.
+    # keeps the difference between "as onboarded" and "as edited" visible.
     # `field` is a dotted path into the config: "business.phone",
-    # "bot.persona_preset". `value` is JSON so lists (services, faq) work
+    # "bot.persona_preset". `value` is JSON so lists (services, faq, etc) work
     # alongside plain strings.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS config_overrides (
@@ -123,6 +124,43 @@ def init_db():
             updated_by   TEXT,
             PRIMARY KEY (business_id, field),
             FOREIGN KEY (business_id) REFERENCES businesses(id)
+        )
+    """)
+
+    # documents — the RAG knowledge base, one row per section.
+    # Markdown files under documents/<slug>/ are the seed; this table is
+    # authoritative once imported. Same relationship YAML has to
+    # config_overrides, and for the same reason: the deployed filesystem is
+    # ephemeral, so anything an owner edits must live in the database.
+    # Storing sections separately rather than one blob means chunk boundaries
+    # are exactly section boundaries — more predictable than inferring them
+    # from a regex over free-form Markdown.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id  INTEGER NOT NULL,
+            position     INTEGER NOT NULL DEFAULT 0,
+            title        TEXT    NOT NULL,
+            body         TEXT    NOT NULL,
+            updated_at   TEXT    NOT NULL,
+            updated_by   TEXT,
+            FOREIGN KEY (business_id) REFERENCES businesses(id)
+        )
+    """)
+
+    # document_versions — previous content, kept on every save.
+    # A bad document edit degrades every answer and, unlike a wrong phone
+    # number, gives no obvious sign of what broke. Being able to see and
+    # revert previous versions is cheap insurance.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS document_versions (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id  INTEGER NOT NULL,
+            title        TEXT    NOT NULL,
+            body         TEXT    NOT NULL,
+            saved_at     TEXT    NOT NULL,
+            saved_by     TEXT,
+            FOREIGN KEY (document_id) REFERENCES documents(id)
         )
     """)
 
@@ -560,3 +598,106 @@ def verify_password(email, password):
                       user["password_hash"].encode("utf-8")):
         return user
     return None
+
+def get_documents(business_id):
+    """Return this business's document sections in display order."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM documents WHERE business_id = ? ORDER BY position, id",
+        (business_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_document_section(business_id, title, body, position=None,
+                         updated_by=None):
+    """Add a section. Appends to the end unless a position is given."""
+    from datetime import datetime as _dt
+    conn = get_connection()
+    if position is None:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM documents "
+            "WHERE business_id = ?", (business_id,)
+        ).fetchone()
+        position = row["p"]
+    cursor = conn.execute(
+        """
+        INSERT INTO documents (business_id, position, title, body,
+                               updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (business_id, position, title, body, _dt.now().isoformat(), updated_by)
+    )
+    doc_id = cursor.lastrowid
+    conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?",
+                 (business_id,))
+    conn.commit()
+    conn.close()
+    return doc_id
+
+
+def update_document_section(document_id, title, body, updated_by=None):
+    """Update a section, keeping the previous content as a version."""
+    from datetime import datetime as _dt
+    conn = get_connection()
+
+    old = conn.execute("SELECT * FROM documents WHERE id = ?",
+                       (document_id,)).fetchone()
+    if not old:
+        conn.close()
+        return
+
+    conn.execute(
+        """
+        INSERT INTO document_versions (document_id, title, body, saved_at, saved_by)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (document_id, old["title"], old["body"], old["updated_at"],
+         old["updated_by"])
+    )
+    conn.execute(
+        "UPDATE documents SET title = ?, body = ?, updated_at = ?, updated_by = ? "
+        "WHERE id = ?",
+        (title, body, _dt.now().isoformat(), updated_by, document_id)
+    )
+    conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?",
+                 (old["business_id"],))
+    conn.commit()
+    conn.close()
+
+
+def delete_document_section(document_id):
+    """Remove a section. Versions are kept — they reference the id only."""
+    conn = get_connection()
+    row = conn.execute("SELECT business_id FROM documents WHERE id = ?",
+                       (document_id,)).fetchone()
+    if not row:
+        conn.close()
+        return
+    conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+    conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?",
+                 (row["business_id"],))
+    conn.commit()
+    conn.close()
+
+
+def get_document_versions(document_id, limit=10):
+    """Return recent previous versions of a section, newest first."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM document_versions WHERE document_id = ? "
+        "ORDER BY id DESC LIMIT ?",
+        (document_id, limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def set_documents_clean(business_id):
+    """Clear the dirty flag after a successful re-ingest."""
+    conn = get_connection()
+    conn.execute("UPDATE businesses SET documents_dirty = 0 WHERE id = ?",
+                 (business_id,))
+    conn.commit()
+    conn.close()

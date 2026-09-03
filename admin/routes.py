@@ -217,3 +217,20 @@ def settings(business_id):
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
     )
+
+@admin_bp.route("/business/<int:business_id>/knowledge")
+@login_required
+def knowledge(business_id):
+    """Show what the bot knows — the document sections behind its answers."""
+    require_business_access(business_id)
+
+    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    if not business:
+        abort(404)
+
+    from db import get_documents
+    return render_template(
+        "admin/knowledge.html",
+        business = business,
+        sections = get_documents(business_id),
+    )

@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}Knowledge base — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a> <span>›</span> {{ business.name }}
+</div>
+
+<div class="page-header">
+  <h1>{{ business.name }}</h1>
+  <div class="subtitle">
+    Knowledge base — {{ sections | length }} section{% if sections | length != 1 %}s{% endif %}.
+    This is what the assistant draws on when answering questions.
+  </div>
+  <div style="margin-top: 8px;">
+    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
+      Conversations →
+    </a>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
+      Appointments →
+    </a>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">
+      Settings →
+    </a>
+  </div>
+</div>  
+  {% if business.documents_dirty %}
+  <div style="margin-top:10px; padding:10px 14px; background:#fffaf0;
+              border:1px solid #feebc8; border-radius:6px; font-size:13px;
+              color:#975a16;">
+    Unpublished changes — customers are still seeing the previous version.
+  </div>
+  {% endif %}
+</div>
+
+{% for s in sections %}
+<div class="card">
+  <div class="card-title">{{ s.title }}</div>
+  <div style="white-space: pre-wrap; font-size:14px; line-height:1.6;
+              color:#2d3748;">{{ s.body }}</div>
+  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
+    Updated {{ s.updated_at | friendly_time }}{% if s.updated_by %} by {{ s.updated_by }}{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="empty"><p>No content yet.</p></div>
+</div>
+{% endfor %}
+{% endblock %}

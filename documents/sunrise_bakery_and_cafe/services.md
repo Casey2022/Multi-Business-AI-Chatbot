@@ -53,3 +53,12 @@ Custom cakes require a 50% deposit at ordering. Wedding cakes require
 a 25% non-refundable deposit. Cancellation more than 7 days out: full
 refund of any deposit beyond the non-refundable portion. Less than 7
 days: deposit forfeited. Less than 48 hours: full order price charged.
+
+## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
+We bake a rotating daily selection of muffins, scones, croissants, and
+danishes. Standard muffin flavors are blueberry, banana nut, lemon poppyseed,
+and double chocolate; seasonal flavors change through the year. Muffins are
+$3.25 each or $35 per dozen. Same-day availability depends on what's baked
+that morning — call ahead to confirm a specific flavor, or order a dozen with
+24 hours' notice to guarantee it. Gluten-free muffins are not part of the
+daily selection but can be made to order with 96 hours' notice.

@@ -136,35 +136,22 @@ def chunk_text(text):
 # Ingestion — run offline: python3 rag.py
 # ---------------------------------------------------------------------------
 
-def ingest_documents(config):
-    """Read Markdown files for a business and store chunks in ChromaDB.
+def ingest_documents(config, business_id=None):
+    """Rebuild a business's vector collection from its document sections.
 
-    Derives the documents folder path and collection name from the business
-    name slug. Deletes and recreates the collection so re-running ingestion
-    always produces a clean, consistent state — no stale chunks.
-
-    After running this, restart the Flask server. The server opens collection
-    handles per-call now (no cached handle to go stale), so this is mostly
-    a reminder: the server's in-flight requests during ingestion would see
-    the old collection until it finishes.
+    Reads from the documents table when a business_id is given; falls back
+    to the Markdown files otherwise, so the standalone ingest script and
+    onboarding still work before anything has been imported.
     """
     slug            = _slugify(config["business"]["name"])
-    docs_path       = Path("documents") / slug
     collection_name = slug
 
     print(f"[rag] Using collection: {collection_name}")
-    print(f"[rag] Ingesting documents from {docs_path}...")
 
-    if not docs_path.exists():
-        print(f"[rag] ERROR: documents folder not found: {docs_path}")
-        print(f"[rag] Expected path: {docs_path.resolve()}")
-        return None
-
-    # Delete and recreate for a clean slate on every ingest run.
     try:
         get_chroma_client().delete_collection(collection_name)
     except Exception:
-        pass  # Collection didn't exist yet — that's fine.
+        pass
 
     collection = get_chroma_client().get_or_create_collection(
         name=collection_name,
@@ -172,29 +159,42 @@ def ingest_documents(config):
         embedding_function=_embedding_fn,
     )
 
-    total_chunks = 0
-    for md_file in sorted(docs_path.glob("*.md")):
-        text   = md_file.read_text(encoding="utf-8")
-        chunks = chunk_text(text)
-        print(f"[rag] {md_file.name}: {len(chunks)} chunks")
+    chunks = []
+    ids    = []
+    metas  = []
 
-        if not chunks:
-            continue
+    if business_id is not None:
+        from db import get_documents
+        sections = get_documents(business_id)
+        print(f"[rag] Ingesting {len(sections)} section(s) from database")
+        for i, s in enumerate(sections):
+            # One chunk per section — boundaries are exactly what the owner
+            # defined, rather than inferred from a regex over free text.
+            chunks.append(f"## {s['title']}\n{s['body']}")
+            ids.append(f"section_{s['id']}")
+            metas.append({"source": "db", "section_id": s["id"],
+                          "title": s["title"]})
+    else:
+        docs_path = Path("documents") / slug
+        print(f"[rag] Ingesting documents from {docs_path}...")
+        if not docs_path.exists():
+            print(f"[rag] ERROR: documents folder not found: {docs_path}")
+            return None
+        for md_file in sorted(docs_path.glob("*.md")):
+            text = md_file.read_text(encoding="utf-8")
+            file_chunks = chunk_text(text)
+            print(f"[rag] {md_file.name}: {len(file_chunks)} chunks")
+            for i, c in enumerate(file_chunks):
+                chunks.append(c)
+                ids.append(f"{md_file.stem}_chunk_{i}")
+                metas.append({"source": md_file.name, "chunk_index": i})
 
-        # One API call for all chunks in this file, not one per chunk.
-        # With a hosted embedder, per-chunk calls burn rate limit and are
-        # far slower than a single batched request.
-        collection.add(
-            documents=chunks,
-            ids=[f"{md_file.stem}_chunk_{i}" for i in range(len(chunks))],
-            metadatas=[
-                {"source": md_file.name, "chunk_index": i}
-                for i in range(len(chunks))
-            ],
-        )
-        total_chunks += len(chunks)
+    if not chunks:
+        print(f"[rag] WARNING: no content to ingest for '{collection_name}'")
+        return collection
 
-    print(f"[rag] Ingested {total_chunks} total chunks into '{collection_name}'.")
+    collection.add(documents=chunks, ids=ids, metadatas=metas)
+    print(f"[rag] Ingested {len(chunks)} chunks into '{collection_name}'.")
     return collection
 
 def ensure_ingested(config):

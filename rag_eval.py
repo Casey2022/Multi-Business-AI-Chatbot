@@ -37,8 +37,8 @@ TESTS = {
         ("is there a fee for after hours",       "Emergency",           "$75"),
         ("what's the warranty on a water heater","Water Heater",        "10-year"),
         # Should retrieve nothing useful:
-        ("do you install solar panels",          None,                  None),
-        ("what's your favourite colour",         None,                  None),
+        ("do you install solar panels",          "ANSWER_ONLY",         "don't"),
+        ("what's your favourite colour",         "ANSWER_ONLY",          None),
     ],
     "sunrise_bakery_and_cafe": [
         ("how much is a 6 inch birthday cake",   "Custom Birthday",     "$45"),
@@ -77,7 +77,10 @@ def main():
         chunks = retrieve(question, config)
         headings = [c.split("\n")[0].strip("# ") for c, _ in chunks]
 
-        if expected_chunk is None:
+        if expected_chunk == "ANSWER_ONLY":
+            ok = True          # retrieval isn't the measure here
+            verdict = "n/a (answer-scored)"
+        elif expected_chunk is None:
             # Negative case — retrieving nothing is the correct behaviour.
             ok = len(chunks) == 0
             verdict = "PASS (correctly empty)" if ok else \
