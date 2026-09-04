@@ -10,6 +10,7 @@
 # different businesses on different requests.
 
 from config import substitute
+import re
 
 # Sentinel value signalling "start the booking flow."
 # Double-underscore prefix marks it as structural/internal, not customer-facing.
@@ -46,13 +47,18 @@ def get_reply(message, config):
 
         if rule.get("match") == "exact":
             # Entire normalized message must equal one of the keywords.
-            # Used for short, unambiguous inputs like "hi".
             if text in keywords:
                 matched = True
         else:
-            # "any" — keyword appears anywhere in the message.
-            # Used for content-bearing questions like "what are your hours".
-            if any(keyword in text for keyword in keywords):
+            # "any" — keyword appears as a whole word.
+            #
+            # Substring matching was the original behaviour and caused real
+            # misfires: a location rule keyed on "address" matched "...to
+            # address a plumbing issue", stealing the question from RAG.
+            # Word boundaries stop the substring class of that problem;
+            # ambiguous words still need removing from the keyword list.
+            if any(re.search(rf"\b{re.escape(keyword)}\b", text)
+                   for keyword in keywords):
                 matched = True
 
         if matched:

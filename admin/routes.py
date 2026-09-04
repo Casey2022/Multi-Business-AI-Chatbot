@@ -221,7 +221,7 @@ def settings(business_id):
 @admin_bp.route("/business/<int:business_id>/knowledge")
 @login_required
 def knowledge(business_id):
-    """Show what the bot knows — the document sections behind its answers."""
+    """Show and edit the document sections the assistant answers from."""
     require_business_access(business_id)
 
     business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
@@ -233,4 +233,140 @@ def knowledge(business_id):
         "admin/knowledge.html",
         business = business,
         sections = get_documents(business_id),
+    )
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/add", methods=["POST"])
+@login_required
+def knowledge_add(business_id):
+    require_business_access(business_id)
+
+    from db import add_document_section
+    from admin.auth import current_user
+
+    title = (request.form.get("title") or "").strip()
+    body  = (request.form.get("body")  or "").strip()
+
+    if not title or not body:
+        flash("A section needs both a title and content.", "error")
+    else:
+        add_document_section(business_id, title, body,
+                             updated_by=current_user()["email"])
+        flash("Section added. Publish to make it live.", "success")
+
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.route("/knowledge/<int:document_id>/update", methods=["POST"])
+@login_required
+def knowledge_update(document_id):
+    from db import get_connection, update_document_section
+    from admin.auth import current_user
+
+    # Derive the business from the section rather than trusting the URL.
+    conn = get_connection()
+    row  = conn.execute("SELECT business_id FROM documents WHERE id = ?",
+                        (document_id,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    require_business_access(row["business_id"])
+
+    title = (request.form.get("title") or "").strip()
+    body  = (request.form.get("body")  or "").strip()
+
+    if not title or not body:
+        flash("A section needs both a title and content.", "error")
+    else:
+        update_document_section(document_id, title, body,
+                                updated_by=current_user()["email"])
+        flash("Section updated. Publish to make it live.", "success")
+
+    return redirect(url_for("admin.knowledge", business_id=row["business_id"]))
+
+
+@admin_bp.route("/knowledge/<int:document_id>/delete", methods=["POST"])
+@login_required
+def knowledge_delete(document_id):
+    from db import get_connection, delete_document_section, get_documents
+
+    conn = get_connection()
+    row  = conn.execute("SELECT business_id FROM documents WHERE id = ?",
+                        (document_id,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    business_id = row["business_id"]
+    require_business_access(business_id)
+
+    # A business with no sections has a bot that can only answer from its
+    # config facts. Warn rather than prevent — it's their content.
+    if len(get_documents(business_id)) <= 1:
+        flash("That was the last section. Your assistant can no longer "
+              "answer detailed questions until you add content.", "error")
+
+    delete_document_section(document_id)
+    flash("Section deleted. Publish to make it live.", "success")
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/publish", methods=["POST"])
+@login_required
+def knowledge_publish(business_id):
+    """Re-ingest the knowledge base so customers see the current version.
+
+    Blocking rather than backgrounded: re-ingestion is a handful of
+    embedding API calls, and there's no worker process on this deployment.
+    Slower, but the owner gets a real success or failure rather than a
+    silent job they can't see.
+    """
+    require_business_access(business_id)
+
+    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    if not business:
+        abort(404)
+
+    from rag import ingest_documents
+    from db import set_documents_clean
+    from config import load_config
+
+    try:
+        ingest_documents(load_config(business["config_path"], business_id),
+                         business_id=business_id)
+        set_documents_clean(business_id)
+        flash("Published — your assistant is now using the updated content.",
+              "success")
+    except Exception as e:
+        # Deliberately do NOT clear the flag: the owner must keep seeing
+        # "unpublished changes" until a publish actually succeeds, or they'd
+        # believe stale content was live.
+        print(f"[knowledge] Publish FAILED for {business['name']}: {e}")
+        flash(f"Publishing failed: {e}. Your previous content is still live.",
+              "error")
+
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.route("/knowledge/<int:document_id>/history")
+@login_required
+def knowledge_history(document_id):
+    from db import get_connection, get_document_versions
+
+    conn = get_connection()
+    doc  = conn.execute("SELECT * FROM documents WHERE id = ?",
+                        (document_id,)).fetchone()
+    conn.close()
+    if not doc:
+        abort(404)
+    doc = dict(doc)
+    require_business_access(doc["business_id"])
+
+    business = next((b for b in get_all_businesses()
+                     if b["id"] == doc["business_id"]), None)
+
+    return render_template(
+        "admin/knowledge_history.html",
+        business = business,
+        section  = doc,
+        versions = get_document_versions(document_id),
     )

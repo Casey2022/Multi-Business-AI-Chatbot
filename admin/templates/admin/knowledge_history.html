@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+{% block title %}History — {{ section.title }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a> <span>›</span>
+  <a href="/admin/business/{{ business.id }}/knowledge">{{ business.name }}</a>
+  <span>›</span> History
+</div>
+
+<div class="page-header">
+  <h1>{{ section.title }}</h1>
+  <div class="subtitle">Previous versions of this section</div>
+</div>
+
+<div class="card">
+  <div class="card-title">Current</div>
+  <div style="white-space:pre-wrap; font-size:14px; line-height:1.6;">{{ section.body }}</div>
+  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
+    Updated {{ section.updated_at | friendly_time }}{% if section.updated_by %} by {{ section.updated_by }}{% endif %}
+  </div>
+</div>
+
+{% for v in versions %}
+<div class="card" style="opacity:0.85;">
+  <div class="card-title" style="color:#718096;">{{ v.title }}</div>
+  <div style="white-space:pre-wrap; font-size:14px; line-height:1.6; color:#4a5568;">{{ v.body }}</div>
+  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
+    Saved {{ v.saved_at | friendly_time }}{% if v.saved_by %} by {{ v.saved_by }}{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="empty"><p>No previous versions — this section hasn't been edited since it was created.</p></div>
+</div>
+{% endfor %}
+{% endblock %}

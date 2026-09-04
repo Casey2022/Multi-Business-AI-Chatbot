@@ -80,12 +80,12 @@ rules:
     reply: "Hi there! 👋 Welcome to {business_name}. How can I help?"
 
   - name: "hours"
-    keywords: ["hours", "open", "closed", "close"]
+    keywords: ["hours", "you open", "are you closed", "you close"]
     match: "any"
     reply: "We're open {hours}."
 
   - name: "location"
-    keywords: ["where", "location", "address", "directions"]
+    keywords: ["where are you", "your location", "your address", "directions"]
     match: "any"
     reply: "We're at {address}. Stop in for a 🥐!"
 

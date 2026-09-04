@@ -139,25 +139,16 @@ def chunk_text(text):
 def ingest_documents(config, business_id=None):
     """Rebuild a business's vector collection from its document sections.
 
-    Reads from the documents table when a business_id is given; falls back
-    to the Markdown files otherwise, so the standalone ingest script and
-    onboarding still work before anything has been imported.
+    Builds into a temporary collection and swaps it in only after every
+    embedding call succeeds. The naive delete-then-rebuild left the business
+    with an empty knowledge base whenever the embedding API failed partway —
+    and the caller had no way to tell that from a clean failure.
     """
     slug            = _slugify(config["business"]["name"])
     collection_name = slug
+    temp_name       = f"{slug}__building"
 
     print(f"[rag] Using collection: {collection_name}")
-
-    try:
-        get_chroma_client().delete_collection(collection_name)
-    except Exception:
-        pass
-
-    collection = get_chroma_client().get_or_create_collection(
-        name=collection_name,
-        metadata={"hnsw:space": "cosine"},
-        embedding_function=_embedding_fn,
-    )
 
     chunks = []
     ids    = []
@@ -167,9 +158,7 @@ def ingest_documents(config, business_id=None):
         from db import get_documents
         sections = get_documents(business_id)
         print(f"[rag] Ingesting {len(sections)} section(s) from database")
-        for i, s in enumerate(sections):
-            # One chunk per section — boundaries are exactly what the owner
-            # defined, rather than inferred from a regex over free text.
+        for s in sections:
             chunks.append(f"## {s['title']}\n{s['body']}")
             ids.append(f"section_{s['id']}")
             metas.append({"source": "db", "section_id": s["id"],
@@ -191,11 +180,49 @@ def ingest_documents(config, business_id=None):
 
     if not chunks:
         print(f"[rag] WARNING: no content to ingest for '{collection_name}'")
-        return collection
+        return None
 
-    collection.add(documents=chunks, ids=ids, metadatas=metas)
+    client = get_chroma_client()
+
+    # Clear any temp collection left behind by a previous failure.
+    try:
+        client.delete_collection(temp_name)
+    except Exception:
+        pass
+
+    temp = client.get_or_create_collection(
+        name=temp_name,
+        metadata={"hnsw:space": "cosine"},
+        embedding_function=_embedding_fn,
+    )
+
+    try:
+        temp.add(documents=chunks, ids=ids, metadatas=metas)
+    except Exception:
+        # Leave the live collection untouched — it's still serving the
+        # previous content, which is exactly what we tell the owner.
+        try:
+            client.delete_collection(temp_name)
+        except Exception:
+            pass
+        raise
+
+    # Every embedding succeeded. Now swap.
+    try:
+        client.delete_collection(collection_name)
+    except Exception:
+        pass
+
+    live = client.get_or_create_collection(
+        name=collection_name,
+        metadata={"hnsw:space": "cosine"},
+        embedding_function=_embedding_fn,
+    )
+    live.add(documents=chunks, ids=ids, metadatas=metas)
+    client.delete_collection(temp_name)
+
     print(f"[rag] Ingested {len(chunks)} chunks into '{collection_name}'.")
-    return collection
+    return live
 
 def ensure_ingested(config):
     """Ingest this business's documents only if its collection is empty.

@@ -13,40 +13,109 @@
     This is what the assistant draws on when answering questions.
   </div>
   <div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
-      Conversations →
-    </a>
+    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">Conversations →</a>
     <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
-      Appointments →
-    </a>
+    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">Appointments →</a>
     <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">
-      Settings →
-    </a>
+    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">Settings →</a>
   </div>
-</div>  
-  {% if business.documents_dirty %}
-  <div style="margin-top:10px; padding:10px 14px; background:#fffaf0;
-              border:1px solid #feebc8; border-radius:6px; font-size:13px;
-              color:#975a16;">
-    Unpublished changes — customers are still seeing the previous version.
-  </div>
-  {% endif %}
 </div>
 
+{% if business.documents_dirty %}
+<div style="padding:14px 18px; background:#fffaf0; border:1px solid #feebc8;
+            border-radius:8px; margin-bottom:20px; display:flex;
+            align-items:center; justify-content:space-between; gap:16px;">
+  <div style="font-size:13px; color:#975a16;">
+    <strong>Unpublished changes.</strong>
+    Customers are still seeing the previous version.
+  </div>
+  <form method="POST" action="/admin/business/{{ business.id }}/knowledge/publish">
+    <button type="submit"
+            style="padding:8px 18px; background:#d69e2e; color:#fff; border:none;
+                   border-radius:6px; font-size:13px; font-weight:600;
+                   cursor:pointer; white-space:nowrap;">
+      Publish changes
+    </button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Existing sections -->
 {% for s in sections %}
 <div class="card">
-  <div class="card-title">{{ s.title }}</div>
-  <div style="white-space: pre-wrap; font-size:14px; line-height:1.6;
-              color:#2d3748;">{{ s.body }}</div>
-  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
-    Updated {{ s.updated_at | friendly_time }}{% if s.updated_by %} by {{ s.updated_by }}{% endif %}
-  </div>
+  <form method="POST" action="/admin/knowledge/{{ s.id }}/update">
+    <input type="text" name="title" value="{{ s.title }}"
+           style="width:100%; padding:8px 12px; border:1px solid #e2e8f0;
+                  border-radius:6px; font-size:15px; font-weight:600;
+                  margin-bottom:10px;">
+    <textarea name="body" rows="7"
+              style="width:100%; padding:10px 12px; border:1px solid #e2e8f0;
+                     border-radius:6px; font-size:14px; line-height:1.6;
+                     font-family:inherit;">{{ s.body }}</textarea>
+
+    <div style="display:flex; align-items:center; justify-content:space-between;
+                margin-top:10px; gap:12px;">
+      <div style="font-size:11px; color:#a0aec0;">
+        Updated {{ s.updated_at | friendly_time }}{% if s.updated_by %} by {{ s.updated_by }}{% endif %}
+        <span style="margin:0 6px;">·</span>
+        <a href="/admin/knowledge/{{ s.id }}/history">History</a>
+      </div>
+      <div style="white-space:nowrap;">
+        <button type="submit"
+                style="padding:6px 16px; background:#3182ce; color:#fff;
+                       border:none; border-radius:5px; font-size:13px;
+                       font-weight:600; cursor:pointer;">Save</button>
+      </div>
+    </div>
+  </form>
+
+  <form method="POST" action="/admin/knowledge/{{ s.id }}/delete"
+        onsubmit="return confirm('Delete this section? Its previous versions are kept.');"
+        style="margin-top:8px;">
+    <button type="submit"
+            style="padding:5px 12px; background:none; color:#e53e3e;
+                   border:1px solid #fed7d7; border-radius:5px;
+                   font-size:12px; cursor:pointer;">Delete section</button>
+  </form>
 </div>
 {% else %}
 <div class="card">
-  <div class="empty"><p>No content yet.</p></div>
+  <div class="empty"><p>No content yet. Add a section below.</p></div>
 </div>
 {% endfor %}
+
+<!-- Add a new section -->
+<div class="card" style="border:2px dashed #e2e8f0; background:#fafbfc;">
+  <div class="card-title">Add a section</div>
+
+  <div style="font-size:12px; color:#718096; margin-bottom:14px; line-height:1.6;">
+    Each section covers one topic. A few things that make a real difference
+    to how well the assistant answers:
+    <ul style="margin:8px 0 0 18px;">
+      <li>Put words customers would actually use in the title — "Drain
+          Cleaning", not "Our Services"</li>
+      <li>State prices, timeframes and policies plainly and specifically</li>
+      <li>Say what you <em>don't</em> offer, and put that in the title too:
+          "Septic Tanks (Not Offered)"</li>
+      <li>If you don't mention something, the assistant will tell customers
+          it doesn't know</li>
+    </ul>
+  </div>
+
+  <form method="POST" action="/admin/business/{{ business.id }}/knowledge/add">
+    <input type="text" name="title" placeholder="Section title"
+           style="width:100%; padding:8px 12px; border:1px solid #e2e8f0;
+                  border-radius:6px; font-size:15px; font-weight:600;
+                  margin-bottom:10px;">
+    <textarea name="body" rows="6"
+              placeholder="What should the assistant know about this topic?"
+              style="width:100%; padding:10px 12px; border:1px solid #e2e8f0;
+                     border-radius:6px; font-size:14px; line-height:1.6;
+                     font-family:inherit;"></textarea>
+    <button type="submit"
+            style="margin-top:10px; padding:8px 20px; background:#38a169;
+                   color:#fff; border:none; border-radius:6px; font-size:13px;
+                   font-weight:600; cursor:pointer;">Add section</button>
+  </form>
+</div>
 {% endblock %}
