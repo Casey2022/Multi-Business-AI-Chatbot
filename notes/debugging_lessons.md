@@ -811,3 +811,142 @@ an authentication problem alongside the one benign case it was written for.
 deliberately — corrupting the calendar ID and checking that nothing changed.
 The happy path passed fine and would have shipped. **Error handlers need
 their own tests, and the assertion is usually that nothing happened.**
+
+# Debugging Lessons — Knowledge Base Editor
+
+Append to `notes/debugging_lessons.md`.
+
+---
+
+## Substring keyword matching steals questions from better answerers
+
+**Symptom.** A customer asked *"do you fix drywall if you have to tear it out
+to address a plumbing issue?"* and got back the shop's street address. The
+newly-added Drywall Repair section was never consulted.
+
+**Cause.** One line in the log:
+
+```
+[rules] matched rule: location
+```
+
+The location rule listed `address` as a keyword with `match: "any"`, which
+did substring matching:
+
+```python
+if any(keyword in text for keyword in keywords):
+```
+
+The message contains *"to **address** a plumbing issue"* — the verb, not the
+noun. The rule fired, returned a canned reply, and the message never reached
+retrieval.
+
+**Fix, two parts.**
+
+Match on word boundaries rather than substrings:
+
+```python
+if any(re.search(rf"\b{re.escape(keyword)}\b", text) for keyword in keywords):
+```
+
+And replace ambiguous single words with unambiguous phrases:
+
+```yaml
+keywords: ["where are you", "your location", "your address", "directions"]
+```
+
+Both were needed. Word boundaries alone wouldn't have helped here — "address"
+*is* a whole word in that sentence, just a different part of speech. The
+phrase change is what actually fixed it; the boundary matching prevents a
+different class of the same problem (`close` matching inside `closet`).
+
+**The pattern this belongs to.** This is the **fourth** time an eager keyword
+rule has stolen a question the LLM would have answered better:
+
+1. A price rule keyed on "how much" caught "how much notice do you need"
+2. A booking rule caught "lets order a dozen cupcakes" as a command
+3. A booking rule caught "I'd like to order a cake for Friday"
+4. A location rule keyed on "address" caught "to address a plumbing issue"
+
+Keyword rules are fast and free, and they cannot tell what a sentence is
+*about*. Each individual fix is easy; the recurrence is the signal. The
+standing item in `future_directions.md` — let the LLM detect booking intent
+and hand off with slots pre-filled — would remove the whole class rather than
+patching instances.
+
+**Rule of thumb:** a keyword is only safe if it's unlikely to appear in a
+sentence about something else. Single common words rarely pass that test;
+short phrases usually do.
+
+---
+
+## "Nothing changed" must be true in every path that says it
+
+**Symptom.** Testing the publish failure path with a deliberately corrupted
+API key produced exactly the intended behaviour — an error flash reading
+*"Publishing failed. Your previous content is still live"* and the
+unpublished-changes banner correctly staying put.
+
+The message was false. The knowledge base was empty.
+
+**Cause.** `ingest_documents` deleted the existing collection before
+rebuilding it:
+
+```python
+client.delete_collection(collection_name)      # old content gone
+collection = client.get_or_create_collection(...)
+collection.add(documents=chunks, ...)          # fails here
+```
+
+A failure between those lines leaves the business with no knowledge base at
+all. The error handling was correct — it reported failure, it didn't clear the
+dirty flag — but the *reassurance* attached to it wasn't.
+
+**Fix.** Build into a temporary collection and swap only after every embedding
+call succeeds:
+
+```python
+temp = client.get_or_create_collection(name=f"{slug}__building", ...)
+try:
+    temp.add(documents=chunks, ...)      # if this fails, live is untouched
+except Exception:
+    client.delete_collection(temp_name)
+    raise
+
+client.delete_collection(collection_name)
+live = client.get_or_create_collection(name=collection_name, ...)
+live.add(documents=chunks, ...)
+client.delete_collection(temp_name)
+```
+
+Trade-off worth knowing: ChromaDB has no rename, so the swap re-embeds
+everything a second time — double the API calls. Trivial at 8 chunks, not at
+800. The cheaper alternative is to embed a single chunk first as a smoke test,
+then rebuild; that catches bad keys, exhausted quota and outages, but not a
+failure partway through a large batch.
+
+**The general rule.** A destructive operation followed by a rebuild is not
+atomic, and any message claiming the previous state survived is a lie in the
+window between them. Either make it atomic, or make the message honest.
+
+**Related, and worth noticing:** this is the same family as the 404/410 bug,
+where an over-broad `except` reported a failed cancellation as a success. Both
+are cases where the code's *report* diverged from reality, and both were only
+caught by testing the failure path deliberately. A wrong answer looks odd; a
+confident reassurance looks finished.
+
+---
+
+## A placeholder comment in pasted code is a runtime error waiting to happen
+
+**Symptom.** `Publishing failed: name 'chunks' is not defined.`
+
+**Cause.** A rewritten function was supplied with `# ... assemble chunks, ids,
+metas exactly as before ...` standing in for a block that was meant to be kept
+from the original. It was pasted literally, so the variables were never built.
+
+Harmless here — it failed loudly, before anything destructive, and the error
+named the missing variable. But worth noting the shape: **an elision in code
+you're pasting is an instruction to yourself, and the interpreter doesn't read
+comments.** When replacing a function wholesale, it's safer to work from a
+complete version than to reconstruct one from a diff and a placeholder.

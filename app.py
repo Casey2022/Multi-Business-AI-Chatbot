@@ -178,20 +178,35 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
             source = "scheduler"
 
         elif reply_text is None:
-            # --- 3. LLM + RAG fallback ---
-            # Fetch history BEFORE saving the current message — otherwise
-            # the current message appears in history AND as the current input,
-            # duplicating it in the prompt Claude receives.
-            history = get_recent_messages(sender_id, business_id, limit=10)
-            reply_text = get_llm_reply(message, history, config, channel=channel)
-            source = "llm"
+            # No keyword rule matched. Before answering, check whether this
+            # is actually a booking request — keyword matching can't tell
+            # "I'd like to order a cake for Friday" from a question, and
+            # was replying by asking the customer to type "order".
+            from scheduler import get_slot_definitions
+            from llm import classify_and_extract
+
+            slots  = get_slot_definitions(config)
+            result = classify_and_extract(message, slots, config)
+
+            if result.get("intent") == "book":
+                print(f"[app] Booking intent detected (LLM) for {sender_id}")
+                extracted = {k: v for k, v in result.items() if k != "intent"}
+                reply_text = handle_booking(
+                    sender_id, message, config, business_id,
+                    prefilled=extracted
+                )
+                source = "scheduler"
+            else:
+                history    = get_recent_messages(sender_id, business_id, limit=10)
+                reply_text = get_llm_reply(message, history, config, channel=channel)
+                source     = "llm"
 
         else:
             source = "rule"
 
     # Save after all logic — preserves the fetch-before-save ordering above.
     save_message(sender_id, "user",      message,    business_id, source ="customer")
-    save_message(sender_id, "assistant", reply_text, business_id, source = source)
+    save_message(sender_id, "assistant", reply_text, business_id, source =source)
 
     return reply_text
 

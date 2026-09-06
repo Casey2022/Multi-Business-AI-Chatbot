@@ -203,6 +203,94 @@ Persona: {bot['persona']}
 
 Behavioral rules: {guardrails_text}"""
 
+def classify_and_extract(message, slots, config):
+    """Decide whether a message is a booking request, and pull any slots from it.
+
+    Runs only on messages the rules engine didn't handle, so short commands
+    like "order" still shortcut without an extra call. This exists because
+    keyword matching cannot tell what a sentence is about: "I'd like to order
+    a cake for Friday" is unmistakably a booking request and was being sent
+    to the LLM, which replied by asking the customer to type "order".
+
+    Returns {"intent": "book"|"question", plus any slot values found}.
+    Defaults to "question" on any failure — wrongly starting a booking is
+    more disruptive than wrongly answering a question.
+    """
+    import json
+
+    business = config["business"]
+    noun     = config.get("booking", {}).get("noun", "appointment")
+
+    slot_lines = "\n".join(
+        f'- "{s["key"]}": {s["description"]}' for s in slots
+    )
+
+    prompt = f"""A customer has messaged {business['name']}.
+
+Decide whether they are trying to start a {noun}, or asking a question.
+
+"book" means they want to schedule or place a {noun} — they've said what they
+want, or asked to book, or described something they'd like arranged.
+"question" means anything else: asking about prices, services, hours,
+policies, availability in general, or making small talk.
+
+Asking whether something is possible ("do you do wedding cakes?") is a
+question, not a booking. Saying they want one ("I'd like a wedding cake for
+June") is a booking.
+
+If it is a booking, also extract any of these details the message provides:
+{slot_lines}
+
+Rules:
+- Respond with ONLY a JSON object. No preamble, no markdown fences.
+- Always include "intent".
+- Include a slot key only if the message clearly provides that value.
+- For "datetime", copy the customer's own phrasing.
+
+Examples:
+Message: "how much are your cakes?"
+{{"intent": "question"}}
+
+Message: "I'd like to order a chocolate cake for Friday"
+{{"intent": "book", "service": "chocolate cake", "datetime": "Friday"}}
+
+Message: "do you do wedding cakes?"
+{{"intent": "question"}}
+
+Message: "can I book a drain cleaning next Tuesday at 2"
+{{"intent": "book", "service": "drain cleaning", "datetime": "next Tuesday at 2"}}
+
+Message: "{message}"
+"""
+    try:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+
+        result = json.loads(raw)
+        if not isinstance(result, dict):
+            return {"intent": "question"}
+
+        intent = result.get("intent")
+        if intent not in ("book", "question"):
+            return {"intent": "question"}
+
+        valid_keys = {s["key"] for s in slots}
+        cleaned = {"intent": intent}
+        for k, v in result.items():
+            if k in valid_keys and v not in (None, "", "null"):
+                cleaned[k] = str(v).strip()
+
+        print(f"[llm] Intent: {cleaned}")
+        return cleaned
+
+    except Exception as e:
+        print(f"[llm] Intent classification failed: {e}")
+        return {"intent": "question"}
 
 # ---------------------------------------------------------------------------
 # Main LLM + RAG reply path

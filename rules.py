@@ -62,18 +62,14 @@ def get_reply(message, config):
                 matched = True
 
         if matched:
-            # Booking triggers should be commands ("book", "order please"),
-            # not sentences that happen to contain the word ("lets order a
-            # dozen cupcakes with chocolate frosting..."). Long messages fall
-            # through — usually to the LLM, which points the customer at
-            # booking conversationally.
-            if rule["reply"] == BOOK_INTENT and len(text.split()) > 4:
-                continue
-
             print(f"[rules] matched rule: {rule['name']}")
             reply = rule["reply"]
+
+            # The booking sentinel is a signal to app.py, not text for the
+            # customer — return it before substitution touches it.
             if reply == BOOK_INTENT:
                 return reply
+
             # Substitute {business_name}, {phone}, etc. at match time,
             # not load time — so dynamic placeholders work correctly.
             return substitute(reply, config)

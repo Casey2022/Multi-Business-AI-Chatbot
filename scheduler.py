@@ -157,11 +157,22 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
     missing = _first_missing_slot(pending, slots)
     if missing:
         prompt = substitute(missing["prompt"], config)
-        # On the opening turn, lead with the booking greeting for warmth
-        # unless the greeting IS the question we're about to ask.
-        if first_turn and missing["key"] != "service":
+
+        if first_turn:
+            noun = BOOKING.get("noun", "appointment")
+            known = []
+            if pending.get("service"):
+                known.append(pending["service"])
+            if pending.get("datetime"):
+                known.append(f"for {pending['datetime']}")
+
+            if known:
+                # Acknowledge what we understood, so the handoff reads like
+                # a conversation continuing rather than a form appearing.
+                return f"Happy to help with {' '.join(known)}. {prompt}"
+
             greeting = substitute(BOOKING.get("greeting", ""), config)
-            if greeting:
+            if greeting and missing["key"] != "service":
                 return f"{greeting} {prompt}"
         return prompt
 
@@ -301,7 +312,7 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
         print(f"[calendar] Early availability check failed: {e}")
         return None
 
-def handle_booking(phone, message, config, business_id):
+def handle_booking(phone, message, config, business_id, prefilled=None):
     """Advance the booking flow and log the reply.
 
     Wraps the real handler so every outgoing scheduler message is visible in
@@ -309,11 +320,11 @@ def handle_booking(phone, message, config, business_id):
     rejections, and confirmations were the one part of the conversation you
     couldn't see without opening a browser.
     """
-    reply = _handle_booking_inner(phone, message, config, business_id)
+    reply = _handle_booking_inner(phone, message, config, business_id, prefilled)
     print(f"[scheduler] Reply: {reply!r}")
     return reply
 
-def _handle_booking_inner(phone, message, config, business_id):
+def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
     """Advance the booking using slot extraction plus a fill-the-gaps loop.
 
     Every message runs through extraction, so customers can volunteer or
@@ -343,15 +354,22 @@ def _handle_booking_inner(phone, message, config, business_id):
     # --- Opening turn: greet, then extract from the triggering message ---
     # The trigger itself may carry information ("book a drain cleaning").
     if state == "idle":
-        extracted = extract_booking_slots(message, slots, config)
-        pending.update(extracted)
+        # Slots the intent classifier already found in the triggering
+        # message — no point extracting them twice.
+        if prefilled:
+            pending.update(prefilled)
+        else:
+            extracted = extract_booking_slots(message, slots, config)
+            pending.update(extracted)
 
-        early = _check_datetime_now(phone, business_id, pending, extracted, config)
+        early = _check_datetime_now(phone, business_id, pending,
+                                    prefilled or {}, config)
         if early:
             return early
 
         set_state(phone, business_id, "collecting", pending=pending)
-        return _ask_next_or_finalize(phone, business_id, pending, config, slots)
+        return _ask_next_or_finalize(phone, business_id, pending, config, slots,
+                                     first_turn=True)
 
     # --- Mid-booking: extract from every message, then re-evaluate ---
     if state == "collecting":
