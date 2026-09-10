@@ -950,3 +950,39 @@ named the missing variable. But worth noting the shape: **an elision in code
 you're pasting is an instruction to yourself, and the interpreter doesn't read
 comments.** When replacing a function wholesale, it's safer to work from a
 complete version than to reconstruct one from a diff and a placeholder.
+
+## Wrapper Functions and Pass-Through Parameters
+
+A wrapper that accepts a parameter and hardcodes it discards it silently
+
+Context. handle_booking is a thin wrapper around _handle_booking_inner, added so every scheduler reply gets logged regardless of which of the many return statements produced it. Adding LLM intent detection meant threading a new prefilled argument through both.
+
+The first symptom was loud:
+
+TypeError: handle_booking() got an unexpected keyword argument 'prefilled'
+
+Only the inner function had been updated. Easy fix, and Python named it precisely.
+
+The second would have been silent. The wrapper's call to the inner function was:
+
+python
+reply = _handle_booking_inner(phone, message, config, business_id, prefilled=None)
+
+Adding prefilled=None to the wrapper's signature fixes the TypeError and leaves this line still passing a hardcoded None. No error. The booking flow would simply ask for a service the customer had already given — which is the exact behaviour the feature existed to remove, failing in a way that looks like the feature not working rather than a bug.
+
+Fix. The wrapper must pass what it received:
+
+python
+def handle_booking(phone, message, config, business_id, prefilled=None):
+    reply = _handle_booking_inner(phone, message, config, business_id, prefilled)
+
+The general shape. A wrapper's job is to add one behaviour and otherwise be invisible. Every parameter it doesn't forward is a silent hole. When adding an argument to a wrapped function, there are always three places to change — the inner signature, the outer signature, and the call between them — and only the first two produce errors when missed.
+
+Worth checking with a grep whenever a wrapper is involved:
+
+bash
+grep -n "def handle_booking\|def _handle_booking_inner\|_handle_booking_inner(" scheduler.py
+
+Three lines, and all three should mention the new parameter. That check found this in seconds; reading the file would have taken longer and might have missed the hardcoded default, since prefilled=None looks entirely reasonable in isolation.
+
+Related pattern in this project. Same family as the earlier sorted()-before-[:3] bug in find_alternatives: every individual piece was correct, and the composition threw the result away. Both are cases where the type checker and the interpreter are satisfied, and only the end-to-end behaviour reveals the problem.

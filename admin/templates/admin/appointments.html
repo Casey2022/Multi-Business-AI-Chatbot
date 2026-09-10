@@ -14,21 +14,16 @@
   <div class="subtitle">
     {{ appointment_list | length }} appointment{% if appointment_list | length != 1 %}s{% endif %} on record
   </div>
-</div>
-
-<div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
-      View conversations →
-    </a>
+  <div style="margin-top: 8px;">
+    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">Conversations →</a>
     <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">
-      Settings →
-    </a>
+    <a href="/admin/business/{{ business.id }}/calendar" style="font-size: 13px;">Calendar →</a>
     <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">
-      Knowledge base →
-    </a>
+    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">Knowledge base →</a>
+    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
+    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">Settings →</a>
   </div>
+</div>
 
 <div class="card">
   {% if appointment_list %}
@@ -42,7 +37,7 @@
         <th>Status</th>
         <th>Details</th>
         <th>Calendar</th>
-        <th>Actions</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -54,7 +49,7 @@
             {{ appt.phone }}
           </a>
         </td>
-       <td>
+        <td>
           <strong>{{ appt.service }}</strong>
           {% if appt.calendar_changed %}
           <div style="font-size:11px; color:#b7791f; margin-top:4px;">
@@ -62,7 +57,12 @@
           </div>
           {% endif %}
         </td>
-        <td>{{ appt.datetime | friendly_time }}</td>
+        <td>
+          <a href="/admin/business/{{ business.id }}/calendar?week={{ appt.week_offset }}&highlight={{ appt.id }}"
+             title="See this appointment in the calendar">
+            {{ appt.datetime | friendly_time }}
+          </a>
+        </td>
         <td>
           {% if appt.status == 'booked' %}
           <span class="badge badge-green">Booked</span>
@@ -87,30 +87,7 @@
           {% endif %}
         </td>
         <td style="white-space: nowrap;">
-          {% if appt.status != 'cancelled' %}
-          <form method="POST"
-                action="/admin/appointment/{{ appt.id }}/reschedule"
-                style="display:inline; margin-right:8px;">
-            <input type="datetime-local" name="new_datetime"
-                   style="font-size:12px; padding:3px; border:1px solid #e2e8f0;
-                          border-radius:4px;">
-            <button type="submit"
-                    style="font-size:12px; padding:4px 10px; border:none;
-                           border-radius:4px; background:#3182ce; color:#fff;
-                           cursor:pointer;">Move</button>
-          </form>
-          <form method="POST"
-                action="/admin/appointment/{{ appt.id }}/cancel"
-                style="display:inline;"
-                onsubmit="return confirm('Cancel this appointment? This also removes it from the calendar.');">
-            <button type="submit"
-                    style="font-size:12px; padding:4px 10px; border:none;
-                           border-radius:4px; background:#e53e3e; color:#fff;
-                           cursor:pointer;">Cancel</button>
-          </form>
-          {% else %}
-          <span style="color:#a0aec0; font-size:12px;">—</span>
-          {% endif %}
+          <a href="/admin/appointment/{{ appt.id }}">View →</a>
         </td>
       </tr>
     {% endfor %}

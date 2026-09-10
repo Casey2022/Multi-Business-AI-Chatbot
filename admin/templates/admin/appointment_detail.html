@@ -1,0 +1,111 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ appt.service }} — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="/admin/">Businesses</a> <span>›</span>
+  <a href="/admin/business/{{ business.id }}/appointments">{{ business.name }}</a>
+  <span>›</span> Appointment #{{ appt.id }}
+</div>
+
+<div class="page-header">
+  <h1>{{ appt.service }}</h1>
+  <div class="subtitle">{{ appt.datetime | friendly_time }}</div>
+</div>
+
+<div class="card">
+  <div class="card-title">Details</div>
+  <table style="width:100%;">
+    <tr>
+      <td style="width:180px; color:#718096; font-size:13px;">Status</td>
+      <td>
+        {% if appt.status == 'booked' %}
+        <span class="badge badge-green">Booked</span>
+        {% elif appt.status == 'cancelled' %}
+        <span class="badge badge-gray">Cancelled</span>
+        {% else %}
+        <span class="badge badge-blue">{{ appt.status | title }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td style="color:#718096; font-size:13px;">Customer</td>
+      <td>
+        <a href="/admin/business/{{ business.id }}/conversations?phone={{ appt.phone | urlencode }}">
+          {{ appt.phone }}
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td style="color:#718096; font-size:13px;">Scheduled for</td>
+      <td>{{ appt.datetime | friendly_time }}</td>
+    </tr>
+    <tr>
+      <td style="color:#718096; font-size:13px;">Calendar</td>
+      <td>
+        {% if appt.sync_status == 'synced' %}
+        <span class="badge badge-green">Synced</span>
+        {% elif appt.sync_status == 'deleted' %}
+        <span class="badge badge-gray">Removed</span>
+        {% else %}
+        <span style="color:#a0aec0;">Not synced</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% if appt.calendar_changed %}
+    <tr>
+      <td style="color:#718096; font-size:13px;">Calendar change</td>
+      <td style="color:#b7791f; font-size:13px;">⚠ {{ appt.calendar_changed }}</td>
+    </tr>
+    {% endif %}
+  </table>
+</div>
+
+{% if details %}
+<div class="card">
+  <div class="card-title">What the customer told us</div>
+  <table style="width:100%;">
+    {% for key, value in details.items() %}
+    <tr>
+      <td style="width:180px; color:#718096; font-size:13px; vertical-align:top;">
+        {{ key.replace('_', ' ') | capitalize }}
+      </td>
+      <td style="font-size:14px;">{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if appt.status != 'cancelled' %}
+<div class="card">
+  <div class="card-title">Reschedule</div>
+  <form method="POST" action="/admin/appointment/{{ appt.id }}/reschedule">
+    <input type="datetime-local" name="new_datetime"
+           style="padding:9px 12px; border:1px solid #e2e8f0; border-radius:6px;
+                  font-size:14px;">
+    <button type="submit"
+            style="margin-left:8px; padding:9px 20px; background:#3182ce;
+                   color:#fff; border:none; border-radius:6px; font-size:14px;
+                   font-weight:600; cursor:pointer;">Move appointment</button>
+  </form>
+  <div style="font-size:12px; color:#718096; margin-top:8px;">
+    Availability isn't checked here — you're the authority on your own schedule.
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Cancel</div>
+  <form method="POST" action="/admin/appointment/{{ appt.id }}/cancel"
+        onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar.');">
+    <button type="submit"
+            style="padding:9px 20px; background:#e53e3e; color:#fff; border:none;
+                   border-radius:6px; font-size:14px; font-weight:600;
+                   cursor:pointer;">Cancel appointment</button>
+  </form>
+  <div style="font-size:12px; color:#718096; margin-top:8px;">
+    Removes the event from your calendar as well. This can't be undone.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

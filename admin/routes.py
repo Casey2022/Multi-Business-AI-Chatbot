@@ -73,6 +73,22 @@ def appointments(business_id):
         print(f"[reconcile] Failed for {business['name']}: {e}")
     appointment_list = get_appointments(business_id)
 
+    # Which week each appointment falls in, relative to the current one, so
+    # the "Scheduled for" cell can link straight to the right calendar week
+    # rather than always landing on today's.
+    from datetime import datetime, timedelta
+    today       = datetime.now().date()
+    this_monday = today - timedelta(days=today.weekday())
+
+    for appt in appointment_list:
+        try:
+            when = datetime.strptime(appt["datetime"], "%Y-%m-%d %H:%M").date()
+            appt_monday = when - timedelta(days=when.weekday())
+            appt["week_offset"] = (appt_monday - this_monday).days // 7
+
+        except (ValueError, TypeError):
+            appt["week_offset"] = 0
+
     return render_template(
         "admin/appointments.html",
         business         = business,
@@ -369,4 +385,124 @@ def knowledge_history(document_id):
         business = business,
         section  = doc,
         versions = get_document_versions(document_id),
+    )
+
+@admin_bp.route("/business/<int:business_id>/calendar")
+@login_required
+def calendar_view(business_id):
+    """Week view of appointments, rendered from the database.
+
+    Deliberately not read from Google: the appointments table has everything
+    needed, is already scoped per business, and avoids an API call per page
+    load. The gap is that events the owner creates directly in their calendar
+    (a dentist appointment, say) block availability but never appear here,
+    because reconciliation only updates appointments the bot created.
+    """
+    require_business_access(business_id)
+
+    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    if not business:
+        abort(404)
+
+    from datetime import datetime, timedelta
+    from db import get_appointments
+    from config import load_config
+
+    config = load_config(business["config_path"], business_id)
+    sched  = config.get("calendar", {}).get("scheduling", {})
+    hours  = sched.get("business_hours", {})
+
+    # Which week? Offset in weeks from the current one, so the arrows work.
+    try:
+        offset = int(request.args.get("week", 0))
+    except ValueError:
+        offset = 0
+
+    # Optional appointment to pick out visually — set when arriving from the
+    # appointments list, so the owner sees which one they clicked rather than
+    # scanning the week.
+    try:
+        highlight = int(request.args.get("highlight", 0)) or None
+    except ValueError:
+        highlight = None
+
+    today       = datetime.now().date()
+    week_start  = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
+    days        = [week_start + timedelta(days=i) for i in range(7)]
+
+    # Grid bounds from business hours — no point rendering hours the
+    # business is never open.
+    open_hours = []
+    for d in days:
+        h = hours.get(d.weekday(), hours.get(str(d.weekday())))
+        if h:
+            open_hours.append((int(h[0][:2]), int(h[1][:2])))
+    if open_hours:
+        grid_start = min(s for s, _ in open_hours)
+        grid_end   = max(e for _, e in open_hours)
+    else:
+        grid_start, grid_end = 9, 17
+
+    # Bucket appointments by (day index, hour).
+    slots = {}
+    for appt in get_appointments(business_id):
+        if appt["status"] == "cancelled":
+            continue
+        try:
+            when = datetime.strptime(appt["datetime"], "%Y-%m-%d %H:%M")
+        except (ValueError, TypeError):
+            continue
+        if not (week_start <= when.date() <= days[-1]):
+            continue
+        key = (when.weekday(), when.hour)
+        slots.setdefault(key, []).append({**appt, "minute": when.minute})
+
+    # Which days are open, for shading closed ones.
+    open_days = {
+        d.weekday(): bool(hours.get(d.weekday(), hours.get(str(d.weekday()))))
+        for d in days
+    }
+
+    return render_template(
+        "admin/calendar.html",
+        business   = business,
+        days       = days,
+        hours      = list(range(grid_start, grid_end + 1)),
+        slots      = slots,
+        open_days  = open_days,
+        offset     = offset,
+        today      = today,
+        highlight  = highlight,
+    )
+
+@admin_bp.route("/appointment/<int:appointment_id>")
+@login_required
+def appointment_detail(appointment_id):
+    """Everything about one appointment, with room for the actions.
+
+    Exists because the cancel and reschedule controls were crammed into a
+    table cell, and because the calendar needed somewhere to link to.
+    """
+    from db import get_appointment
+
+    appt = get_appointment(appointment_id)
+    if not appt:
+        abort(404)
+    require_business_access(appt["business_id"])
+
+    business = next((b for b in get_all_businesses()
+                     if b["id"] == appt["business_id"]), None)
+
+    # details is stored as JSON text; parse for display.
+    import json
+    try:
+        details = json.loads(appt.get("details") or "{}")
+    except (ValueError, TypeError):
+        details = {}
+
+    return render_template(
+        "admin/appointment_detail.html",
+        business = business,
+        appt     = appt,
+        details  = details,
     )
