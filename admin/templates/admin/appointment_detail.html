@@ -68,7 +68,7 @@
     {% for key, value in details.items() %}
     <tr>
       <td style="width:180px; color:#718096; font-size:13px; vertical-align:top;">
-        {{ key.replace('_', ' ') | capitalize }}
+        {{ detail_labels.get(key) or key.replace('_', ' ') | capitalize }}
       </td>
       <td style="font-size:14px;">{{ value }}</td>
     </tr>

@@ -8,6 +8,10 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+import logging
+log = logging.getLogger("db")
+log_config = logging.getLogger("config")
+
 DB_PATH = Path("chatbot.db")
 
 
@@ -166,7 +170,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("[db] Database ready.")
+    log.info("Database ready.")
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +223,7 @@ def add_business(name, slug, config_path, twilio_number=None):
     business_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    print(f"[db] Registered business: '{name}' (id={business_id}, slug={slug})")
+    log.info(f"Registered business: '{name}' (id={business_id}, slug={slug})")
     return business_id
 
 def clear_config_override(business_id, field):
@@ -334,6 +338,20 @@ def get_state(phone, business_id):
 # Admin queries
 # ---------------------------------------------------------------------------
 
+def get_business_by_id(business_id):
+    """Return the business row for an id, or None.
+
+    Exists so the config loader can stamp a business's immutable slug onto
+    the config it hands out.
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM businesses WHERE id = ?", (business_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def get_all_businesses():
     """Return all businesses ordered by name. Used by the admin dashboard."""
     conn = get_connection()
@@ -371,7 +389,7 @@ def set_config_override(business_id, field, value, updated_by=None):
     )
     conn.commit()
     conn.close()
-    print(f"[config] {updated_by or 'unknown'} set {field} for business {business_id}")
+    log_config.info(f"{updated_by or 'unknown'} set {field} for business {business_id}")
 
 
 def get_conversation_list(business_id):
@@ -564,7 +582,7 @@ def create_user(email, password, business_id=None, is_operator=False):
     user_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    print(f"[db] Created user {email} (id={user_id}, operator={is_operator})")
+    log.info(f"Created user {email} (id={user_id}, operator={is_operator})")
     return user_id
 
 

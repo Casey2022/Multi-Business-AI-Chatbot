@@ -99,6 +99,51 @@
   <div style="font-size:12px; color:#718096; margin-top:6px;">
     e.g. "appointment", "order", "reservation"
   </div>
+
+  <div style="margin-top:24px;">
+    {% set used = question_rows | selectattr('prompt') | list | length %}
+    <div style="display:flex; align-items:baseline; justify-content:space-between;">
+      <label style="font-size:13px; font-weight:600; color:#4a5568;">
+        {{ fields['booking.extra_questions'].label }}
+      </label>
+      <span style="font-size:12px; color:{% if used == max_extra_questions %}#c05621{% else %}#718096{% endif %};">
+        {{ used }} of {{ max_extra_questions }} used
+      </span>
+    </div>
+    <div style="font-size:12px; color:#718096; margin:6px 0 10px;">
+      Asked after the service and the date/time, in this order. The label is
+      the short name you'll see on the appointment; the question is what the
+      assistant actually asks. Clear both boxes on a row to drop that question.
+    </div>
+
+    <div style="display:flex; gap:8px; padding-left:26px; margin-bottom:4px;
+                font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+                color:#a0aec0;">
+      <div style="flex:0 0 180px;">Label</div>
+      <div style="flex:1;">Question the assistant asks</div>
+    </div>
+
+    {% for row in question_rows %}
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+      <div style="flex:0 0 18px; text-align:right; font-size:12px;
+                  color:#cbd5e0;">{{ row.number }}</div>
+      <input type="hidden"
+             name="booking.extra_questions[{{ row.index }}].key"
+             value="{{ row.key }}">
+      <input type="text"
+             name="booking.extra_questions[{{ row.index }}].label"
+             value="{{ row.label }}"
+             style="flex:0 0 180px; padding:8px 10px; border:1px solid #e2e8f0;
+                    border-radius:6px; font-size:14px;">
+      <input type="text"
+             name="booking.extra_questions[{{ row.index }}].prompt"
+             value="{{ row.prompt }}"
+             style="flex:1; min-width:0; padding:8px 10px;
+                    border:1px solid #e2e8f0; border-radius:6px;
+                    font-size:14px;">
+    </div>
+    {% endfor %}
+  </div>
 </div>
 
 <button type="submit"

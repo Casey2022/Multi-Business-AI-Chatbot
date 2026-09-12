@@ -7,6 +7,11 @@ from config import load_config
 import calendar_sync
 from db import (get_all_businesses, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
 
+import logging
+log = logging.getLogger("admin")
+log_rec = logging.getLogger("reconcile")
+log_kb = logging.getLogger("knowledge")
+
 
 @admin_bp.route("/")
 @login_required
@@ -70,7 +75,7 @@ def appointments(business_id):
     try:
         reconcile_business(business)
     except Exception as e:
-        print(f"[reconcile] Failed for {business['name']}: {e}")
+        log_rec.warning(f"Failed for {business['name']}: {e}")
     appointment_list = get_appointments(business_id)
 
     # Which week each appointment falls in, relative to the current one, so
@@ -117,7 +122,7 @@ def cancel(appointment_id):
         try:
             calendar_sync.delete_event(config, appt["external_event_id"])
         except Exception as e:
-            print(f"[admin] Calendar delete FAILED for appt {appointment_id}: {e}")
+            log.warning(f"Calendar delete FAILED for appt {appointment_id}: {e}")
             flash(f"Could not remove the calendar event: {e}. "
                   f"Nothing was cancelled.", "error")
             return redirect(url_for("admin.appointments",
@@ -155,7 +160,7 @@ def reschedule(appointment_id):
                 config, appt["external_event_id"], new_dt
             )
         except Exception as e:
-            print(f"[admin] Calendar update FAILED for appt {appointment_id}: {e}")
+            log.warning(f"Calendar update FAILED for appt {appointment_id}: {e}")
             flash(f"Could not move the calendar event: {e}. "
                   f"Nothing was changed.", "error")
             return redirect(url_for("admin.appointments",
@@ -176,7 +181,8 @@ def settings(business_id):
     if not business:
         abort(404)
 
-    from config import EDITABLE_FIELDS, load_personas, load_config
+    from config import (EDITABLE_FIELDS, MAX_EXTRA_QUESTIONS,
+                        extra_question_rows, load_personas, load_config)
     from db import set_config_override
     from admin.auth import current_user
 
@@ -187,11 +193,34 @@ def settings(business_id):
         # Load the YAML WITHOUT overrides — this is the baseline we compare
         # against. Storing a value identical to the file would pin the field,
         # so it stops inheriting future YAML improvements for no reason.
-        from config import get_nested
+        from config import get_nested, parse_extra_questions
         from db import clear_config_override
         base = load_config(business["config_path"])
 
+        had_error = False
+
         for field, spec in EDITABLE_FIELDS.items():
+            # Extra questions post one input per row rather than a single
+            # named field, so they're read from the whole form.
+            if spec["type"] == "questions":
+                value, errors = parse_extra_questions(request.form)
+                if value is None:
+                    continue        # this form doesn't carry the questions
+                if errors:
+                    # Reject the whole field rather than save a partly
+                    # understood list — silently dropping a question the
+                    # owner typed is worse than changing nothing.
+                    for message in errors:
+                        flash(message, "error")
+                    had_error = True
+                    continue
+                if value == get_nested(base, field):
+                    clear_config_override(business_id, field)
+                else:
+                    set_config_override(business_id, field, value,
+                                        updated_by=user["email"])
+                continue
+
             raw = request.form.get(field)
             if raw is None:
                 continue
@@ -209,6 +238,7 @@ def settings(business_id):
             elif spec["type"] == "choice":
                 if raw not in personas:
                     flash(f"Unknown personality: {raw}", "error")
+                    had_error = True
                     continue
                 value = raw
             else:
@@ -222,7 +252,10 @@ def settings(business_id):
                 set_config_override(business_id, field, value,
                                     updated_by=user["email"])
 
-        flash("Settings saved.", "success")
+        if had_error:
+            flash("Your other settings were saved.", "success")
+        else:
+            flash("Settings saved.", "success")
         return redirect(url_for("admin.settings", business_id=business_id))
 
     config = load_config(business["config_path"], business_id)
@@ -232,6 +265,8 @@ def settings(business_id):
         config   = config,
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
+        max_extra_questions = MAX_EXTRA_QUESTIONS,
+        question_rows       = extra_question_rows(config),
     )
 
 @admin_bp.route("/business/<int:business_id>/knowledge")
@@ -356,7 +391,7 @@ def knowledge_publish(business_id):
         # Deliberately do NOT clear the flag: the owner must keep seeing
         # "unpublished changes" until a publish actually succeeds, or they'd
         # believe stale content was live.
-        print(f"[knowledge] Publish FAILED for {business['name']}: {e}")
+        log_kb.warning(f"Publish FAILED for {business['name']}: {e}")
         flash(f"Publishing failed: {e}. Your previous content is still live.",
               "error")
 
@@ -500,9 +535,21 @@ def appointment_detail(appointment_id):
     except (ValueError, TypeError):
         details = {}
 
+    # Label each answer with what the business currently calls that question,
+    # so fixing a typo in the settings editor fixes it on past appointments
+    # too. Keys with no matching question left (the owner deleted it) fall
+    # back to the humanized key in the template.
+    from config import question_labels
+    detail_labels = {}
+    if business:
+        detail_labels = question_labels(
+            load_config(business["config_path"], appt["business_id"])
+        )
+
     return render_template(
         "admin/appointment_detail.html",
         business = business,
         appt     = appt,
         details  = details,
+        detail_labels = detail_labels,
     )

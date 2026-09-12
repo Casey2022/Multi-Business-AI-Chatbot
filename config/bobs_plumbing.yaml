@@ -118,6 +118,8 @@ booking:
   fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 2pm' or 'June 5 at 10am'."
   cancel_reply: "No problem — appointment cancelled. Text 'book' anytime to schedule again."
   extra_questions:
+    - key: "service_address"
+      prompt: "What's the address we're coming to?"
     - key: "problem_description"
       prompt: "Briefly, what's the issue? (e.g. 'kitchen sink draining slowly')"
 

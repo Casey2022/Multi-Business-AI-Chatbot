@@ -986,3 +986,58 @@ grep -n "def handle_booking\|def _handle_booking_inner\|_handle_booking_inner(" 
 Three lines, and all three should mention the new parameter. That check found this in seconds; reading the file would have taken longer and might have missed the hardcoded default, since prefilled=None looks entirely reasonable in isolation.
 
 Related pattern in this project. Same family as the earlier sorted()-before-[:3] bug in find_alternatives: every individual piece was correct, and the composition threw the result away. Both are cases where the type checker and the interpreter are satisfied, and only the end-to-end behaviour reveals the problem.
+## Logging replaced print (2026-09-11)
+
+`print()` writes to stdout and forgets: no level, no timestamp, no way to
+quiet the chatty lines in production or turn them up while debugging, and
+on Render the output dies with the process.
+
+The conversion rule was mechanical, because the old prefixes were already
+doing a logger's job: **`print(f"[rag] ...")` became
+`log.info(f"...")` with `log = logging.getLogger("rag")`.** The `[rag]` in
+the output now comes from the logger name instead of being typed into every
+string, so every `grep "\[rag\]"` still works.
+
+Three things worth knowing:
+
+- **Levels are a filter, not decoration.** `LOG_LEVEL=DEBUG` in `.env`
+  turns on the per-request noise (raw LLM output, RAG distances) with no
+  code change. Default is INFO. The chatty lines were set to DEBUG during
+  conversion precisely so INFO stays readable.
+- **The turn id is what makes the log usable.** One customer message fans
+  out into a dozen lines from five modules, and under gunicorn two
+  customers interleave. `new_turn()` at each entry point puts a short id in
+  a `ContextVar`, and a `logging.Filter` stamps it on every record — so
+  `grep 9781 logs/app.log` gives one customer's whole turn in order.
+  ContextVar rather than a global because a global is shared between
+  threads and would hand you two customers' lines under one id.
+- **File logging is best-effort.** If the log directory can't be created
+  the app still starts and logs to console. A logging failure must never be
+  an outage.
+
+### The bug the conversion introduced, caught on first restart
+
+`[rag] Using Voyage AI embeddings.` disappeared from the startup output.
+No error, no traceback — one line that used to be there, wasn't.
+
+Cause: `setup_logging()` was called *after* app.py's own imports. rag.py
+logs that line at module level, so it fires **during** the
+`from llm import ...` statement, before any handler exists. Logging doesn't
+error when it has nowhere to send a record; it falls back to a last-resort
+handler that passes only WARNING and above, and drops the INFO line in
+silence. Moving `setup_logging()` above the project imports fixed it.
+
+The general rule: **configure logging before importing anything that logs
+at import time.** Stdlib imports first, then logging setup, then everything
+else. And note the failure mode — a missing line rather than a crash, which
+is the same plausible-but-wrong shape as the other bugs in this file.
+
+A second thing went wrong at the same time: `werkzeug` had been pinned to
+WARNING as "noise", which silently took the dev-server URL and the debugger
+PIN with it. Quieting a third-party logger wholesale throws away its useful
+lines along with its boring ones.
+
+Prints that stayed prints: the CLI blocks in `rag.py`, `seed_businesses.py`,
+`project_stats.py` and friends. Those talk to a person reading a terminal
+right now, which is exactly what `print` is for. Logging is for the record
+you read later.

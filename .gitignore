@@ -5,3 +5,4 @@ __pycache__/
 chatbot.db
 .DS_Store
 chroma_db/
+logs/

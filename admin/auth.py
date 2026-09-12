@@ -15,6 +15,10 @@ from flask import (render_template, request, redirect, url_for,
 from admin import admin_bp
 from db import verify_password, get_user_by_email
 
+import logging
+log = logging.getLogger("admin")
+log_sec = logging.getLogger("security")
+
 
 def current_user():
     """Return the logged-in user dict, or None."""
@@ -58,7 +62,7 @@ def require_business_access(business_id):
     if user["is_operator"]:
         return
     if user["business_id"] != business_id:
-        print(f"[security] {user['email']} denied access to business {business_id}")
+        log_sec.warning(f"{user['email']} denied access to business {business_id}")
         abort(403)
 
 
@@ -76,13 +80,13 @@ def login():
         if user:
             session["user_email"] = user["email"]
             session.permanent = False
-            print(f"[admin] Login: {user['email']} "
+            log.info(f"Login: {user['email']} "
                   f"(operator={bool(user['is_operator'])})")
             return redirect(url_for("admin.dashboard"))
 
         # Deliberately vague — don't confirm whether the email exists.
         error = "Invalid credentials."
-        print(f"[admin] Failed login attempt for {email!r}")
+        log.warning(f"Failed login attempt for {email!r}")
 
     return render_template("admin/login.html", error=error)
 

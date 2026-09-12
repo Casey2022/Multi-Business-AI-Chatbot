@@ -12,7 +12,7 @@ load_dotenv()
 
 from db import init_db, get_all_businesses, get_documents, add_document_section
 from config import load_config
-from rag import _slugify
+from rag import collection_for
 
 
 def split_sections(text):
@@ -42,8 +42,8 @@ def main():
             print(f"{b['name']}: already has sections — skipping")
             continue
 
-        config = load_config(b["config_path"])
-        docs   = Path("documents") / _slugify(config["business"]["name"])
+        config = load_config(b["config_path"], b["id"])
+        docs   = Path("documents") / collection_for(config)
         if not docs.exists():
             print(f"{b['name']}: no documents folder at {docs}")
             continue

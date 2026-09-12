@@ -13,10 +13,14 @@
 # module can serve any business simultaneously.
 
 import calendar_sync
-from config import substitute
+from config import substitute, question_labels, humanize
 from db import get_state, set_state, save_appointment, get_recent_messages
 from llm import parse_datetime
 from llm import parse_datetime, extract_booking_slots
+
+import logging
+log = logging.getLogger("scheduler")
+log_cal = logging.getLogger("calendar")
 
 def get_slot_definitions(config):
     """Return the ordered list of slots this business collects.
@@ -106,7 +110,7 @@ def _finalize_booking(phone, business_id, pending, config):
             calendar_id = config["calendar"]["calendar_id"]
             sync_status = "synced"
         except Exception as e:
-            print(f"[scheduler] Calendar write FAILED: {e}")
+            log.warning(f"Calendar write FAILED: {e}")
             # Reset state so the customer isn't stuck mid-booking, and be
             # honest that nothing was booked.
             set_state(phone, business_id, "idle", pending={})
@@ -118,7 +122,7 @@ def _finalize_booking(phone, business_id, pending, config):
     save_appointment(phone, service, parsed, business_id, details=extras, external_event_id=event_id, external_calendar=calendar_id, sync_status=sync_status,)
 
     noun = BOOKING.get("noun", "appointment")
-    print(f"[scheduler] Saved {noun}: {phone} | {service} | {parsed} | extras={extras}")
+    log.info(f"Saved {noun}: {phone} | {service} | {parsed} | extras={extras}")
 
     friendly_when = _dt.strptime(parsed, "%Y-%m-%d %H:%M").strftime(
         "%A, %B %-d at %-I:%M %p"
@@ -203,7 +207,7 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
                 set_state(phone, business_id, "collecting", pending=pending)
                 return _unavailable_message(parsed, alts, config, reason=reason)
         except Exception as e:
-            print(f"[calendar] Availability check failed (continuing): {e}")
+            log_cal.warning(f"Availability check failed (continuing): {e}")
 
     set_state(phone, business_id, "confirming", pending=pending)
     return _confirmation_question(pending, config)
@@ -241,13 +245,14 @@ def _confirmation_question(pending, config):
     # and skip "none"-style answers, which add nothing for the customer.
     skip_keys   = {"service", "datetime", "datetime_parsed"}
     skip_values = {"none", "n/a", "no", "nothing", "-"}
+    labels      = question_labels(config)
 
     for key, value in pending.items():
         if key in skip_keys:
             continue
         if not value or str(value).strip().lower() in skip_values:
             continue
-        label = key.replace("_", " ").capitalize()
+        label = labels.get(key) or humanize(key)
         lines.append(f"{label}: {value}.")
 
     lines.append("Is that right?")
@@ -309,7 +314,7 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
         set_state(phone, business_id, "collecting", pending=pending)
         return _unavailable_message(candidate, alts, config, reason=reason)
     except Exception as e:
-        print(f"[calendar] Early availability check failed: {e}")
+        log_cal.warning(f"Early availability check failed: {e}")
         return None
 
 def handle_booking(phone, message, config, business_id, prefilled=None):
@@ -321,7 +326,7 @@ def handle_booking(phone, message, config, business_id, prefilled=None):
     couldn't see without opening a browser.
     """
     reply = _handle_booking_inner(phone, message, config, business_id, prefilled)
-    print(f"[scheduler] Reply: {reply!r}")
+    log.debug(f"Reply: {reply!r}")
     return reply
 
 def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
@@ -384,7 +389,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
             missing = _first_missing_slot(pending, slots)
             if missing:
                 extracted = {missing["key"]: message.strip()[:200]}
-                print(f"[scheduler] No slots extracted — "
+                log.info(f"No slots extracted — "
                       f"treating message as '{missing['key']}'")
 
         pending.update(extracted)
@@ -419,6 +424,6 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         return _confirmation_question(pending, config)
 
     # --- Unknown state: reset gracefully ---
-    print(f"[scheduler] WARNING: unknown state '{state}' for {phone} — resetting.")
+    log.warning(f"Unknown state '{state}' for {phone} — resetting.")
     set_state(phone, business_id, "idle", pending={})
     return "Something went wrong on my end. Let's start over — how can I help?"

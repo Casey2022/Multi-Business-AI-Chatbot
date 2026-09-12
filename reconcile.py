@@ -16,6 +16,9 @@ from config import load_config
 from db import (get_sync_token, set_sync_token, get_appointment_by_event_id,
                 cancel_appointment, reschedule_appointment, mark_calendar_change)
 
+import logging
+log = logging.getLogger("reconcile")
+
 
 def reconcile_business(business):
     """Pull calendar changes for one business into the database.
@@ -74,8 +77,8 @@ def reconcile_business(business):
         set_sync_token(business["id"], next_token)
 
     if changes:
-        print(f"[reconcile] {business['name']}: {len(changes)} change(s)")
+        log.info(f"{business['name']}: {len(changes)} change(s)")
         for c in changes:
-            print(f"  {c}")
+            log.debug(f"  {c}")
 
     return changes

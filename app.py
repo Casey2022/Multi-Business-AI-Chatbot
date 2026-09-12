@@ -17,7 +17,17 @@ load_dotenv()  # Must run before any module reads os.environ
 # Imports
 # ---------------------------------------------------------------------------
 
+import logging
 import os
+
+# Logging is configured BEFORE our own modules are imported, and that order
+# is load-bearing. rag.py announces its embedding backend at import time, so
+# that line is emitted *during* the import statement below. Anything logged
+# before handlers exist falls to logging's last-resort handler, which passes
+# only WARNING and above — so the line vanished with no error to explain it.
+from logging_setup import setup_logging, new_turn
+setup_logging()
+
 from flask import Flask, request, render_template
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.request_validator import RequestValidator
@@ -35,6 +45,11 @@ from llm import get_llm_reply
 from scheduler import handle_booking, is_mid_booking
 from phone_utils import normalize as normalize_phone
 from admin import admin_bp
+
+log_boot = logging.getLogger("bootstrap")
+log_sec = logging.getLogger("security")
+log = logging.getLogger("app")
+log_web = logging.getLogger("webchat")
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -54,7 +69,7 @@ def bootstrap():
     businesses = get_all_businesses()
 
     if not businesses:
-        print("[bootstrap] No businesses registered — running seed.")
+        log_boot.info("No businesses registered — running seed.")
         from seed_businesses import seed
         seed()
         businesses = get_all_businesses()
@@ -72,9 +87,9 @@ def bootstrap():
         password = os.environ.get("ADMIN_PASSWORD")
         if email and password:
             create_user(email, password, business_id=None, is_operator=True)
-            print(f"[bootstrap] Seeded operator account: {email}")
+            log_boot.info(f"Seeded operator account: {email}")
         else:
-            print("[bootstrap] WARNING: no users exist and ADMIN_EMAIL / "
+            log_boot.warning("No users exist and ADMIN_EMAIL / "
                   "ADMIN_PASSWORD are not set — the admin portal is "
                   "unreachable.")
 
@@ -83,13 +98,13 @@ def bootstrap():
         if not b["active"]:
             continue
         try:
-            ensure_ingested(load_config(b["config_path"]))
+            ensure_ingested(load_config(b["config_path"], b["id"]))
         except Exception as e:
             # A failed ingest shouldn't stop the server from starting —
             # that business just won't have RAG until it's fixed.
-            print(f"[bootstrap] WARNING: ingest failed for {b['name']}: {e}")
+            log_boot.warning(f"Ingest failed for {b['name']}: {e}")
 
-    print(f"[bootstrap] Ready — {len(businesses)} business(es) registered.")
+    log_boot.info(f"Ready — {len(businesses)} business(es) registered.")
     
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
@@ -120,13 +135,13 @@ def is_valid_twilio_request():
     if ALLOW_UNSIGNED_REQUESTS:
         signature = request.headers.get("X-Twilio-Signature", "")
         if not signature:
-            print("[security] WARNING: ALLOW_UNSIGNED_REQUESTS=true "
+            log_sec.warning("ALLOW_UNSIGNED_REQUESTS=true "
                   "— accepting unsigned request")
         return True
 
     signature = request.headers.get("X-Twilio-Signature", "")
     if not signature:
-        print("[security] Rejected: no X-Twilio-Signature header")
+        log_sec.warning("Rejected: no X-Twilio-Signature header")
         return False
 
     is_valid = _twilio_validator.validate(
@@ -135,7 +150,7 @@ def is_valid_twilio_request():
         signature
     )
     if not is_valid:
-        print(f"[security] Rejected: signature mismatch for {request.url}")
+        log_sec.warning(f"Rejected: signature mismatch for {request.url}")
     return is_valid
 
 
@@ -173,7 +188,7 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
 
         if reply_text == BOOK_INTENT:
             # Rule matched a booking trigger — start the booking flow.
-            print(f"[app] Booking intent detected for {sender_id}")
+            log.info(f"Booking intent detected for {sender_id}")
             reply_text = handle_booking(sender_id, message, config, business_id)
             source = "scheduler"
 
@@ -189,7 +204,7 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
             result = classify_and_extract(message, slots, config)
 
             if result.get("intent") == "book":
-                print(f"[app] Booking intent detected (LLM) for {sender_id}")
+                log.info(f"Booking intent detected (LLM) for {sender_id}")
                 extracted = {k: v for k, v in result.items() if k != "intent"}
                 reply_text = handle_booking(
                     sender_id, message, config, business_id,
@@ -231,18 +246,19 @@ def sms_reply():
     from_number  = normalize_phone(request.form.get("From", "unknown"))
     to_number    = normalize_phone(request.form.get("To",   "unknown"))
 
-    print(f"Incoming message from {from_number}: {incoming_msg!r}")
+    new_turn()      # every line logged for this message shares one id
+    log.info(f"Incoming message from {from_number}: {incoming_msg!r}")
 
      # Identify which business this webhook is for.
     business = get_business_by_number(to_number)
     if not business:
-        print(f"[app] WARNING: no business registered for {to_number}")
+        log.warning(f"No business registered for {to_number}")
         return "Forbidden", 404
 
     config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
 
-    print(f"[app] Serving: {business['name']} (id={business_id})")
+    log.info(f"Serving: {business['name']} (id={business_id})")
 
     # Run the message through the channel-agnostic brain.
     reply_text = process_message(
@@ -284,7 +300,8 @@ def webchat_reply(slug):
     config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
 
-    print(f"[webchat] {business['name']} <- {session_id}: {message!r}")
+    new_turn()
+    log_web.info(f"{business['name']} <- {session_id}: {message!r}")
 
     reply_text = process_message(
         message, session_id, business_id, config, channel="webchat"

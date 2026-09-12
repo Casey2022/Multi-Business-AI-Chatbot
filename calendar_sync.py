@@ -16,6 +16,11 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from zoneinfo import ZoneInfo
 
+from config import question_labels, humanize
+
+import logging
+log = logging.getLogger("calendar")
+
 # calendar.events covers creating/updating events; freebusy queries need
 # the broader calendar scope. Both are required for availability checking.
 SCOPES = [
@@ -75,8 +80,9 @@ def create_event(config, service_name, start_iso, customer_id, details=None):
 
     # Build a readable description from the booking details.
     lines = [f"Booked via {business['name']} assistant.", f"Customer: {customer_id}"]
+    labels = question_labels(config)
     for key, value in (details or {}).items():
-        lines.append(f"{key.replace('_', ' ').title()}: {value}")
+        lines.append(f"{labels.get(key) or humanize(key)}: {value}")
 
     event = {
         "summary": f"{service_name} — {customer_id}",
@@ -91,7 +97,7 @@ def create_event(config, service_name, start_iso, customer_id, details=None):
     ).execute()
 
     event_id = created.get("id")
-    print(f"[calendar] Created event {event_id} for {service_name} at {start_iso}")
+    log.info(f"Created event {event_id} for {service_name} at {start_iso}")
     return event_id
 
 def _sched(config):
@@ -335,7 +341,7 @@ def delete_event(config, event_id):
             calendarId=cal["calendar_id"],
             eventId=event_id,
         ).execute()
-        print(f"[calendar] Deleted event {event_id}")
+        log.info(f"Deleted event {event_id}")
     except HttpError as e:
         # Only 410 Gone means "this event existed and is already deleted" —
         # the desired end state is true, so treat it as success.
@@ -345,7 +351,7 @@ def delete_event(config, event_id):
         # a successful cancellation while the real event stays on the owner's
         # calendar.
         if e.resp.status == 410:
-            print(f"[calendar] Event {event_id} already deleted — treating as success")
+            log.warning(f"Event {event_id} already deleted — treating as success")
             return
         raise
 
@@ -368,7 +374,7 @@ def update_event_time(config, event_id, new_start_iso):
         },
     ).execute()
 
-    print(f"[calendar] Moved event {event_id} to {new_start_iso}")
+    log.info(f"Moved event {event_id} to {new_start_iso}")
     return updated.get("id")
 
 def fetch_changes(config, sync_token=None):
@@ -401,7 +407,7 @@ def fetch_changes(config, sync_token=None):
         result = _get_service().events().list(**params).execute()
     except HttpError as e:
         if e.resp.status == 410:
-            print("[calendar] Sync token expired — full resync needed")
+            log.warning("Sync token expired — full resync needed")
             return None, None
         raise
 

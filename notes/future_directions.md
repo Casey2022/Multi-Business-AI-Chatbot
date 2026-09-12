@@ -407,3 +407,37 @@ Phase 4 — availability checking. Query the calendar's busy times before confir
 Cancellation / rescheduling sync. When customer self-service cancellation exists, cancelled bookings must also be removed from the calendar. The external_event_id from Phase 3 is what makes that possible — worth adding before it's needed.
 
 Second calendar for the bakery. Currently only Bob's Plumbing has calendar sync configured. A second calendar shared with the same service account would demonstrate the multi-tenant story properly.
+
+---
+
+## Response quality pass (wanted — not yet scheduled)
+
+Several replies during informal testing didn't flow well. Nothing was
+*wrong* exactly; the wording and the handoffs read stiff or off-key. Worth
+a dedicated pass rather than fixing one reply at a time as it's noticed.
+
+What makes this tractable: every turn is already in the `messages` table,
+role-tagged and business-scoped — 538 rows at the time of writing. That's a
+real transcript corpus, not a memory of "one time it said something odd".
+The pass should be: pull the assistant turns, read them in conversation
+order, and sort the awkwardness into buckets before changing anything.
+
+Likely buckets, to be confirmed against the transcripts rather than assumed:
+
+- **Template seams.** Config-authored strings (`greeting`, `ask_datetime`,
+  `final_confirmation`) sitting next to LLM-generated prose. Two voices in
+  one conversation, and the joins show.
+- **The confirmation summary.** `Just to confirm: X. Service address: Y.
+  Problem description: Z. Is that right?` is a form read aloud. Fine for
+  correctness, stiff as speech.
+- **Handoff into the booking flow.** The moment the assistant stops
+  answering and the state machine starts asking.
+- **Rejection and fallback wording** — closed, blackout, conflict, bad date.
+  These are the replies a frustrated customer sees, so tone matters most
+  here and they're the least exercised.
+- **Guardrail bleed.** Places where the "I can't do that, call us" rules
+  make an otherwise normal answer sound defensive.
+
+Do this *after* file logging, so the odd replies can be traced back to
+which path produced them (rules engine, RAG hit, RAG miss, scheduler) —
+without that, judging a reply means guessing at where it came from.

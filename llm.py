@@ -13,6 +13,9 @@ from anthropic import Anthropic
 from config import substitute
 from rag import retrieve
 
+import logging
+log = logging.getLogger("llm")
+
 # ---------------------------------------------------------------------------
 # Module-level constants (not business-specific — safe at import time)
 # ---------------------------------------------------------------------------
@@ -99,7 +102,7 @@ Message: "{message}"
 
         extracted = json.loads(raw)
         if not isinstance(extracted, dict):
-            print(f"[llm] Slot extraction returned non-dict: {raw!r}")
+            log.warning(f"Slot extraction returned non-dict: {raw!r}")
             return {}
 
         # Keep only known slot keys with non-empty values — the model
@@ -110,14 +113,14 @@ Message: "{message}"
             for k, v in extracted.items()
             if k in valid_keys and v not in (None, "", "null")
         }
-        print(f"[llm] Slots extracted: {cleaned}")
+        log.debug(f"Slots extracted: {cleaned}")
         return cleaned
 
     except json.JSONDecodeError as e:
-        print(f"[llm] Slot extraction JSON error: {e} | raw={raw!r}")
+        log.info(f"Slot extraction JSON error: {e} | raw={raw!r}")
         return {}
     except Exception as e:
-        print(f"[llm] Slot extraction error: {e}")
+        log.info(f"Slot extraction error: {e}")
         return {}
 
 def build_system_prompt(config, channel="sms"):
@@ -285,11 +288,11 @@ Message: "{message}"
             if k in valid_keys and v not in (None, "", "null"):
                 cleaned[k] = str(v).strip()
 
-        print(f"[llm] Intent: {cleaned}")
+        log.debug(f"Intent: {cleaned}")
         return cleaned
 
     except Exception as e:
-        print(f"[llm] Intent classification failed: {e}")
+        log.warning(f"Intent classification failed: {e}")
         return {"intent": "question"}
 
 # ---------------------------------------------------------------------------
@@ -348,11 +351,11 @@ def get_llm_reply(message, history=None, config=None, channel="sms"):
             messages=messages,
         )
         reply = response.content[0].text.strip()
-        print(f"[llm] Claude replied: {reply!r}")
+        log.debug(f"Claude replied: {reply!r}")
         return reply
 
     except Exception as e:
-        print(f"[llm] ERROR calling Claude: {e}")
+        log.error(f"ERROR calling Claude: {e}")
         return ("Sorry, I'm having trouble right now. "
                 "Please try again or call us directly.")
 
@@ -431,7 +434,7 @@ User: "{user_input}"
             messages=[{"role": "user", "content": prompt}],
         )
         result = response.content[0].text.strip()
-        print(f"[llm] Date parse result: {result!r}")
+        log.debug(f"Date parse result: {result!r}")
 
         if result.startswith("NONE"):
             return None
@@ -442,7 +445,7 @@ User: "{user_input}"
         import re
         match = re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", result)
         if not match:
-            print("[llm] No timestamp found in response")
+            log.warning("No timestamp found in response")
             return None
         result = match.group(0)
 
@@ -450,5 +453,5 @@ User: "{user_input}"
         return result
 
     except Exception as e:
-        print(f"[llm] Date parse error: {e}")
+        log.info(f"Date parse error: {e}")
         return None

@@ -21,6 +21,9 @@ from pathlib import Path
 import os
 import chromadb.utils.embedding_functions as embedding_functions
 
+import logging
+log = logging.getLogger("rag")
+
 # Embedding backend selection.
 #
 # Chroma's default embedder runs a local ONNX model — fine on a laptop,
@@ -35,11 +38,11 @@ if VOYAGE_API_KEY:
         api_key=VOYAGE_API_KEY,
         model_name="voyage-3-large",
     )
-    print("[rag] Using Voyage AI embeddings.")
+    log.info("Using Voyage AI embeddings.")
 else:
     # Fallback: Chroma's local default. Works locally; too slow to deploy.
     _embedding_fn = None
-    print("[rag] WARNING: VOYAGE_API_KEY not set — falling back to local "
+    log.warning("VOYAGE_API_KEY not set — falling back to local "
           "ONNX embeddings. Slow, and NOT compatible with collections "
           "built using Voyage (different vector dimensions).")
 
@@ -136,6 +139,23 @@ def chunk_text(text):
 # Ingestion — run offline: python3 rag.py
 # ---------------------------------------------------------------------------
 
+def collection_for(config):
+    """The ChromaDB collection this business's knowledge lives in.
+
+    Prefers the immutable slug stamped on the config by load_config. Falls
+    back to slugifying the business name for callers that load a YAML file
+    directly with no business_id — the offline scripts.
+
+    Why this matters: the business NAME is owner-editable. Keying a
+    collection on it meant that renaming a business in settings pointed
+    retrieval at a collection that had never existed, and the failure was
+    silent — no exception, just an empty result list and a bot that quietly
+    stopped knowing anything. The slug is a database column nobody can edit.
+    """
+    business = config.get("business", {})
+    return business.get("slug") or _slugify(business.get("name", ""))
+
+
 def ingest_documents(config, business_id=None):
     """Rebuild a business's vector collection from its document sections.
 
@@ -144,11 +164,11 @@ def ingest_documents(config, business_id=None):
     with an empty knowledge base whenever the embedding API failed partway —
     and the caller had no way to tell that from a clean failure.
     """
-    slug            = _slugify(config["business"]["name"])
+    slug            = collection_for(config)
     collection_name = slug
     temp_name       = f"{slug}__building"
 
-    print(f"[rag] Using collection: {collection_name}")
+    log.info(f"Using collection: {collection_name}")
 
     chunks = []
     ids    = []
@@ -157,7 +177,7 @@ def ingest_documents(config, business_id=None):
     if business_id is not None:
         from db import get_documents
         sections = get_documents(business_id)
-        print(f"[rag] Ingesting {len(sections)} section(s) from database")
+        log.info(f"Ingesting {len(sections)} section(s) from database")
         for s in sections:
             chunks.append(f"## {s['title']}\n{s['body']}")
             ids.append(f"section_{s['id']}")
@@ -165,21 +185,21 @@ def ingest_documents(config, business_id=None):
                           "title": s["title"]})
     else:
         docs_path = Path("documents") / slug
-        print(f"[rag] Ingesting documents from {docs_path}...")
+        log.info(f"Ingesting documents from {docs_path}...")
         if not docs_path.exists():
-            print(f"[rag] ERROR: documents folder not found: {docs_path}")
+            log.error(f"Documents folder not found: {docs_path}")
             return None
         for md_file in sorted(docs_path.glob("*.md")):
             text = md_file.read_text(encoding="utf-8")
             file_chunks = chunk_text(text)
-            print(f"[rag] {md_file.name}: {len(file_chunks)} chunks")
+            log.info(f"{md_file.name}: {len(file_chunks)} chunks")
             for i, c in enumerate(file_chunks):
                 chunks.append(c)
                 ids.append(f"{md_file.stem}_chunk_{i}")
                 metas.append({"source": md_file.name, "chunk_index": i})
 
     if not chunks:
-        print(f"[rag] WARNING: no content to ingest for '{collection_name}'")
+        log.warning(f"No content to ingest for '{collection_name}'")
         return None
 
     client = get_chroma_client()
@@ -221,7 +241,7 @@ def ingest_documents(config, business_id=None):
     live.add(documents=chunks, ids=ids, metadatas=metas)
     client.delete_collection(temp_name)
 
-    print(f"[rag] Ingested {len(chunks)} chunks into '{collection_name}'.")
+    log.info(f"Ingested {len(chunks)} chunks into '{collection_name}'.")
     return live
 
 def ensure_ingested(config):
@@ -231,7 +251,7 @@ def ensure_ingested(config):
     fast no-op; on an ephemeral one (cloud free tiers) it rebuilds the vector
     store automatically after a restart.
     """
-    slug      = _slugify(config["business"]["name"])
+    slug      = collection_for(config)
     docs_path = Path("documents") / slug
 
     # Expected chunk count from the source documents. Comparing against this
@@ -249,9 +269,9 @@ def ensure_ingested(config):
         )
         count = collection.count()
         if count == expected and count > 0:
-            print(f"[rag] Collection '{slug}' complete ({count} chunks) — skipping.")
+            log.info(f"Collection '{slug}' complete ({count} chunks) — skipping.")
             return
-        print(f"[rag] Collection '{slug}' has {count} chunks, expected {expected} "
+        log.info(f"Collection '{slug}' has {count} chunks, expected {expected} "
               f"— rebuilding.")
     except Exception:
         pass
@@ -270,8 +290,8 @@ def retrieve(query, config):
     DISTANCE_THRESHOLD. Returns [] if nothing is close enough or if the
     collection hasn't been ingested yet.
     """
-    collection_name = _slugify(config["business"]["name"])
-    print(f"[rag] Opening collection '{collection_name}'...")
+    collection_name = collection_for(config)
+    log.info(f"Opening collection '{collection_name}'...")
 
     try:
         collection = get_chroma_client().get_collection(
@@ -279,12 +299,12 @@ def retrieve(query, config):
             embedding_function=_embedding_fn,
         )
     except Exception as e:
-        print(f"[rag] WARNING: collection '{collection_name}' not found: {e}")
+        log.warning(f"Collection '{collection_name}' not found: {e}")
         return []
 
-    print("[rag] Collection opened. Embedding query and searching...")
+    log.debug("Collection opened. Embedding query and searching...")
     results = collection.query(query_texts=[query], n_results=TOP_K)
-    print(f"[rag] Search returned {len(results['documents'][0])} raw results.")
+    log.debug(f"Search returned {len(results['documents'][0])} raw results.")
 
     documents = results["documents"][0]
     distances = results["distances"][0]
@@ -295,11 +315,11 @@ def retrieve(query, config):
         if dist <= DISTANCE_THRESHOLD
     ]
 
-    print(f"[rag] Query: {query!r} -> {len(filtered)} usable chunks "
+    log.info(f"Query: {query!r} -> {len(filtered)} usable chunks "
           f"(of {len(documents)} returned)")
     for doc, dist in filtered:
         preview = doc[:80] + ("..." if len(doc) > 80 else "")
-        print(f"        distance={dist:.4f}  {preview}")
+        log.debug(f"distance={dist:.4f}  {preview}")
 
     return filtered
 
