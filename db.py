@@ -168,6 +168,33 @@ def init_db():
         )
     """)
 
+    # geocode_cache — addresses already resolved, so a repeat booking to the
+    # same street doesn't pay for a second lookup. Keyed by the query plus
+    # its viewport bias, because the same string biased differently is a
+    # different question. A row with result NULL is a remembered miss.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS geocode_cache (
+            query      TEXT PRIMARY KEY,
+            result     TEXT,
+            fetched_at TEXT NOT NULL
+        )
+    """)
+
+    # geocode_usage — how many geocoding calls each business has spent today.
+    # The limit lives here rather than in Google's console because a vendor
+    # quota is per-project, often not adjustable, and tells you about it by
+    # failing inside a customer's booking. This one is per-business, always
+    # adjustable, and resets at midnight by virtue of the date being part of
+    # the key — no cleanup job, and yesterday's rows are free history.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS geocode_usage (
+            usage_key TEXT    NOT NULL,
+            day       TEXT    NOT NULL,
+            calls     INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (usage_key, day)
+        )
+    """)
+
     conn.commit()
     conn.close()
     log.info("Database ready.")
@@ -719,3 +746,91 @@ def set_documents_clean(business_id):
                  (business_id,))
     conn.commit()
     conn.close()
+
+# ---------------------------------------------------------------------------
+# Geocode cache
+# ---------------------------------------------------------------------------
+
+def get_cached_geocode(query):
+    """Return {'result': <dict or None>} if this query was looked up before.
+
+    The wrapper dict distinguishes "never asked" (None) from "asked, and the
+    answer was no match" ({'result': None}) — without it, every remembered
+    miss would be looked up again forever.
+    """
+    import json as _json
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT result FROM geocode_cache WHERE query = ?", (query,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return {"result": _json.loads(row["result"]) if row["result"] else None}
+
+
+def save_cached_geocode(query, result):
+    """Remember a lookup, hit or miss."""
+    import json as _json
+    from datetime import datetime
+    conn = get_connection()
+    conn.execute(
+        """
+        INSERT INTO geocode_cache (query, result, fetched_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(query) DO UPDATE SET
+            result = excluded.result, fetched_at = excluded.fetched_at
+        """,
+        (query, _json.dumps(result) if result else None,
+         datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Geocode usage
+# ---------------------------------------------------------------------------
+
+def reserve_geocode_call(usage_key, day):
+    """Count one geocoding call against a business's day, returning the new total.
+
+    Increment-then-check rather than check-then-increment: the UPSERT is a
+    single atomic statement, so two gunicorn workers can't both read "99"
+    and both decide they're clear. The cost of that ordering is that
+    attempts made after the limit is reached still increment, so the number
+    can exceed the limit — it becomes a count of attempts rather than of
+    calls. That's the more useful number anyway when someone is hammering
+    the endpoint.
+    """
+    conn = get_connection()
+    conn.execute(
+        """
+        INSERT INTO geocode_usage (usage_key, day, calls)
+        VALUES (?, ?, 1)
+        ON CONFLICT(usage_key, day) DO UPDATE SET calls = calls + 1
+        """,
+        (usage_key, day)
+    )
+    # Read back on the SAME connection before committing. The INSERT already
+    # took SQLite's write lock, so no other worker can slip between these two
+    # statements — the same guarantee RETURNING would give, without depending
+    # on the SQLite version that happens to be bundled wherever this runs.
+    row = conn.execute(
+        "SELECT calls FROM geocode_usage WHERE usage_key = ? AND day = ?",
+        (usage_key, day)
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return row["calls"]
+
+
+def get_geocode_usage(usage_key, day):
+    """Calls already counted for this business today."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT calls FROM geocode_usage WHERE usage_key = ? AND day = ?",
+        (usage_key, day)
+    ).fetchone()
+    conn.close()
+    return row["calls"] if row else 0

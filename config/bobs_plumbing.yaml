@@ -6,6 +6,11 @@ business:
   address: "123 Main St, Rochester NY"
   hours: "Mon-Fri, 9am-5pm"
   service_area: "Greater Rochester, within 20 miles"
+  # Structured form of the line above, used for the address check.
+  # Origin defaults to business.address when omitted. Businesses
+  # without this key simply skip the check.
+  service_radius:
+    miles: 20
 
 services:
   - "drain cleaning"
