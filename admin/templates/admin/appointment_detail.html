@@ -70,7 +70,26 @@
       <td style="width:180px; color:#718096; font-size:13px; vertical-align:top;">
         {{ detail_labels.get(key) or key.replace('_', ' ') | capitalize }}
       </td>
-      <td style="font-size:14px;">{{ value }}</td>
+      <td style="font-size:14px;">
+        {{ value }}
+        {% set check = address_checks.get(key) %}
+        {% if check %}
+          {% if check.status == 'inside' %}
+          <div style="font-size:12px; color:#2f855a; margin-top:3px;">
+            ✓ in the service area — {{ check.reason }}</div>
+          {% elif check.status == 'outside' %}
+          <div style="font-size:12px; color:#c53030; margin-top:3px;">
+            ✗ outside the service area — {{ check.reason }}</div>
+          {% else %}
+          <div style="font-size:12px; color:#b7791f; margin-top:3px;">
+            ⚠ not verified — {{ check.reason }}</div>
+          {% endif %}
+          {% if check.formatted and check.formatted != value %}
+          <div style="font-size:12px; color:#718096;">
+            resolved to {{ check.formatted }}</div>
+          {% endif %}
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>

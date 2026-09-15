@@ -195,9 +195,24 @@ def init_db():
         )
     """)
 
+    # --- migrations -------------------------------------------------------
+    # CREATE TABLE IF NOT EXISTS is a no-op once a table exists, so a new
+    # column on an existing table needs an explicit ALTER. Guarded by an
+    # inspection rather than a try/except so a genuine error still surfaces.
+    _add_column_if_missing(conn, "appointments", "address_check", "TEXT")
+
     conn.commit()
     conn.close()
     log.info("Database ready.")
+
+
+def _add_column_if_missing(conn, table, column, declaration):
+    """Add a column to an existing table, once. Safe to run on every boot."""
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column in existing:
+        return
+    log.info("Adding column %s.%s", table, column)
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +328,7 @@ def get_recent_messages(phone, business_id, limit=10):
 
 def save_appointment(phone, service, when, business_id, details=None,
                      external_event_id=None, external_calendar=None,
-                     sync_status="none"):
+                     sync_status="none", address_check=None):
     """Write a completed booking.
 
     The external_* fields record where this booking was mirrored, so it can
@@ -325,11 +340,12 @@ def save_appointment(phone, service, when, business_id, details=None,
         """
         INSERT INTO appointments
             (business_id, phone, service, datetime, status, details,
-             external_event_id, external_calendar, sync_status)
-        VALUES (?, ?, ?, ?, 'booked', ?, ?, ?, ?)
+             external_event_id, external_calendar, sync_status, address_check)
+        VALUES (?, ?, ?, ?, 'booked', ?, ?, ?, ?, ?)
         """,
         (business_id, phone, service, when, _json.dumps(details or {}),
-         external_event_id, external_calendar, sync_status)
+         external_event_id, external_calendar, sync_status,
+         _json.dumps(address_check) if address_check else None)
     )
     conn.commit()
     conn.close()
@@ -766,11 +782,17 @@ def get_cached_geocode(query):
     conn.close()
     if row is None:
         return None
-    return {"result": _json.loads(row["result"]) if row["result"] else None}
+    if not row["result"]:
+        return {"result": None, "detail": None}
+    stored = _json.loads(row["result"])
+    # Rows written before the detail was cached hold the bare result dict.
+    if isinstance(stored, dict) and "result" in stored:
+        return stored
+    return {"result": stored, "detail": None}
 
 
-def save_cached_geocode(query, result):
-    """Remember a lookup, hit or miss."""
+def save_cached_geocode(query, result, detail=None):
+    """Remember a lookup, hit or miss, along with why it missed."""
     import json as _json
     from datetime import datetime
     conn = get_connection()
@@ -781,7 +803,7 @@ def save_cached_geocode(query, result):
         ON CONFLICT(query) DO UPDATE SET
             result = excluded.result, fetched_at = excluded.fetched_at
         """,
-        (query, _json.dumps(result) if result else None,
+        (query, _json.dumps({"result": result, "detail": detail}),
          datetime.now().isoformat())
     )
     conn.commit()

@@ -181,7 +181,7 @@ def settings(business_id):
     if not business:
         abort(404)
 
-    from config import (EDITABLE_FIELDS, MAX_EXTRA_QUESTIONS,
+    from config import (EDITABLE_FIELDS, MAX_EXTRA_QUESTIONS, choice_value,
                         extra_question_rows, load_personas, load_config)
     from db import set_config_override
     from admin.auth import current_user
@@ -193,7 +193,7 @@ def settings(business_id):
         # Load the YAML WITHOUT overrides — this is the baseline we compare
         # against. Storing a value identical to the file would pin the field,
         # so it stops inheriting future YAML improvements for no reason.
-        from config import get_nested, parse_extra_questions
+        from config import get_nested, parse_extra_questions, coerce_choice
         from db import clear_config_override
         base = load_config(business["config_path"])
 
@@ -235,6 +235,13 @@ def settings(business_id):
                     q, a = line.split("|", 1)
                     if q.strip() and a.strip():
                         value.append({"question": q.strip(), "answer": a.strip()})
+            elif spec["type"] == "select":
+                if raw not in spec["options"]:
+                    flash(f"{spec['label']}: {raw!r} isn't one of the choices.",
+                          "error")
+                    had_error = True
+                    continue
+                value = coerce_choice(raw, spec)
             elif spec["type"] == "choice":
                 if raw not in personas:
                     flash(f"Unknown personality: {raw}", "error")
@@ -267,6 +274,11 @@ def settings(business_id):
         personas = load_personas(),
         max_extra_questions = MAX_EXTRA_QUESTIONS,
         question_rows       = extra_question_rows(config),
+        choice_values       = {
+            field: choice_value(config, field, spec)
+            for field, spec in EDITABLE_FIELDS.items()
+            if spec["type"] == "select"
+        },
     )
 
 @admin_bp.route("/business/<int:business_id>/knowledge")
@@ -539,6 +551,11 @@ def appointment_detail(appointment_id):
     # so fixing a typo in the settings editor fixes it on past appointments
     # too. Keys with no matching question left (the owner deleted it) fall
     # back to the humanized key in the template.
+    try:
+        address_checks = json.loads(appt.get("address_check") or "{}")
+    except (ValueError, TypeError):
+        address_checks = {}
+
     from config import question_labels
     detail_labels = {}
     if business:
@@ -552,4 +569,5 @@ def appointment_detail(appointment_id):
         appt     = appt,
         details  = details,
         detail_labels = detail_labels,
+        address_checks = address_checks,
     )

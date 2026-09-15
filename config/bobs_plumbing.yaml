@@ -10,6 +10,7 @@ business:
   # Origin defaults to business.address when omitted. Businesses
   # without this key simply skip the check.
   service_radius:
+    enabled: true
     miles: 20
 
 services:
@@ -122,6 +123,10 @@ booking:
   final_confirmation: "Perfect! Appointment scheduled: {service} on {datetime}. We'll call to confirm. To change or cancel, just give us a call at {phone}."
   fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 2pm' or 'June 5 at 10am'."
   cancel_reply: "No problem — appointment cancelled. Text 'book' anytime to schedule again."
+  # Sent when an address is confidently outside the service radius. This is
+  # the most delicate sentence in the flow — it turns someone away — so it
+  # lives in config where the owner can word it themselves.
+  out_of_area_reply: "That address looks like it's outside our service area ({service_area}). Give us a call at {phone} — if we can make it work, we will."
   extra_questions:
     - key: "service_address"
       prompt: "What's the address we're coming to?"

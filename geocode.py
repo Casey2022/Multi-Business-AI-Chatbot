@@ -191,6 +191,10 @@ def radius_config(config):
     """
     business = config.get("business") or {}
     radius   = business.get("service_radius") or {}
+    # Explicitly switched off wins over any distance still stored alongside
+    # it, so turning the feature off doesn't depend on also clearing miles.
+    if radius.get("enabled") is False:
+        return None
     miles    = radius.get("miles")
     if not miles:
         return None
@@ -260,7 +264,16 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
             cached = None
         if cached is not None:
             log.debug("Cache hit for %r", query)
-            return cached.get("result"), cached.get("detail")
+            result = cached.get("result")
+            detail = cached.get("detail")
+            if result is None and detail is None:
+                # Rows cached before the detail was stored. A miss was only
+                # ever remembered for ZERO_RESULTS, so that's what it was —
+                # and without this, an old row reads as a reasonless failure,
+                # which the booking flow treats as our problem rather than
+                # something the customer could fix.
+                detail = "address not found"
+            return result, detail
 
     # Deliberately after the cache check — a cached answer makes no request,
     # so it shouldn't spend the day's budget.
@@ -283,7 +296,7 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
     if status != "OK" or not body.get("results"):
         if status == "ZERO_RESULTS":
             log.info("Geocode for %r found nothing", query)
-            _remember(cache_key, None, use_cache)     # a real miss, worth remembering
+            _remember(cache_key, None, use_cache, "address not found")
             return None, "address not found"
         # OVER_QUERY_LIMIT / REQUEST_DENIED / INVALID_REQUEST are our
         # problems, not the address's — and they must not be cached, or a
@@ -309,12 +322,19 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
     return result, None
 
 
-def _remember(cache_key, result, use_cache):
+def _remember(cache_key, result, use_cache, detail=None):
+    """Cache a lookup, hit or miss.
+
+    The detail travels with it. Without that, the first miss reported
+    "address not found" and every later one — served from cache — reported
+    nothing at all, which is how appointment 36 ended up flagged with a null
+    reason.
+    """
     if not use_cache:
         return
     try:
         from db import save_cached_geocode
-        save_cached_geocode(cache_key, result)
+        save_cached_geocode(cache_key, result, detail)
     except Exception as e:                       # caching must never break a booking
         log.warning("Could not cache geocode result: %s", e)
 
@@ -333,8 +353,12 @@ def check_service_area(address, config, business_id=None):
     accepts those and flags them; only "outside" should change the reply.
     """
     typed   = (address or "").strip()
+    # customer_can_fix separates "you could retype this" from "our side is
+    # broken". Asking someone to re-enter a perfectly good address because
+    # our API key expired is rude and useless.
     outcome = {"status": "unverified", "miles": None, "formatted": None,
-               "address": typed, "reason": None}
+               "address": typed, "reason": None, "locality": None,
+               "state": None, "customer_can_fix": False}
 
     settings = radius_config(config)
     if not settings:
@@ -366,12 +390,15 @@ def check_service_area(address, config, business_id=None):
     match, detail = _geocode_detailed(typed, bias=bias, usage_key=usage_key)
     if not match:
         outcome["reason"] = detail
+        outcome["customer_can_fix"] = (detail == "address not found")
         return outcome
 
     miles = haversine_miles(origin["lat"], origin["lon"],
                             match["lat"], match["lon"])
     outcome["miles"]     = round(miles, 1)
     outcome["formatted"] = match["formatted"]
+    outcome["locality"]  = match.get("locality")
+    outcome["state"]     = match.get("state")
 
     if not match["confident"]:
         # We found something, but not precisely: either Google flagged the
@@ -381,6 +408,7 @@ def check_service_area(address, config, business_id=None):
                              "right address" if match["partial"] else
                              "approximate match — resolved to an area, not a "
                              "street address")
+        outcome["customer_can_fix"] = True
         return outcome
 
     implausible = max(radius_miles * IMPLAUSIBLE_MULTIPLE, IMPLAUSIBLE_FLOOR_MILES)
@@ -418,6 +446,7 @@ def check_service_area(address, config, business_id=None):
                 retried = None
 
         if not retried:
+            outcome["customer_can_fix"] = True
             if area:
                 outcome["reason"] = (f"no address like this near {area} — the "
                                      f"closest match was {match['formatted']}, "

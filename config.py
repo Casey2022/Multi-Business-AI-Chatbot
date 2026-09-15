@@ -30,6 +30,28 @@ EDITABLE_FIELDS = {
     "booking.noun":         {"label": "What you call a booking",
                              "type": "text"},
     "bot.persona_preset":   {"label": "Bot personality", "type": "choice"},
+
+    # Service area. Two plain controls rather than one clever one: an on/off
+    # an owner can see at a glance, and a distance picked from a list so
+    # there's no such thing as an invalid answer. The booking flow asks for
+    # an address by itself when this is on — the owner never has to know
+    # that's how it works.
+    "business.service_radius.enabled": {
+        "label": "Limit service area?",
+        "type": "select",
+        "coerce": "bool",
+        "options": {
+            "no":  "No — take bookings anywhere",
+            "yes": "Yes — check the customer's address first",
+        },
+    },
+    "business.service_radius.miles": {
+        "label": "How far will you travel?",
+        "type": "select",
+        "coerce": "int",
+        "options": {str(m): f"{m} miles" for m in
+                    (5, 10, 15, 20, 25, 30, 40, 50)},
+    },
     "booking.extra_questions": {"label": "Extra booking questions",
                                 "type": "questions"},
 }
@@ -46,6 +68,8 @@ MAX_EXTRA_QUESTIONS = 5
 RESERVED_SLOT_KEYS  = {"service", "datetime", "datetime_parsed"}
 
 
+
+
 def slugify(label):
     """Turn an owner-facing label into a storage key.
 
@@ -55,6 +79,29 @@ def slugify(label):
     anything that would look wrong in JSON.
     """
     return re.sub(r"[^a-z0-9]+", "_", label.strip().lower()).strip("_")
+
+
+def coerce_choice(raw, spec):
+    """Turn a posted dropdown value into the type the config stores.
+
+    Every form value arrives as a string. Storing "20" where the YAML says
+    20 would make the two compare unequal forever, so the override would
+    never clear and the business would stop inheriting the file.
+    """
+    kind = spec.get("coerce")
+    if kind == "int":
+        return int(raw)
+    if kind == "bool":
+        return raw == "yes"
+    return raw
+
+
+def choice_value(config, field, spec):
+    """The dropdown value that matches what's currently stored."""
+    current = get_nested(config, field)
+    if spec.get("coerce") == "bool":
+        return "yes" if current else "no"
+    return str(current) if current is not None else None
 
 
 def humanize(key):

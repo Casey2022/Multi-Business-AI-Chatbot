@@ -1,0 +1,33 @@
+Ask for the address in the booking flow and confirm what was inferred
+
+The service area is now two controls in Business details — "Limit service
+area?" and a distance picked from a list — instead of a per-question type
+dropdown in the Booking section. That section is the owner's own wording,
+and asking them to mark a question's data type in order to turn on a
+business rule was the wrong question in the wrong place. It also failed
+quietly: the type defaulted to text, so a business could have a service
+radius configured and no check running, with nothing anywhere saying so.
+
+Turning the limit on is now the only switch. The address becomes a
+built-in booking slot rather than something the owner wires up, asked
+second — after the service, before any times — so a customer outside the
+area is turned away before describing their problem, picking a slot, or
+costing a calendar lookup. An owner who already wrote their own address
+question keeps their wording, and the key stays service_address so
+existing appointments still read correctly.
+
+Addresses are confirmed only when the geocoder inferred something. "1738
+William St, Buffalo NY" resolving to Buffalo is the system agreeing with
+the customer; the same street silently resolving to Rochester because
+that's where the search was biased is the system deciding on their
+behalf, and that decision books a job sixty miles from where someone
+lives. An address that can't be placed at all is re-asked twice, then
+booked as typed and flagged — a geocoder still can't block a booking.
+
+Fixes two bugs a live booking exposed. The geocode cache stored a
+lookup's result but not the reason it failed, so the first miss reported
+"address not found" and every cached one reported nothing — which the
+booking flow then read as our outage rather than something the customer
+could fix, and skipped the re-ask. And a completed check was never
+persisted, because handle_booking saves state before the check runs, so
+every message in a booking re-checked the same address.
