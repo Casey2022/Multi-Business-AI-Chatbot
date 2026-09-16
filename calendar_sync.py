@@ -23,12 +23,14 @@
 import logging
 
 import calendar_google
+import calendar_sim
 
 log = logging.getLogger("calendar")
 
 # Backends must implement every name in _FORWARDED below.
 _BACKENDS = {
-    "google": calendar_google,
+    "google":    calendar_google,
+    "simulated": calendar_sim,
 }
 
 DEFAULT_PROVIDER = "google"

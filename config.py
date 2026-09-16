@@ -260,6 +260,12 @@ def load_config(config_path, business_id=None):
         row = get_business_by_id(business_id)
         if row:
             config.setdefault("business", {})["slug"] = row["slug"]
+            # The id too: the simulated calendar reads busy time straight out
+            # of the appointments table and must scope that to one business.
+            # Without this its filter is None, and every business sees every
+            # other business's bookings — multi-tenancy quietly undone by a
+            # missing key.
+            config["business"]["id"] = row["id"]
 
     # Resolve the persona preset into actual persona text.
     preset = config.get("bot", {}).get("persona_preset")

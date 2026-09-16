@@ -9,7 +9,10 @@
 # unit test with a stubbed extractor can't see them, because the stub encodes
 # what I assume the model does. So the extractor here is REAL — that's the
 # thing under test — while the calendar, the database and the geocoder are
-# faked so a run is repeatable and costs nothing but tokens.
+# faked so a run is repeatable and costs nothing but tokens. The calendar
+# is the REAL simulated backend (calendar_sim) rather than a fixture, so the
+# harness exercises the same availability code the sandbox demo will — and a
+# fixture can't drift away from the rules while nobody is looking.
 #
 # The scripts are taken from real transcripts in the messages table, not
 # invented. Customers answer two slots at once, say "pipe leak" when the
@@ -34,7 +37,6 @@ setup_logging(level="WARNING")          # the transcript is the output, not the 
 import db
 db.DB_PATH = Path(tempfile.mkdtemp()) / "eval.db"      # never touch the real one
 
-import calendar_sync
 import geocode
 from config import load_config
 from db import init_db, set_state
@@ -50,70 +52,31 @@ import scheduler
 # answers from a list in memory. No network, no service account, same answers
 # every run.
 
-class FakeCalendar:
-    """Everything free except the slots in `busy`, as 'YYYY-MM-DD HH:MM'."""
+def _seed_busy(scenario, dates):
+    """Fill the temp database with the bookings a scenario needs.
 
-    busy = set()
-    busy_dates = set()
-    created = []
+    The simulated calendar reads busy time out of the appointments table, so
+    "this slot is taken" is expressed here the way it is in production: by
+    there being an appointment. No fixture calendar to keep in step with the
+    real rules.
+    """
+    from db import get_connection, save_appointment
 
-    @classmethod
-    def reset(cls, busy=(), busy_dates=()):
-        cls.busy = set(busy)
-        cls.busy_dates = set(busy_dates)
-        cls.created = []
+    conn = get_connection()
+    conn.execute("DELETE FROM appointments")      # each scenario starts clean
+    conn.commit()
+    conn.close()
 
-    @classmethod
-    def _taken(cls, iso):
-        return iso in cls.busy or iso.split(" ")[0] in cls.busy_dates
+    for slot in scenario.get("busy", []):
+        save_appointment("eval_seed", "existing job", slot.format(**dates), 1)
 
-    @staticmethod
-    def is_enabled(config):
-        return True
-
-    @classmethod
-    def is_slot_available(cls, config, start_iso, busy=None):
-        return not cls._taken(start_iso)
-
-    @classmethod
-    def slot_rejection_reason(cls, config, start_iso, busy=None):
-        return "conflict" if cls._taken(start_iso) else None
-
-    @classmethod
-    def find_alternatives(cls, config, desired_iso):
-        from datetime import datetime, timedelta
-        start = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
-        out = []
-        step = timedelta(minutes=60)
-        cursor = start + step
-        # Two weeks, not one: an alternative on a LATER week is exactly the
-        # case where "Wednesday at 9" is ambiguous, which is the bug.
-        while len(out) < 3 and cursor < start + timedelta(days=14):
-            iso = cursor.strftime("%Y-%m-%d %H:%M")
-            if not cls._taken(iso) and 9 <= cursor.hour <= 16:
-                out.append(iso)
-            cursor += step
-        return out
-
-    @classmethod
-    def create_event(cls, config, service_name, start_iso, customer_id, details=None):
-        cls.created.append((service_name, start_iso))
-        return f"fake-event-{len(cls.created)}"
-
-    @staticmethod
-    def delete_event(config, event_id):
-        return True
-
-    @staticmethod
-    def update_event_time(config, event_id, new_start_iso):
-        return True
-
-    @staticmethod
-    def fetch_changes(config, sync_token=None):
-        return [], None
-
-
-calendar_sync.register_backend("fake", FakeCalendar)
+    # A blocked day is a day with no room left in it: book every hour the
+    # business is open. Bob's 45-minute buffer does the rest.
+    for day in scenario.get("busy_dates", []):
+        date = day.format(**dates)
+        for hour in range(9, 18):
+            save_appointment("eval_seed", "existing job",
+                             f"{date} {hour:02d}:00", 1)
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +269,8 @@ SCENARIOS = [
         "why":  "The bot offered Wednesday the 23rd, the customer said "
                 "'Wednesday at 9', and it resolved against the calendar "
                 "instead of its own offer.",
-        "busy_dates": ["{d2}", "{d3}", "{d4}", "{d5}", "{d6}", "{d7}"],
+        "busy_dates": ["{d0}", "{d1}", "{d2}", "{d3}", "{d4}", "{d5}",
+                       "{d6}", "{d7}"],
         "script": ["book", "drain cleaning", "12 Elm St, Rochester NY",
                    "{plus2day} at 1", "{offer}", "clogged sink", "yes"],
         "checks": ALWAYS + ["offer_honoured"],
@@ -360,7 +324,7 @@ def _dates():
         "plus2": plus2.strftime("%Y-%m-%d"),
         "plus2day": plus2.strftime("%A"),
     }
-    for n in range(2, 9):
+    for n in range(0, 10):
         out[f"d{n}"] = (now + timedelta(days=n)).strftime("%Y-%m-%d")
     return out
 
@@ -369,10 +333,7 @@ def run(scenario, config, verbose=False):
     from db import get_state
 
     dates = _dates()
-    FakeCalendar.reset(
-        [b.format(**dates) for b in scenario.get("busy", [])],
-        [d.format(**dates) for d in scenario.get("busy_dates", [])],
-    )
+    _seed_busy(scenario, dates)
 
     phone = f"eval_{abs(hash(scenario['name'])) % 10**8}"
     set_state(phone, 1, "idle", pending={})
@@ -436,9 +397,12 @@ def main():
 
     init_db()
     config = load_config("config/bobs_plumbing.yaml")
-    config.setdefault("calendar", {})["provider"] = "fake"
-    config["calendar"].setdefault("calendar_id", "fake")
+    config.setdefault("calendar", {})["provider"] = "simulated"
     config["calendar"]["enabled"] = True
+    # load_config stamps the business id only when given a business_id; the
+    # harness loads the YAML directly, so set it by hand. calendar_sim needs
+    # it to scope its busy query, and refuses to answer without it.
+    config.setdefault("business", {})["id"] = 1
 
     # The address check has its own tests; here it just gets out of the way.
     geocode.check_service_area = lambda addr, cfg, business_id=None: {

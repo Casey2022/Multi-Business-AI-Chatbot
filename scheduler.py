@@ -19,6 +19,8 @@ from llm import parse_datetime
 from llm import parse_datetime, extract_booking_slots
 
 import logging
+import re
+
 log = logging.getLogger("scheduler")
 log_cal = logging.getLogger("calendar")
 
@@ -379,33 +381,78 @@ def _snap_to_catalogue(value, config):
     return value
 
 
-def _match_offered(message, offered):
-    """Which offered time did the customer just accept? None if unclear.
+# "9", "9:30", "10 am", "2pm" — an hour, optional minutes, optional meridiem.
+SPOKEN_TIME = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b")
 
-    A reply like "Wednesday at 9" means the Wednesday we just named, not the
-    next Wednesday on the calendar. Matching here — against our own offer —
-    is deterministic and needs no model. Genuine ambiguity ("Wednesday" when
-    three Wednesday slots were offered) returns None and lets the normal
-    parsing run, rather than guessing.
+
+def _spoken_times(text):
+    """Times named in a customer's reply, as (hour, minute or None, am/pm or None)."""
+    out = []
+    for hour, minute, meridiem in SPOKEN_TIME.findall(text):
+        hour = int(hour)
+        if not 1 <= hour <= 12:
+            continue                       # a date or a house number, not a time
+        out.append((hour, int(minute) if minute else None, meridiem or None))
+    return out
+
+
+def _match_offered(message, offered):
+    """Which offered time did the customer just accept? None if genuinely unclear.
+
+    A reply like "Thursday at 9" means the Thursday we just named, not the
+    next Thursday on the calendar — so this matches against our own offer,
+    deterministically, before the model gets a chance to re-read the weekday.
+
+    The awkward case is a half-hour granularity: offer 9:00, 9:30 and 10:00
+    and "Thursday at 9" fits two of them. Treating that as ambiguous and
+    giving up is what a machine would do; a person would hear "9" and say
+    9 o'clock. So an exact minute match wins, then a time on the hour, then
+    the earliest — and only a reply naming no time at all against several
+    candidates is left as truly unclear.
     """
-    import re
     from datetime import datetime
 
     text = (message or "").lower()
     if not text.strip():
         return None
 
-    spoken_hours = set(re.findall(r"\b(\d{1,2})\b", text))
-    matches = []
+    spoken = _spoken_times(text)
+    ranked = []
+
     for iso in offered:
         when = datetime.strptime(iso, "%Y-%m-%d %H:%M")
         if when.strftime("%A").lower() not in text:
             continue
-        if spoken_hours and when.strftime("%-I") not in spoken_hours:
-            continue
-        matches.append(iso)
 
-    return matches[0] if len(matches) == 1 else None
+        if not spoken:
+            ranked.append((2, when, iso))          # weekday only
+            continue
+
+        hour12 = when.hour % 12 or 12
+        for hour, minute, meridiem in spoken:
+            if hour != hour12:
+                continue
+            if meridiem and meridiem != when.strftime("%p").lower():
+                continue
+            if minute is not None:
+                if minute == when.minute:
+                    ranked.append((0, when, iso))  # they said the minutes
+            else:
+                ranked.append((1 if when.minute == 0 else 3, when, iso))
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda row: (row[0], row[1]))
+    best = ranked[0][0]
+    tied = [row for row in ranked if row[0] == best]
+
+    # No time named and more than one slot that day: genuinely ambiguous,
+    # so fall through to normal parsing rather than picking for them.
+    if best == 2 and len(tied) > 1:
+        return None
+
+    return tied[0][2]
 
 
 def _question_part(prompt):
