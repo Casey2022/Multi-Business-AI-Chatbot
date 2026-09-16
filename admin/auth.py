@@ -67,6 +67,14 @@ def require_business_access(business_id):
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
+def _login_ip():
+    """The caller's address, honouring the proxy header Render sets."""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
 def login():
     if current_user():
         return redirect(url_for("admin.dashboard"))
@@ -75,6 +83,22 @@ def login():
     if request.method == "POST":
         email    = request.form.get("email", "")
         password = request.form.get("password", "")
+
+        # Throttle before checking the password, not after. bcrypt is
+        # deliberately slow, so an unthrottled login form is both a
+        # guessing oracle and a way to pin the CPU. Counted per IP and per
+        # account named: per-IP alone lets a botnet spread one account's
+        # guesses across many addresses, per-account alone lets one address
+        # walk through a list of emails.
+        import ratelimit
+        allowed, wait = ratelimit.login_attempt(_login_ip(), email.lower())
+        if not allowed:
+            log_sec.warning("Login attempts throttled for %s / %r",
+                            _login_ip(), email)
+            return render_template(
+                "admin/login.html",
+                error=f"Too many attempts. Try again in {max(wait, 1)} seconds."
+            ), 429
 
         user = verify_password(email, password)
         if user:

@@ -563,8 +563,65 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
 # Recognized responses in the confirming state. Kept deliberately small —
 # anything else is treated as a possible correction and run through extraction.
 AFFIRMATIVE = {"yes", "y", "yep", "yeah", "yup", "correct", "right",
-               "confirm", "confirmed", "sounds good", "that's right", "ok", "okay"}
-NEGATIVE    = {"no", "n", "nope", "nah", "wrong", "incorrect"}
+               "confirm", "confirmed", "sounds good", "that's right", "ok", "okay",
+               "sure", "perfect", "great", "affirmative", "exactly"}
+NEGATIVE    = {"no", "n", "nope", "nah", "wrong", "incorrect", "not"}
+
+# Whole phrases people actually use to agree. Matched as substrings, because
+# "thats correct" and "yes, I said that is correct already" are both
+# agreement and neither is equal to any single word.
+AFFIRMATIVE_PHRASES = (
+    "thats it", "that's it", "thats correct", "that's correct",
+    "thats right", "that's right", "sounds good", "looks good",
+    "looks right", "go ahead", "book it", "all good", "you got it",
+    "that works", "works for me", "yes please", "correct",
+)
+NEGATIVE_PHRASES = (
+    "thats wrong", "that's wrong", "not right", "not correct", "not it",
+    "no thats", "no that's", "change it", "thats not", "that's not",
+)
+
+
+def _normalise(message):
+    """Lowercase, strip punctuation, collapse spaces — for matching only."""
+    import string
+    text = (message or "").lower()
+    text = "".join(ch for ch in text if ch not in string.punctuation or ch == "'")
+    return " ".join(text.split())
+
+
+def _is_negative(message):
+    """Does this reply reject what was just read back?
+
+    Checked before the affirmative, because "no, that's correct" is a
+    correction and "not right" contains "right".
+    """
+    text = _normalise(message)
+    if not text:
+        return False
+    if text in NEGATIVE:
+        return True
+    if any(phrase in text for phrase in NEGATIVE_PHRASES):
+        return True
+    return text.split()[0] in NEGATIVE
+
+
+def _is_affirmative(message):
+    """Does this reply accept what was just read back?
+
+    Exact membership was the old test, and it failed on everything a real
+    customer types: "thats correct", "thats it", "yes, I said that is
+    correct already". Now: the whole message, a known phrase anywhere in it,
+    or an opening word that means yes.
+    """
+    text = _normalise(message)
+    if not text or _is_negative(message):
+        return False
+    if text in AFFIRMATIVE:
+        return True
+    if any(phrase in text for phrase in AFFIRMATIVE_PHRASES):
+        return True
+    return text.split()[0] in AFFIRMATIVE
 
 
 def _confirmation_question(pending, config):
@@ -734,7 +791,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         if awaiting:
             pending.pop("_address_confirm", None)
 
-            if text in AFFIRMATIVE:
+            if _is_affirmative(message):
                 # They agreed to the resolved address, so store that rather
                 # than the fragment they typed — it's the version with a city
                 # on it, and it's what a van needs.
@@ -748,7 +805,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 return _ask_next_or_finalize(phone, business_id, pending,
                                              config, slots)
 
-            if text in NEGATIVE:
+            if _is_negative(message):
                 attempts = pending.get("_address_attempts", 0) + 1
                 pending["_address_attempts"] = attempts
                 pending.pop(awaiting["key"], None)
@@ -773,10 +830,18 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                     "ZIP code?"
                 )
 
-            # Neither yes nor no: they probably just typed the address again.
-            # Fall through to normal extraction, but keep the slot clear so
-            # the new answer lands in it.
-            pending.pop(awaiting["key"], None)
+            # Neither yes nor no. Only treat it as a replacement address if
+            # it plausibly contains one — "you just listed the address" is a
+            # complaint, and filing it as the address (which is what the
+            # terse-reply fallback did) turns one missed cue into two.
+            if any(ch.isdigit() for ch in message):
+                pending.pop(awaiting["key"], None)
+            else:
+                pending["_address_confirm"] = awaiting
+                set_state(phone, business_id, "collecting", pending=pending)
+                return (f"Sorry — I want to be sure before I book it. Is "
+                        f"{awaiting['formatted']} the right address? "
+                        f"Yes or no is fine.")
 
         # Did they just accept a time we offered? Settle that before the
         # extractor gets a chance to re-interpret the weekday.
@@ -829,7 +894,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         return _ask_next_or_finalize(phone, business_id, pending, config, slots)
     # --- Confirming: read-back accepted, rejected, or corrected ---
     if state == "confirming":
-        if text in AFFIRMATIVE:
+        if _is_affirmative(message):
             return _finalize_booking(phone, business_id, pending, config)
 
         # Not a plain yes — see if they're correcting something
@@ -843,7 +908,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
             set_state(phone, business_id, "collecting", pending=pending)
             return _ask_next_or_finalize(phone, business_id, pending, config, slots)
 
-        if text in NEGATIVE:
+        if _is_negative(message):
             pending.pop("datetime", None)
             pending.pop("datetime_parsed", None)
             set_state(phone, business_id, "collecting", pending=pending)

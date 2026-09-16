@@ -230,6 +230,21 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
 # Channel adapters
 # ---------------------------------------------------------------------------
 
+def _client_ip():
+    """The caller's address, honouring the proxy header Render sets.
+
+    request.remote_addr on a platform like Render is the load balancer, so
+    every visitor looks like one address. X-Forwarded-For's FIRST entry is
+    the original client; later entries are the proxies it passed through.
+    A client can forge the header, but on a platform that always sets it
+    the forged value is appended to, not substituted for, the real one.
+    """
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
 @app.route("/sms", methods=["POST"])
 def sms_reply():
     """Twilio SMS channel adapter.
@@ -296,6 +311,19 @@ def webchat_reply(slug):
     # unlike SMS which is naturally capped by the carrier.
     if len(message) > 1000:
         return {"error": "Message too long"}, 400
+
+    # Every message here costs an LLM call and an embedding call. This
+    # endpoint is public, so the limit is the difference between a demo and
+    # a bill. Counted per session AND per IP: a script that mints a fresh
+    # session_id per request would sail past a session-only limit.
+    import ratelimit
+    allowed, wait = ratelimit.webchat(slug, session_id, _client_ip())
+    if not allowed:
+        log_web.warning("Rate limited %s (%s) on %s", session_id,
+                        _client_ip(), slug)
+        return {"reply": "You're sending messages faster than I can keep up "
+                         "with. Give me a moment and try again.",
+                "retry_after": wait}, 429
 
     config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]

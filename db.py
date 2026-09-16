@@ -195,6 +195,19 @@ def init_db():
         )
     """)
 
+    # rate_limits — fixed-window counters for public endpoints. In SQLite
+    # rather than memory because gunicorn workers don't share memory and the
+    # container restarts; a counter that resets with the process is not a
+    # limit.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            bucket       TEXT    NOT NULL,
+            window_start INTEGER NOT NULL,
+            count        INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (bucket, window_start)
+        )
+    """)
+
     # --- migrations -------------------------------------------------------
     # CREATE TABLE IF NOT EXISTS is a no-op once a table exists, so a new
     # column on an existing table needs an explicit ALTER. Guarded by an
@@ -856,3 +869,13 @@ def get_geocode_usage(usage_key, day):
     ).fetchone()
     conn.close()
     return row["calls"] if row else 0
+
+
+def prune_rate_limits(older_than_seconds=172800):
+    """Drop counters from closed windows. Cheap, and keeps the table small."""
+    import time
+    conn = get_connection()
+    conn.execute("DELETE FROM rate_limits WHERE window_start < ?",
+                 (int(time.time()) - older_than_seconds,))
+    conn.commit()
+    conn.close()

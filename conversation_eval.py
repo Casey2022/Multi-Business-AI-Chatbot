@@ -293,6 +293,25 @@ SCENARIOS = [
         "checks": ALWAYS,
     },
     {
+        "name": "agreeing without saying the word yes (2026-09-16)",
+        "why":  "A real customer answered the address read-back with "
+                "'thats it' and the confirmation with 'thats correct'. "
+                "Neither was recognised: the first got filed AS the address, "
+                "the second made the bot repeat itself three times.",
+        "script": ["book", "leak repair", "522 Penbrooke Drive", "thats it",
+                   "Tuesday at 2", "leaky pipe", "thats correct"],
+        "checks": ALWAYS + ["booking_completed"],
+    },
+    {
+        "name": "pushing back on the read-back (2026-09-16)",
+        "why":  "'you just listed the address' is a complaint, not an "
+                "address — it must not be stored as one.",
+        "script": ["book", "leak repair", "522 Penbrooke Drive",
+                   "you just listed the address",
+                   "yes", "Tuesday at 2", "leaky pipe", "yes"],
+        "checks": ALWAYS,
+    },
+    {
         "name": "everything in one breath",
         "why":  "Customers volunteer several slots at once; the flow should "
                 "not re-ask for what it already has.",
