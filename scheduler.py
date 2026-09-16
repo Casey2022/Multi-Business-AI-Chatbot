@@ -24,7 +24,8 @@ log_cal = logging.getLogger("calendar")
 
 # Bookkeeping the booking flow keeps in `pending` that is not a customer
 # answer. Prefixed so it can never collide with a slot key an owner invents.
-INTERNAL_PENDING_KEYS = ("_checks", "_address_confirm", "_address_attempts")
+INTERNAL_PENDING_KEYS = ("_checks", "_address_confirm", "_address_attempts",
+                         "_offered")
 
 # How many times we'll ask a customer to clarify an address before giving up
 # and booking it as typed. Two is a compromise: enough to recover a typo or a
@@ -53,7 +54,13 @@ def get_slot_definitions(config):
         {
             "key": "service",
             "prompt": BOOKING.get("greeting", "What service do you need?"),
-            "description": f"the service or item being requested for this {noun}",
+            # The catalogue goes in the description because the description is
+            # all the extractor sees. Without it the model was guessing what
+            # this business even sells: "pipe leak" went unrecognised for four
+            # turns in a row, and when it did land it arrived as the invented
+            # "pipe leak repair". Mapping a customer's words onto a catalogue
+            # needs to know the catalogue.
+            "description": _service_description(config, noun),
         },
         {
             "key": "datetime",
@@ -301,6 +308,121 @@ def _check_addresses(phone, business_id, pending, config, slots):
     return None
 
 
+# Openers that mean a customer is asking rather than answering. Kept small
+# and literal: "none", "no", "yes" are answers, and a sentence ending in "?"
+# is not.
+QUESTION_OPENERS = ("what", "when", "where", "why", "how", "who", "can you",
+                    "could you", "do you", "does", "are you", "is there",
+                    "will you", "would you", "any chance")
+
+
+def _looks_like_a_question(message):
+    text = (message or "").strip().lower()
+    if not text:
+        return False
+    if text.endswith("?"):
+        return True
+    return text.startswith(QUESTION_OPENERS) and len(text.split()) > 2
+
+
+def _answer_mid_booking(phone, message, config, business_id):
+    """Answer a question asked during booking, using the normal Q&A path.
+
+    Best-effort: if the model is unavailable the booking continues without
+    an answer rather than failing. Never lets a question become a slot value.
+    """
+    try:
+        from llm import get_llm_reply
+        history = get_recent_messages(phone, business_id, limit=6)
+        return get_llm_reply(message, history=history, config=config,
+                             channel="webchat")
+    except Exception as e:
+        log.warning("Couldn't answer a mid-booking question (%s)", e)
+        return None
+
+
+def _service_description(config, noun):
+    """What the extractor is told the service slot means."""
+    services = [s for s in (config.get("services") or []) if s]
+    if not services:
+        return f"the service or item being requested for this {noun}"
+    catalogue = "; ".join(services)
+    return (f"the service being requested for this {noun}. This business "
+            f"offers exactly these: {catalogue}. Return the business's own "
+            f"wording for whichever one the customer means — a customer "
+            f"saying 'pipe leak' or 'my sink is dripping' means the closest "
+            f"listed service. If the customer clearly wants something not on "
+            f"that list, return their words unchanged rather than forcing a "
+            f"match.")
+
+
+def _snap_to_catalogue(value, config):
+    """Tidy a near-miss into the business's own wording, conservatively.
+
+    Only when one string contains the other — "pipe leak repair" becomes
+    "leak repair". Deliberately NOT fuzzy: "water heater repair" and "water
+    heater installation" share most of their words and are different jobs,
+    and a scoring threshold that mapped one to the other would put the wrong
+    work on the van. Anything less obvious is left alone for the owner to
+    read.
+    """
+    if not value:
+        return value
+    text = " ".join(str(value).lower().split())
+    for service in (config.get("services") or []):
+        listed = " ".join(service.lower().split())
+        if listed == text:
+            return service
+        if listed in text or text in listed:
+            log.info("Service %r recorded as %r", value, service)
+            return service
+    return value
+
+
+def _match_offered(message, offered):
+    """Which offered time did the customer just accept? None if unclear.
+
+    A reply like "Wednesday at 9" means the Wednesday we just named, not the
+    next Wednesday on the calendar. Matching here — against our own offer —
+    is deterministic and needs no model. Genuine ambiguity ("Wednesday" when
+    three Wednesday slots were offered) returns None and lets the normal
+    parsing run, rather than guessing.
+    """
+    import re
+    from datetime import datetime
+
+    text = (message or "").lower()
+    if not text.strip():
+        return None
+
+    spoken_hours = set(re.findall(r"\b(\d{1,2})\b", text))
+    matches = []
+    for iso in offered:
+        when = datetime.strptime(iso, "%Y-%m-%d %H:%M")
+        if when.strftime("%A").lower() not in text:
+            continue
+        if spoken_hours and when.strftime("%-I") not in spoken_hours:
+            continue
+        matches.append(iso)
+
+    return matches[0] if len(matches) == 1 else None
+
+
+def _question_part(prompt):
+    """Drop a leading pleasantry from a configured prompt, keep the question.
+
+    "Happy to schedule an appointment! What service do you need? (e.g. …)"
+    becomes "What service do you need? (e.g. …)" — so an acknowledgement can
+    be prepended without the customer being greeted twice.
+    """
+    import re
+    parts = re.split(r"(?<=[.!])\s+", prompt.strip())
+    for i, part in enumerate(parts):
+        if "?" in part:
+            return " ".join(parts[i:])
+    return prompt
+
+
 def _first_missing_slot(pending, slots):
     """Return the first slot definition with no value in pending, or None."""
     for slot in slots:
@@ -329,25 +451,34 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
         prompt = substitute(missing["prompt"], config)
 
         if first_turn:
-            noun = BOOKING.get("noun", "appointment")
-            known = []
-            if pending.get("service"):
-                known.append(pending["service"])
-            if pending.get("datetime"):
-                known.append(f"for {pending['datetime']}")
+            service = pending.get("service")
+            when    = pending.get("datetime")
 
-            if known:
-                # Acknowledge what we understood, so the handoff reads like
-                # a conversation continuing rather than a form appearing.
-                return f"Happy to help with {' '.join(known)}. {prompt}"
+            if service or when:
+                # Acknowledge what we understood, so the handoff reads like a
+                # conversation continuing rather than a form appearing. Built
+                # per-case: gluing "for {datetime}" onto "Happy to help with"
+                # produced "Happy to help with for next wednesday".
+                if service and when:
+                    ack = f"Happy to help with {service} on {when}."
+                elif service:
+                    ack = f"Happy to help with {service}."
+                else:
+                    ack = f"Happy to help — you mentioned {when}."
+                # The service prompt is itself a greeting; two hellos in one
+                # breath is the other half of that bug.
+                return f"{ack} {_question_part(prompt)}"
 
             greeting = substitute(BOOKING.get("greeting", ""), config)
             if greeting and missing["key"] != "service":
                 return f"{greeting} {prompt}"
         return prompt
 
-    # All slots filled — parse the datetime before saving.
-    parsed = parse_datetime(pending["datetime"], config)
+    # All slots filled — parse the datetime before saving. A time already
+    # resolved (because the customer picked one we offered) is kept as-is;
+    # re-parsing its prose form is how the right answer gets lost again.
+    parsed = pending.get("datetime_parsed") or parse_datetime(
+        pending["datetime"], config)
     if parsed is None:
         # Unparseable: clear it so the loop asks again next turn.
         pending.pop("datetime", None)
@@ -370,6 +501,9 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
                 alts = calendar_sync.find_alternatives(config, parsed)
                 pending.pop("datetime", None)
                 pending.pop("datetime_parsed", None)
+                # Record what we're about to offer BEFORE saving: anything
+                # written into pending after set_state is thrown away.
+                pending["_offered"] = list(alts)
                 set_state(phone, business_id, "collecting", pending=pending)
                 return _unavailable_message(parsed, alts, config, reason=reason)
         except Exception as e:
@@ -478,6 +612,7 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
             return None
         alts = calendar_sync.find_alternatives(config, candidate)
         pending.pop("datetime", None)
+        pending["_offered"] = list(alts)          # before the save, not after
         set_state(phone, business_id, "collecting", pending=pending)
         return _unavailable_message(candidate, alts, config, reason=reason)
     except Exception as e:
@@ -596,6 +731,22 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
             # the new answer lands in it.
             pending.pop(awaiting["key"], None)
 
+        # Did they just accept a time we offered? Settle that before the
+        # extractor gets a chance to re-interpret the weekday.
+        offered = pending.get("_offered")
+        if offered:
+            chosen = _match_offered(message, offered)
+            if chosen:
+                from datetime import datetime as _dt
+                pending["datetime"] = _dt.strptime(
+                    chosen, "%Y-%m-%d %H:%M").strftime("%A, %B %-d at %-I:%M %p")
+                pending["datetime_parsed"] = chosen
+                pending.pop("_offered", None)
+                log.info("Customer accepted an offered slot: %s", chosen)
+                set_state(phone, business_id, "collecting", pending=pending)
+                return _ask_next_or_finalize(phone, business_id, pending,
+                                             config, slots)
+
         extracted = extract_booking_slots(
             message, slots, config, already_filled=pending
         )
@@ -605,12 +756,25 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         # Handles terse replies ("none", "blue") the extractor may skip.
         if not extracted:
             missing = _first_missing_slot(pending, slots)
+            if missing and _looks_like_a_question(message):
+                # Absorbing this would file "Do you charge a call-out fee?"
+                # as the problem description and move on as though the
+                # customer had answered. They asked something; answer it,
+                # then ask again for what's still missing.
+                log.info("Question mid-booking: %r — answering, not storing",
+                         message.strip()[:60])
+                answer = _answer_mid_booking(phone, message, config, business_id)
+                set_state(phone, business_id, "collecting", pending=pending)
+                prompt = substitute(missing["prompt"], config)
+                return f"{answer} {prompt}" if answer else prompt
             if missing:
                 extracted = {missing["key"]: message.strip()[:200]}
                 log.info(f"No slots extracted — "
                       f"treating message as '{missing['key']}'")
 
         pending.update(extracted)
+        if pending.get("service"):
+            pending["service"] = _snap_to_catalogue(pending["service"], config)
         early = _check_datetime_now(phone, business_id, pending, extracted, config)
         if early:
             return early
