@@ -3,9 +3,9 @@
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a> <span>›</span>
-  <a href="/admin/business/{{ business.id }}/appointments">{{ business.name }}</a>
-  <span>›</span> Appointment #{{ appt.id }}
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
+  <a href="{{ url_for('admin.appointments', business_id=business.id) }}">{{ business.name }}</a> ›
+  Appointment #{{ appt.id }}
 </div>
 
 <div class="page-header">
@@ -14,48 +14,43 @@
 </div>
 
 <div class="card">
-  <div class="card-title">Details</div>
-  <table style="width:100%;">
+  <div class="card-title">Booking</div>
+  <table class="facts">
     <tr>
-      <td style="width:180px; color:#718096; font-size:13px;">Status</td>
+      <th>Status</th>
       <td>
         {% if appt.status == 'booked' %}
-        <span class="badge badge-green">Booked</span>
+          <span class="chip chip-booked">Booked</span>
         {% elif appt.status == 'cancelled' %}
-        <span class="badge badge-gray">Cancelled</span>
+          <span class="chip chip-quiet">Cancelled</span>
         {% else %}
-        <span class="badge badge-blue">{{ appt.status | title }}</span>
+          <span class="chip chip-pending">{{ appt.status | title }}</span>
         {% endif %}
       </td>
     </tr>
     <tr>
-      <td style="color:#718096; font-size:13px;">Customer</td>
+      <th>Customer</th>
       <td>
-        <a href="/admin/business/{{ business.id }}/conversations?phone={{ appt.phone | urlencode }}">
-          {{ appt.phone }}
-        </a>
+        <a href="{{ url_for('admin.conversations', business_id=business.id) }}?phone={{ appt.phone | urlencode }}">{{ appt.phone }}</a>
       </td>
     </tr>
+    <tr><th>Scheduled for</th><td>{{ appt.datetime | friendly_time }}</td></tr>
     <tr>
-      <td style="color:#718096; font-size:13px;">Scheduled for</td>
-      <td>{{ appt.datetime | friendly_time }}</td>
-    </tr>
-    <tr>
-      <td style="color:#718096; font-size:13px;">Calendar</td>
+      <th>Calendar</th>
       <td>
         {% if appt.sync_status == 'synced' %}
-        <span class="badge badge-green">Synced</span>
+          <span class="chip chip-booked">Synced</span>
         {% elif appt.sync_status == 'deleted' %}
-        <span class="badge badge-gray">Removed</span>
+          <span class="chip chip-quiet">Removed</span>
         {% else %}
-        <span style="color:#a0aec0;">Not synced</span>
+          <span class="cell-sub">Not synced</span>
         {% endif %}
       </td>
     </tr>
     {% if appt.calendar_changed %}
     <tr>
-      <td style="color:#718096; font-size:13px;">Calendar change</td>
-      <td style="color:#b7791f; font-size:13px;">⚠ {{ appt.calendar_changed }}</td>
+      <th>Changed on the calendar</th>
+      <td><span class="chip chip-pending">{{ appt.calendar_changed }}</span></td>
     </tr>
     {% endif %}
   </table>
@@ -64,29 +59,23 @@
 {% if details %}
 <div class="card">
   <div class="card-title">What the customer told us</div>
-  <table style="width:100%;">
+  <table class="facts">
     {% for key, value in details.items() %}
     <tr>
-      <td style="width:180px; color:#718096; font-size:13px; vertical-align:top;">
-        {{ detail_labels.get(key) or key.replace('_', ' ') | capitalize }}
-      </td>
-      <td style="font-size:14px;">
+      <th>{{ detail_labels.get(key) or key.replace('_', ' ') | capitalize }}</th>
+      <td>
         {{ value }}
         {% set check = address_checks.get(key) %}
         {% if check %}
           {% if check.status == 'inside' %}
-          <div style="font-size:12px; color:#2f855a; margin-top:3px;">
-            ✓ in the service area — {{ check.reason }}</div>
+            <div class="verdict verdict-inside">In the service area — {{ check.reason }}</div>
           {% elif check.status == 'outside' %}
-          <div style="font-size:12px; color:#c53030; margin-top:3px;">
-            ✗ outside the service area — {{ check.reason }}</div>
+            <div class="verdict verdict-outside">Outside the service area — {{ check.reason }}</div>
           {% else %}
-          <div style="font-size:12px; color:#b7791f; margin-top:3px;">
-            ⚠ not verified — {{ check.reason }}</div>
+            <div class="verdict verdict-unknown">Not verified — {{ check.reason }}</div>
           {% endif %}
           {% if check.formatted and check.formatted != value %}
-          <div style="font-size:12px; color:#718096;">
-            resolved to {{ check.formatted }}</div>
+            <div class="verdict-resolved">Resolved to {{ check.formatted }}</div>
           {% endif %}
         {% endif %}
       </td>
@@ -98,32 +87,30 @@
 
 {% if appt.status != 'cancelled' %}
 <div class="card">
-  <div class="card-title">Reschedule</div>
-  <form method="POST" action="/admin/appointment/{{ appt.id }}/reschedule">
-    <input type="datetime-local" name="new_datetime"
-           style="padding:9px 12px; border:1px solid #e2e8f0; border-radius:6px;
-                  font-size:14px;">
-    <button type="submit"
-            style="margin-left:8px; padding:9px 20px; background:#3182ce;
-                   color:#fff; border:none; border-radius:6px; font-size:14px;
-                   font-weight:600; cursor:pointer;">Move appointment</button>
-  </form>
-  <div style="font-size:12px; color:#718096; margin-top:8px;">
-    Availability isn't checked here — you're the authority on your own schedule.
+  <div class="card-title">Move this appointment</div>
+  <div class="card-pad">
+    <form method="POST" action="{{ url_for('admin.reschedule', appointment_id=appt.id) }}"
+          class="toolbar">
+      <label class="sr-only" for="new_datetime">New date and time</label>
+      <input class="w-auto" type="datetime-local" id="new_datetime" name="new_datetime">
+      <button class="btn btn-primary" type="submit">Move appointment</button>
+    </form>
+    <p class="danger-note mt-3">
+      Availability isn't checked here — you're the authority on your own schedule.
+    </p>
   </div>
 </div>
 
 <div class="card">
   <div class="card-title">Cancel</div>
-  <form method="POST" action="/admin/appointment/{{ appt.id }}/cancel"
-        onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar.');">
-    <button type="submit"
-            style="padding:9px 20px; background:#e53e3e; color:#fff; border:none;
-                   border-radius:6px; font-size:14px; font-weight:600;
-                   cursor:pointer;">Cancel appointment</button>
-  </form>
-  <div style="font-size:12px; color:#718096; margin-top:8px;">
-    Removes the event from your calendar as well. This can't be undone.
+  <div class="card-pad">
+    <form method="POST" action="{{ url_for('admin.cancel', appointment_id=appt.id) }}"
+          onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar.');">
+      <button class="btn btn-danger" type="submit">Cancel appointment</button>
+    </form>
+    <p class="danger-note mt-3">
+      Removes the event from your calendar as well. This can't be undone.
+    </p>
   </div>
 </div>
 {% endif %}

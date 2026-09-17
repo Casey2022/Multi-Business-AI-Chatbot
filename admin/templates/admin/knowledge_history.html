@@ -3,35 +3,47 @@
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a> <span>›</span>
-  <a href="/admin/business/{{ business.id }}/knowledge">{{ business.name }}</a>
-  <span>›</span> History
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
+  <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">{{ business.name }}</a> ›
+  History
 </div>
 
 <div class="page-header">
   <h1>{{ section.title }}</h1>
-  <div class="subtitle">Previous versions of this section</div>
+  <div class="subtitle">
+    What this section says now, and what it said before. A bad edit here degrades
+    every answer, so nothing is ever overwritten without being kept.
+  </div>
 </div>
 
 <div class="card">
-  <div class="card-title">Current</div>
-  <div style="white-space:pre-wrap; font-size:14px; line-height:1.6;">{{ section.body }}</div>
-  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
-    Updated {{ section.updated_at | friendly_time }}{% if section.updated_by %} by {{ section.updated_by }}{% endif %}
+  <div class="card-title">
+    Current
+    <span class="chip chip-booked">Live</span>
+  </div>
+  <div class="card-pad">
+    <div class="prose">{{ section.body }}</div>
+    <p class="cell-sub mt-3">
+      Updated {{ section.updated_at | friendly_time }}{% if section.updated_by %} by {{ section.updated_by }}{% endif %}
+    </p>
   </div>
 </div>
 
 {% for v in versions %}
-<div class="card" style="opacity:0.85;">
-  <div class="card-title" style="color:#718096;">{{ v.title }}</div>
-  <div style="white-space:pre-wrap; font-size:14px; line-height:1.6; color:#4a5568;">{{ v.body }}</div>
-  <div style="margin-top:12px; font-size:11px; color:#a0aec0;">
-    Saved {{ v.saved_at | friendly_time }}{% if v.saved_by %} by {{ v.saved_by }}{% endif %}
+<div class="card version">
+  <div class="card-title">{{ v.title }}</div>
+  <div class="card-pad">
+    <div class="prose">{{ v.body }}</div>
+    <p class="cell-sub mt-3">
+      Saved {{ v.saved_at | friendly_time }}{% if v.saved_by %} by {{ v.saved_by }}{% endif %}
+    </p>
   </div>
 </div>
 {% else %}
 <div class="card">
-  <div class="empty"><p>No previous versions — this section hasn't been edited since it was created.</p></div>
+  <div class="empty">
+    <p>No previous versions — this section hasn't been edited since it was created.</p>
+  </div>
 </div>
 {% endfor %}
 {% endblock %}

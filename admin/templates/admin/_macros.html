@@ -1,0 +1,25 @@
+{# _macros.html — markup that appears on more than one page lives here.
+
+   The nav was pasted into nine templates once. Every time that happens the
+   copies drift: one page gets a new link, another keeps a dead one, and
+   nobody notices because each page looks fine on its own. #}
+
+{% macro destinations(business, current='') %}
+  {# The five places a business is managed from. `current` names the page
+     you're on, which is shown as plain text rather than a link — a button
+     that reloads the page you're already looking at is a small lie. #}
+  <div class="toolbar toolbar-nav">
+    {% for key, label, endpoint in [
+         ('appointments',  'Appointments',   'admin.appointments'),
+         ('conversations', 'Conversations',  'admin.conversations'),
+         ('calendar',      'Calendar',       'admin.calendar_view'),
+         ('knowledge',     'Knowledge base', 'admin.knowledge'),
+         ('settings',      'Settings',       'admin.settings')] %}
+      {% if key == current %}
+        <span class="btn btn-here" aria-current="page">{{ label }}</span>
+      {% else %}
+        <a class="btn btn-nav" href="{{ url_for(endpoint, business_id=business.id) }}">{{ label }}</a>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}

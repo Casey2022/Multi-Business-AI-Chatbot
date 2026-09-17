@@ -1,186 +1,143 @@
 {% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
 {% block title %}Settings — {{ business.name }}{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a> <span>›</span> {{ business.name }}
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> › {{ business.name }}
 </div>
 
 <div class="page-header">
   <h1>{{ business.name }}</h1>
-  <div class="subtitle">Settings</div>
+  <div class="subtitle">Everything here changes what the assistant says. Save, then
+    open the chat and hear it.</div>
 </div>
-<div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">
-      Conversations →
-    </a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/calendar" style="font-size: 13px;">Calendar →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">
-      Appointments →
-    </a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">
-      Knowledge base →
-    </a>
-  </div>
-<form method="POST">
-<div class="card">
-  <div class="card-title">Business details</div>
 
-  {% for field in ['business.name', 'business.phone', 'business.address',
-                   'business.hours', 'business.service_area'] %}
-  {% set parts = field.split('.') %}
-  <div style="margin-bottom:16px;">
-    <label style="display:block; font-size:13px; font-weight:600;
-                  color:#4a5568; margin-bottom:6px;">
-      {{ fields[field].label }}
-    </label>
-    <input type="text" name="{{ field }}"
-           value="{{ config[parts[0]][parts[1]] or '' }}"
-           style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
-                  border-radius:6px; font-size:14px;">
-  </div>
-  {% endfor %}
+{{ ui.destinations(business, 'settings') }}
 
-  <div style="border-top:1px solid #edf2f7; margin-top:20px; padding-top:18px;">
-    <div style="display:flex; gap:24px; flex-wrap:wrap;">
-      {% for field in ['business.service_radius.enabled',
-                       'business.service_radius.miles'] %}
-      <div>
-        <label style="display:block; font-size:13px; font-weight:600;
-                      color:#4a5568; margin-bottom:6px;">
-          {{ fields[field].label }}
-        </label>
-        <select name="{{ field }}"
-                style="padding:9px 12px; border:1px solid #e2e8f0;
-                       border-radius:6px; font-size:14px; background:#fff;
-                       min-width:230px;">
-          {% for value, caption in fields[field].options.items() %}
-          <option value="{{ value }}"
-                  {% if choice_values[field] == value %}selected{% endif %}>
-            {{ caption }}</option>
-          {% endfor %}
-        </select>
+<form method="POST" class="stack">
+
+  <div class="card">
+    <div class="card-title">Business details</div>
+
+    {% for field in ['business.name', 'business.phone', 'business.address',
+                     'business.hours', 'business.service_area'] %}
+      {% set parts = field.split('.') %}
+      <div class="field">
+        <label for="f-{{ loop.index }}">{{ fields[field].label }}</label>
+        <input type="text" id="f-{{ loop.index }}" name="{{ field }}"
+               value="{{ config[parts[0]][parts[1]] or '' }}">
       </div>
-      {% endfor %}
-    </div>
-    <div style="font-size:12px; color:#718096; margin-top:10px;">
-      With this on, the assistant asks for the customer's address early in
-      the booking — right after the service, before offering any times — and
-      checks it against the distance above. Anyone further out is told you
-      don't cover their area and given your phone number.
-    </div>
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-title">Bot personality</div>
-  <select name="bot.persona_preset"
-          style="padding:9px 12px; border:1px solid #e2e8f0;
-                 border-radius:6px; font-size:14px; min-width:220px;">
-    {% for key, text in personas.items() %}
-    <option value="{{ key }}"
-            {% if config.bot.persona_preset == key %}selected{% endif %}>
-      {{ key | title }}
-    </option>
     {% endfor %}
-  </select>
-  <div style="margin-top:12px; font-size:12px; color:#718096;">
-    {% for key, text in personas.items() %}
-    <div style="margin-bottom:6px;"><strong>{{ key | title }}:</strong>
-      {{ text.split('\n')[0] }}</div>
-    {% endfor %}
-  </div>
-</div>
 
-<div class="card">
-  <div class="card-title">Services offered</div>
-  <div style="font-size:12px; color:#718096; margin-bottom:8px;">One per line.</div>
-  <textarea name="services" rows="6"
-            style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
-                   border-radius:6px; font-size:14px; font-family:inherit;"
-  >{{ config.services | join('\n') }}</textarea>
-</div>
-
-<div class="card">
-  <div class="card-title">Frequently asked questions</div>
-  <div style="font-size:12px; color:#718096; margin-bottom:8px;">
-    One per line, as <code>Question | Answer</code>.
-  </div>
-  <textarea name="faq" rows="8"
-            style="width:100%; padding:9px 12px; border:1px solid #e2e8f0;
-                   border-radius:6px; font-size:14px; font-family:inherit;"
-  >{% for item in config.faq %}{{ item.question }} | {{ item.answer }}
-{% endfor %}</textarea>
-</div>
-
-<div class="card">
-  <div class="card-title">Booking</div>
-  <label style="display:block; font-size:13px; font-weight:600;
-                color:#4a5568; margin-bottom:6px;">
-    {{ fields['booking.noun'].label }}
-  </label>
-  <input type="text" name="booking.noun"
-         value="{{ config.booking.noun }}"
-         style="padding:9px 12px; border:1px solid #e2e8f0;
-                border-radius:6px; font-size:14px; max-width:240px;">
-  <div style="font-size:12px; color:#718096; margin-top:6px;">
-    e.g. "appointment", "order", "reservation"
-  </div>
-
-  <div style="margin-top:24px;">
-    {% set used = question_rows | selectattr('prompt') | list | length %}
-    <div style="display:flex; align-items:baseline; justify-content:space-between;">
-      <label style="font-size:13px; font-weight:600; color:#4a5568;">
-        {{ fields['booking.extra_questions'].label }}
-      </label>
-      <span style="font-size:12px; color:{% if used == max_extra_questions %}#c05621{% else %}#718096{% endif %};">
-        {{ used }} of {{ max_extra_questions }} used
+    <div class="field">
+      <div class="field-row">
+        {% for field in ['business.service_radius.enabled',
+                         'business.service_radius.miles'] %}
+          <div class="field">
+            <label for="r-{{ loop.index }}">{{ fields[field].label }}</label>
+            <select id="r-{{ loop.index }}" name="{{ field }}">
+              {% for value, caption in fields[field].options.items() %}
+                <option value="{{ value }}" {{ 'selected' if choice_values[field] == value }}>{{ caption }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endfor %}
+      </div>
+      <span class="hint">
+        With this on, the assistant asks for the customer's address early in the
+        booking — right after the service, before offering any times — and checks
+        it against the distance above. Anyone further out is told you don't cover
+        their area and given your phone number.
       </span>
     </div>
-    <div style="font-size:12px; color:#718096; margin:6px 0 10px;">
-      Asked after the service and the date/time, in this order. The label is
-      the short name you'll see on the appointment; the question is what the
-      assistant actually asks. Clear both boxes on a row to drop that question.
-      These are asked after the service, the address and the date and time.
-    </div>
-
-    <div style="display:flex; gap:8px; padding-left:26px; margin-bottom:4px;
-                font-size:11px; text-transform:uppercase; letter-spacing:.04em;
-                color:#a0aec0;">
-      <div style="flex:0 0 180px;">Label</div>
-      <div style="flex:1;">Question the assistant asks</div>
-    </div>
-
-    {% for row in question_rows %}
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-      <div style="flex:0 0 18px; text-align:right; font-size:12px;
-                  color:#cbd5e0;">{{ row.number }}</div>
-      <input type="hidden"
-             name="booking.extra_questions[{{ row.index }}].key"
-             value="{{ row.key }}">
-      <input type="text"
-             name="booking.extra_questions[{{ row.index }}].label"
-             value="{{ row.label }}"
-             style="flex:0 0 180px; padding:8px 10px; border:1px solid #e2e8f0;
-                    border-radius:6px; font-size:14px;">
-      <input type="text"
-             name="booking.extra_questions[{{ row.index }}].prompt"
-             value="{{ row.prompt }}"
-             style="flex:1; min-width:0; padding:8px 10px;
-                    border:1px solid #e2e8f0; border-radius:6px;
-                    font-size:14px;">
-    </div>
-    {% endfor %}
   </div>
-</div>
 
-<button type="submit"
-        style="padding:10px 24px; background:#3182ce; color:#fff; border:none;
-               border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;">
-  Save settings
-</button>
+  <div class="card">
+    <div class="card-title">How the assistant sounds</div>
+    <div class="field">
+      <label for="persona">Personality</label>
+      <select class="w-short" id="persona" name="bot.persona_preset">
+        {% for key, text in personas.items() %}
+          <option value="{{ key }}" {{ 'selected' if config.bot.persona_preset == key }}>{{ key | title }}</option>
+        {% endfor %}
+      </select>
+      <div class="guidance mt-2">
+        {% for key, text in personas.items() %}
+          <div><strong>{{ key | title }}:</strong> {{ text.split('\n')[0] }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Services offered</div>
+    <div class="field">
+      <label for="services">One per line</label>
+      <textarea id="services" name="services" rows="6">{{ config.services | join('\n') }}</textarea>
+      <span class="hint">These are the only services the assistant will book. Anything
+        else, it says you don't offer it.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Frequently asked questions</div>
+    <div class="field">
+      <label for="faq">One per line, as <code>Question | Answer</code></label>
+      <textarea id="faq" name="faq" rows="8">{% for item in config.faq %}{{ item.question }} | {{ item.answer }}
+{% endfor %}</textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Booking</div>
+
+    <div class="field">
+      <label for="noun">{{ fields['booking.noun'].label }}</label>
+      <input type="text" id="noun" name="booking.noun" value="{{ config.booking.noun }}"
+             class="w-short">
+      <span class="hint">“appointment”, “order”, “reservation” — whatever your customers call it.</span>
+    </div>
+
+    <div class="field">
+      {% set used = question_rows | selectattr('prompt') | list | length %}
+      <div class="split-baseline">
+        <label>{{ fields['booking.extra_questions'].label }}</label>
+        <span class="quota {{ 'is-full' if used == max_extra_questions }}">
+          {{ used }} of {{ max_extra_questions }} used
+        </span>
+      </div>
+      <span class="hint">
+        Asked in this order, after the service, the address and the date and time.
+        The label is the short name you'll see on the appointment; the question is
+        what the assistant actually asks. Clear both boxes on a row to drop it.
+      </span>
+
+      <div class="qrows mt-3">
+        <div class="qhead">
+          <div class="qlabel">Label</div>
+          <div class="qprompt">Question the assistant asks</div>
+        </div>
+
+        {% for row in question_rows %}
+          <div class="qrow">
+            <div class="num">{{ row.number }}</div>
+            <input type="hidden" name="booking.extra_questions[{{ row.index }}].key" value="{{ row.key }}">
+            <input class="qlabel" type="text" aria-label="Label for question {{ row.number }}"
+                   name="booking.extra_questions[{{ row.index }}].label"
+                   value="{{ row.label }}" placeholder="Label">
+            <input class="qprompt" type="text" aria-label="Question {{ row.number }}"
+                   name="booking.extra_questions[{{ row.index }}].prompt"
+                   value="{{ row.prompt }}" placeholder="What should the assistant ask?">
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="savebar">
+    <button class="btn btn-primary" type="submit">Save settings</button>
+  </div>
 </form>
 {% endblock %}

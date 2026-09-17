@@ -4,98 +4,110 @@
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a>
-  <span>›</span>
-  {{ business.name }}
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> › {{ business.name }}
 </div>
 
 <div class="page-header">
   <h1>{{ business.name }}</h1>
   <div class="subtitle">
-    {{ appointment_list | length }} appointment{% if appointment_list | length != 1 %}s{% endif %} on record
+    {{ appointment_list | length }} appointment{{ '' if appointment_list | length == 1 else 's' }} on record
   </div>
-  <div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">Conversations →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/calendar" style="font-size: 13px;">Calendar →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">Knowledge base →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">Settings →</a>
-  </div>
+</div>
+
+{# Where an owner goes next. Buttons rather than a row of links separated by
+   middots: these are the four places this business is managed from, and they
+   deserve to look like the destinations they are. #}
+<div class="toolbar toolbar-nav">
+  <a class="btn btn-nav" href="{{ url_for('admin.conversations', business_id=business.id) }}">Conversations</a>
+  <a class="btn btn-nav" href="{{ url_for('admin.calendar_view', business_id=business.id) }}">Calendar</a>
+  <a class="btn btn-nav" href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge base</a>
+  <a class="btn btn-nav" href="{{ url_for('admin.settings', business_id=business.id) }}">Settings</a>
 </div>
 
 <div class="card">
   {% if appointment_list %}
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Customer phone</th>
-        <th>Service</th>
-        <th>Scheduled for</th>
-        <th>Status</th>
-        <th>Details</th>
-        <th>Calendar</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for appt in appointment_list %}
-      <tr>
-        <td style="color:#a0aec0">{{ appt.id }}</td>
-        <td>
-          <a href="/admin/business/{{ business.id }}/conversations?phone={{ appt.phone | urlencode }}">
-            {{ appt.phone }}
-          </a>
-        </td>
-        <td>
-          <strong>{{ appt.service }}</strong>
-          {% if appt.calendar_changed %}
-          <div style="font-size:11px; color:#b7791f; margin-top:4px;">
-            ⚠ {{ appt.calendar_changed }}
-          </div>
-          {% endif %}
-        </td>
-        <td>
-          <a href="/admin/business/{{ business.id }}/calendar?week={{ appt.week_offset }}&highlight={{ appt.id }}"
-             title="See this appointment in the calendar">
-            {{ appt.datetime | friendly_time }}
-          </a>
-        </td>
-        <td>
-          {% if appt.status == 'booked' %}
-          <span class="badge badge-green">Booked</span>
-          {% elif appt.status == 'cancelled' %}
-          <span class="badge badge-gray">Cancelled</span>
-          {% else %}
-          <span class="badge badge-blue">{{ appt.status | title }}</span>
-          {% endif %}
-        </td>
-        <td style="font-size:12px; color:#718096;">
-          {% if appt.details and appt.details != '{}' %}
-            {{ appt.details }}
-          {% else %}—{% endif %}
-        </td>
-        <td>
-          {% if appt.sync_status == 'synced' %}
-          <span class="badge badge-green">Synced</span>
-          {% elif appt.sync_status == 'deleted' %}
-          <span class="badge badge-gray">Removed</span>
-          {% else %}
-          <span style="color:#cbd5e0">—</span>
-          {% endif %}
-        </td>
-        <td style="white-space: nowrap;">
-          <a href="/admin/appointment/{{ appt.id }}">View →</a>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="tablewrap">
+    {# table-stack: on a phone each row becomes a stacked record, with the
+       column name in front of each value (see the data-label attributes).
+       Five columns in 360px is unreadable otherwise. #}
+    <table class="table-stack" data-resizable="appointments">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Service</th>
+          <th>Scheduled for</th>
+          <th>Status</th>
+          <th>Calendar</th>
+          <th>Details</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for appt in appointment_list %}
+        <tr>
+          <td data-label="Customer">
+            <a href="{{ url_for('admin.conversations', business_id=business.id) }}?phone={{ appt.phone | urlencode }}">{{ appt.phone }}</a>
+            <div class="cell-sub">#{{ appt.id }}</div>
+          </td>
+
+          <td data-label="Service">
+            <span class="cell-strong">{{ appt.service }}</span>
+            {% if appt.calendar_changed %}
+              <div class="mt-1">
+                <span class="chip chip-pending">{{ appt.calendar_changed }}</span>
+              </div>
+            {% endif %}
+          </td>
+
+          <td data-label="Scheduled for">
+            <a href="{{ url_for('admin.calendar_view', business_id=business.id) }}?week={{ appt.week_offset }}&highlight={{ appt.id }}"
+               title="See this appointment in the calendar">{{ appt.datetime | friendly_time }}</a>
+          </td>
+
+          <td data-label="Status">
+            {% if appt.status == 'booked' %}
+              <span class="chip chip-booked">Booked</span>
+            {% elif appt.status == 'cancelled' %}
+              <span class="chip chip-quiet">Cancelled</span>
+            {% else %}
+              <span class="chip chip-pending">{{ appt.status | title }}</span>
+            {% endif %}
+          </td>
+
+          <td data-label="Calendar">
+            {% if appt.sync_status == 'synced' %}
+              <span class="chip chip-booked">Synced</span>
+            {% elif appt.sync_status == 'deleted' %}
+              <span class="chip chip-quiet">Removed</span>
+            {% else %}
+              <span class="cell-sub">Not synced</span>
+            {% endif %}
+          </td>
+
+          <td data-label="Details">
+            {% if appt.detail_rows %}
+              <dl class="details">
+                {% for label, value in appt.detail_rows %}
+                  <dt>{{ label }}</dt><dd>{{ value }}</dd>
+                {% endfor %}
+              </dl>
+            {% else %}
+              <span class="cell-sub">—</span>
+            {% endif %}
+          </td>
+
+          <td data-label="">
+            <a class="btn btn-quiet btn-sm" href="{{ url_for('admin.appointment_detail', appointment_id=appt.id) }}">View</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
   <div class="empty">
-    <p>No appointments yet for {{ business.name }}.</p>
+    <p>No appointments yet for {{ business.name }}. When a customer books one — by
+       text or in the chat — it appears here straight away.</p>
   </div>
   {% endif %}
 </div>

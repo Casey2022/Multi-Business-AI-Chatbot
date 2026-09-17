@@ -9,10 +9,19 @@ chat, with an admin portal for managing conversations and appointments.
 
 ## Live demo
 
-Two fictional businesses running on the same server, from the same codebase:
+**[Try it](https://simonai-q92o.onrender.com/demo)** — pick a business and you
+get your own copy of it: the chat a customer sees, and the portal its owner
+uses to change what the bot says. Your copy is yours alone and is cleared
+once you've finished with it.
 
-- **[Bob's Plumbing](https://simonai-q92o.onrender.com/demo/bobs_plumbing)** — a service business with emergency calls and job scheduling
-- **[Sunrise Bakery & Café](https://simonai-q92o.onrender.com/demo/sunrise_bakery_and_cafe)** — a retail bakery with custom orders and dietary questions
+Five fictional businesses run on the same server from the same codebase, each
+set up to show something the others don't:
+
+- **[Bob's Plumbing](https://simonai-q92o.onrender.com/chat/bobs_plumbing)** — one job at a time, travel buffers between them, and the customer's address checked against a 20-mile service radius
+- **[Belmont Hair Studio](https://simonai-q92o.onrender.com/chat/belmont_hair_studio)** — three chairs, and appointments that aren't the same length: a blowout takes half an hour, a balayage takes three
+- **[Crosstown Pizza Co.](https://simonai-q92o.onrender.com/chat/crosstown_pizza)** — six orders in the oven at once on a 15-minute clock, with the same address check deciding delivery rather than travel
+- **[Ridgeline Contracting](https://simonai-q92o.onrender.com/chat/ridgeline_contracting)** — books the free estimate, never the job, and refuses to quote a price
+- **[Sunrise Bakery & Café](https://simonai-q92o.onrender.com/chat/sunrise_bakery_and_cafe)** — orders rather than appointments, with three pickups able to share one slot
 
 - [Demo]
 - <img width="357" height="497" alt="Bob&#39;s Plumbing" src="https://github.com/user-attachments/assets/110aa1d6-801e-4d55-80dc-c1651769ff20" /> <img width="357" height="497" alt="Sunrise Bakery" src="https://github.com/user-attachments/assets/0f36852d-64b2-46f5-8633-371e44bbc2b3" />
@@ -168,9 +177,27 @@ Then:
 python3 app.py
 ```
 
-The app self-heals on boot: it creates tables, registers the demo businesses,
-and ingests their documents if any of that is missing. Visit
-`http://127.0.0.1:5000/demo/bobs_plumbing`.
+The app self-heals on boot: it creates tables, registers any business missing
+from the registry, imports its knowledge base, and ingests the documents into
+a vector collection if any of that hasn't happened yet.
+
+Then visit `http://127.0.0.1:5000/demo` to pick a business, or go straight to
+one: `http://127.0.0.1:5000/chat/bobs_plumbing`.
+
+URLs worth knowing:
+
+| path | what it is |
+|---|---|
+| `/chat/<slug>` | the chat page a customer sees, for any business |
+| `/demo` | the sandbox: pick a business and get your own copy |
+| `/demo/start` | mints that copy and signs you in as its owner |
+| `/admin` | the owner's portal |
+| `/webchat/<slug>` | the JSON endpoint the chat page posts to |
+| `/sms` | the Twilio webhook |
+
+(`/demo/<slug>` still works and redirects to `/chat/<slug>` — it was the
+original address, back when "demo" meant the chat page rather than the
+sandbox.)
 
 ## Project structure
 

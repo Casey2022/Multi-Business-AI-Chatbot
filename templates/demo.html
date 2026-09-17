@@ -3,85 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ business.name }} — Chat</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f0f2f5;
-      display: flex; flex-direction: column; gap: 14px;
-      justify-content: center; align-items: center;
-      min-height: 100vh; padding: 16px;
-    }
-    .demo-bar {
-      width: 100%; max-width: 480px; background: #ebf8ff;
-      border: 1px solid #bee3f8; border-radius: 12px;
-      padding: 12px 16px; font-size: 13px; line-height: 1.5; color: #2c5282;
-    }
-    .demo-bar a { color: #2b6cb0; font-weight: 600; text-decoration: none; }
-    .demo-bar a:hover { text-decoration: underline; }
-    .demo-bar .row { display: flex; justify-content: space-between; gap: 12px;
-                     margin-top: 6px; }
-    .chat {
-      width: 100%; max-width: 480px; height: 640px; max-height: 90vh;
-      background: #fff; border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .chat-header {
-      background: #2d3748; color: #fff; padding: 16px 20px;
-      font-weight: 600; font-size: 16px;
-    }
-    .chat-header .sub { font-size: 12px; font-weight: 400; color: #a0aec0; margin-top: 2px; }
-    .chat-body {
-      flex: 1; overflow-y: auto; padding: 16px;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-    .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px;
-           font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
-    .msg.user { align-self: flex-end; background: #3182ce; color: #fff;
-                border-bottom-right-radius: 4px; }
-    .msg.bot  { align-self: flex-start; background: #edf2f7; color: #2d3748;
-                border-bottom-left-radius: 4px; }
-    .msg.typing { color: #a0aec0; font-style: italic; }
-    .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e2e8f0; }
-    .chat-input input {
-      flex: 1; padding: 11px 14px; border: 1px solid #e2e8f0;
-      border-radius: 22px; font-size: 14px; outline: none;
-    }
-    .chat-input input:focus { border-color: #3182ce; }
-    .chat-input button {
-      padding: 11px 20px; background: #3182ce; color: #fff; border: none;
-      border-radius: 22px; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
-    .chat-input button:disabled { background: #a0aec0; cursor: default; }
-  </style>
+  <title>{{ business.name }} — chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
-<body>
+<body class="chatpage">
 
-{% if is_demo %}
-<div class="demo-bar">
-  This is your own copy of {{ business.name }} — chat with it as a customer,
-  then change what it says as the owner.
-  <div class="row">
-    <a href="{{ url_for('admin.settings', business_id=business.id) }}">Open the owner's portal →</a>
-    <a href="{{ url_for('demo_picker') }}">Try a different business</a>
-  </div>
-</div>
-{% endif %}
+<nav class="topnav">
+  <a class="wordmark" href="{{ url_for('demo_picker') }}">Simon<em> Says</em></a>
+  <span class="nav-links">
+    {% if is_demo %}
+      <a class="btn btn-primary" href="{{ url_for('admin.settings', business_id=business.id) }}">Open the owner&rsquo;s portal</a>
+      <a class="nav-link" href="{{ url_for('demo_picker') }}">Try a different business</a>
+    {% endif %}
+  </span>
+</nav>
 
-<div class="chat">
-  <div class="chat-header">
-    {{ business.name }}
-    <div class="sub">Ask a question or start a booking</div>
-  </div>
-  <div class="chat-body" id="chatBody">
-    <div class="msg bot">{{ greeting }}</div>
-  </div>
-  <div class="chat-input">
-    <input id="msgInput" type="text" placeholder="Type a message…" autofocus
-           maxlength="1000">
-    <button id="sendBtn">Send</button>
+<div class="chatwrap">
+  {% if is_demo %}
+    <p class="footnote chatnote">
+      This is your own copy of {{ business.name }}. Chat with it as a customer,
+      then change what it says as the owner.
+    </p>
+  {% endif %}
+
+  <div class="card chatcard">
+    <div class="card-title chathead">
+      {{ business.name }}
+      <span class="chathead-sub">Ask a question or start a booking</span>
+    </div>
+
+    <div class="thread" id="chatBody">
+      <div class="msg msg-from-customer"><div class="bubble">{{ greeting }}</div></div>
+    </div>
+
+    <form class="chatform" id="chatForm">
+      <label class="sr-only" for="msgInput">Your message</label>
+      <input id="msgInput" type="text" placeholder="Type a message\u2026" autocomplete="off"
+             maxlength="1000" autofocus>
+      <button class="btn btn-primary" id="sendBtn" type="submit">Send</button>
+    </form>
   </div>
 </div>
 
@@ -101,13 +64,22 @@
   const input = document.getElementById("msgInput");
   const btn   = document.getElementById("sendBtn");
 
-  function addMsg(text, cls) {
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.textContent = text;   // textContent, not innerHTML — no injection risk
-    body.appendChild(div);
+  // A message is a row that positions, plus a bubble that holds the words.
+  // Two elements rather than one so the stylesheet can place the row and
+  // shape the bubble independently — the same structure the owner's portal
+  // uses for the same conversation.
+  function addMsg(text, who, extraClass) {
+    const row = document.createElement("div");
+    row.className = "msg msg-from-" + who;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble" + (extraClass ? " " + extraClass : "");
+    bubble.textContent = text;   // textContent, not innerHTML — no injection risk
+
+    row.appendChild(bubble);
+    body.appendChild(row);
     body.scrollTop = body.scrollHeight;
-    return div;
+    return row;
   }
 
   async function send() {
@@ -117,8 +89,8 @@
     inFlight = true;
     input.value = "";
     btn.disabled = true;
-    addMsg(text, "user");
-    const typing = addMsg("…", "bot typing");
+    addMsg(text, "customer");
+    const typing = addMsg("…", "bot", "typing");
 
     try {
       const res = await fetch(`/webchat/${slug}`, {
@@ -131,7 +103,7 @@
       addMsg(data.reply || data.error || "Something went wrong.", "bot");
     } catch (err) {
       typing.remove();
-      addMsg("Connection error — is the server running?", "bot");
+      addMsg("Sorry — I couldn't reach the assistant just then. Try again?", "bot");
     } finally {
       inFlight = false;
       btn.disabled = false;
@@ -139,8 +111,13 @@
     }
   }
 
-  btn.addEventListener("click", send);
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+  // The input is a real form now, so Enter and the button both arrive here
+  // as one submit event — and preventDefault stops the page reloading,
+  // which is what a form does when nobody stops it.
+  document.getElementById("chatForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    send();
+  });
 </script>
 
 </body>

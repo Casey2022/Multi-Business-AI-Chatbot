@@ -1,9 +1,11 @@
 {% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
 {% block title %}Calendar — {{ business.name }}{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a> <span>›</span> {{ business.name }}
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> › {{ business.name }}
 </div>
 
 <div class="page-header">
@@ -11,93 +13,57 @@
   <div class="subtitle">
     Week of {{ days[0].strftime('%B %-d') }} – {{ days[6].strftime('%B %-d, %Y') }}
   </div>
-  <div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">Conversations →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">Appointments →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/knowledge" style="font-size: 13px;">Knowledge base →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">Settings →</a>
+</div>
+
+{{ ui.destinations(business, 'calendar') }}
+
+<div class="toolbar">
+  <a class="btn btn-quiet" href="?week={{ offset - 1 }}">← Previous</a>
+  <a class="btn btn-quiet" href="?week=0">This week</a>
+  <a class="btn btn-quiet" href="?week={{ offset + 1 }}">Next →</a>
+</div>
+
+<div class="card">
+  <div class="tablewrap">
+    <table class="weekgrid">
+      <thead>
+        <tr>
+          <th class="gutter"></th>
+          {% for d in days %}
+            <th class="{{ 'is-today' if d == today }}">
+              {{ d.strftime('%a') }}
+              <span class="daynum">{{ d.strftime('%-d') }}</span>
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in hours %}
+        <tr>
+          <td class="hour">
+            {{ '%d:00'|format(h if h <= 12 else h - 12) }}{{ 'am' if h < 12 else 'pm' }}
+          </td>
+          {% for d in days %}
+            <td class="{{ '' if open_days[d.weekday()] else 'closed' }}">
+              {% for appt in slots.get((d.weekday(), h), []) %}
+                <a class="slot {{ 'is-highlighted' if highlight == appt.id }}"
+                   href="{{ url_for('admin.appointment_detail', appointment_id=appt.id) }}"
+                   title="{{ appt.service }}">
+                  {% if appt.minute %}<span class="at">:{{ '%02d'|format(appt.minute) }}</span>{% endif %}
+                  <span class="what">{{ appt.service }}</span>
+                </a>
+              {% endfor %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 
-<div style="display:flex; gap:10px; align-items:center; margin-bottom:16px;">
-  <a href="?week={{ offset - 1 }}"
-     style="padding:6px 14px; border:1px solid #e2e8f0; border-radius:6px;
-            font-size:13px; background:#fff; text-decoration:none;">← Previous</a>
-  <a href="?week=0"
-     style="padding:6px 14px; border:1px solid #e2e8f0; border-radius:6px;
-            font-size:13px; background:#fff; text-decoration:none;">This week</a>
-  <a href="?week={{ offset + 1 }}"
-     style="padding:6px 14px; border:1px solid #e2e8f0; border-radius:6px;
-            font-size:13px; background:#fff; text-decoration:none;">Next →</a>
-</div>
-
-<div class="card" style="padding:0; overflow-x:auto;">
-  <!-- table-layout:fixed is load-bearing. Without it the browser sizes
-       columns to fit content, so one long service name stretches its day
-       to several times the width of the others. -->
-  <table style="width:100%; border-collapse:collapse; min-width:820px;
-                table-layout:fixed;">
-    <thead>
-      <tr>
-        <th style="width:60px; background:#f7fafc; border-bottom:2px solid #e2e8f0;"></th>
-        {% for d in days %}
-        <th style="width:13%; padding:10px 6px;
-                   background:{{ '#ebf8ff' if d == today else '#f7fafc' }};
-                   border-bottom:2px solid #e2e8f0; border-left:1px solid #edf2f7;
-                   font-size:12px; font-weight:600; color:#4a5568;">
-          {{ d.strftime('%a') }}<br>
-          <span style="font-size:15px; color:{{ '#2b6cb0' if d == today else '#2d3748' }};">
-            {{ d.strftime('%-d') }}
-          </span>
-        </th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for h in hours %}
-      <tr>
-        <td style="padding:4px 8px; text-align:right; font-size:11px; color:#a0aec0;
-                   vertical-align:top; border-bottom:1px solid #edf2f7;">
-          {{ '%d:00'|format(h if h <= 12 else h - 12) }}{{ 'am' if h < 12 else 'pm' }}
-        </td>
-        {% for d in days %}
-        <td style="height:52px; border-left:1px solid #edf2f7;
-                   border-bottom:1px solid #edf2f7; vertical-align:top;
-                   padding:2px; overflow:hidden;
-                   background:{{ '#fff' if open_days[d.weekday()] else '#fafbfc' }};">
-          {% for appt in slots.get((d.weekday(), h), []) %}
-          {% set is_highlighted = (highlight == appt.id) %}
-          <a href="/admin/appointment/{{ appt.id }}"
-             title="{{ appt.service }}"
-             style="display:block; border-radius:4px; padding:3px 6px;
-                    margin-bottom:2px; font-size:11px; line-height:1.3;
-                    overflow:hidden; text-decoration:none;
-                    {% if is_highlighted %}
-                    background:#d69e2e; color:#fff;
-                    box-shadow:0 0 0 2px #faf089;
-                    {% else %}
-                    background:#3182ce; color:#fff;
-                    {% endif %}">
-            {% if appt.minute %}
-            <div style="opacity:0.8;">:{{ '%02d'|format(appt.minute) }}</div>
-            {% endif %}
-            <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis;
-                        white-space:nowrap;">{{ appt.service }}</div>
-          </a>
-          {% endfor %}
-        </td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<div style="font-size:12px; color:#a0aec0; margin-top:12px;">
-  Shows bookings taken through the assistant. Appointments you add directly
-  in Google Calendar still block availability, but won't appear here.
-</div>
+<p class="footnote">
+  Shows bookings taken through the assistant. Appointments added directly in
+  Google Calendar still block availability, but won't appear here.
+</p>
 {% endblock %}

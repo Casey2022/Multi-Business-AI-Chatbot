@@ -1,123 +1,102 @@
 {% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
 {% block title %}Knowledge base — {{ business.name }}{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
-  <a href="/admin/">Businesses</a> <span>›</span> {{ business.name }}
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> › {{ business.name }}
 </div>
 
 <div class="page-header">
   <h1>{{ business.name }}</h1>
   <div class="subtitle">
-    Knowledge base — {{ sections | length }} section{% if sections | length != 1 %}s{% endif %}.
-    This is what the assistant draws on when answering questions.
-  </div>
-  <div style="margin-top: 8px;">
-    <a href="/admin/business/{{ business.id }}/conversations" style="font-size: 13px;">Conversations →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/calendar" style="font-size: 13px;">Calendar →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/appointments" style="font-size: 13px;">Appointments →</a>
-    <span style="color:#cbd5e0; margin: 0 8px;">·</span>
-    <a href="/admin/business/{{ business.id }}/settings" style="font-size: 13px;">Settings →</a>
+    Knowledge base — {{ sections | length }} section{{ '' if sections | length == 1 else 's' }}.
+    This is everything the assistant knows about your business.
   </div>
 </div>
 
+{{ ui.destinations(business, 'knowledge') }}
+
 {% if business.documents_dirty %}
-<div style="padding:14px 18px; background:#fffaf0; border:1px solid #feebc8;
-            border-radius:8px; margin-bottom:20px; display:flex;
-            align-items:center; justify-content:space-between; gap:16px;">
-  <div style="font-size:13px; color:#975a16;">
-    <strong>Unpublished changes.</strong>
-    Customers are still seeing the previous version.
-  </div>
-  <form method="POST" action="/admin/business/{{ business.id }}/knowledge/publish">
-    <button type="submit"
-            style="padding:8px 18px; background:#d69e2e; color:#fff; border:none;
-                   border-radius:6px; font-size:13px; font-weight:600;
-                   cursor:pointer; white-space:nowrap;">
-      Publish changes
-    </button>
+<div class="banner">
+  <div><strong>Unpublished changes.</strong> Customers are still being answered
+    from the previous version.</div>
+  <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
+    <button class="btn btn-primary" type="submit">Publish changes</button>
   </form>
 </div>
 {% endif %}
 
-<!-- Existing sections -->
 {% for s in sections %}
 <div class="card">
-  <form method="POST" action="/admin/knowledge/{{ s.id }}/update">
-    <input type="text" name="title" value="{{ s.title }}"
-           style="width:100%; padding:8px 12px; border:1px solid #e2e8f0;
-                  border-radius:6px; font-size:15px; font-weight:600;
-                  margin-bottom:10px;">
-    <textarea name="body" rows="7"
-              style="width:100%; padding:10px 12px; border:1px solid #e2e8f0;
-                     border-radius:6px; font-size:14px; line-height:1.6;
-                     font-family:inherit;">{{ s.body }}</textarea>
-
-    <div style="display:flex; align-items:center; justify-content:space-between;
-                margin-top:10px; gap:12px;">
-      <div style="font-size:11px; color:#a0aec0;">
+  <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}">
+    <div class="field">
+      <label for="title-{{ s.id }}">Title</label>
+      <input class="section-title" type="text" id="title-{{ s.id }}" name="title" value="{{ s.title }}">
+      <span class="hint">Use the words a customer would — “Drain cleaning”, not “Our services”.</span>
+    </div>
+    <div class="field">
+      <label for="body-{{ s.id }}">What the assistant should know</label>
+      <textarea id="body-{{ s.id }}" name="body" rows="7">{{ s.body }}</textarea>
+    </div>
+    <div class="section-foot">
+      <span class="meta">
         Updated {{ s.updated_at | friendly_time }}{% if s.updated_by %} by {{ s.updated_by }}{% endif %}
-        <span style="margin:0 6px;">·</span>
-        <a href="/admin/knowledge/{{ s.id }}/history">History</a>
-      </div>
-      <div style="white-space:nowrap;">
-        <button type="submit"
-                style="padding:6px 16px; background:#3182ce; color:#fff;
-                       border:none; border-radius:5px; font-size:13px;
-                       font-weight:600; cursor:pointer;">Save</button>
-      </div>
+        · <a href="{{ url_for('admin.knowledge_history', document_id=s.id) }}">History</a>
+      </span>
+      <span class="toolbar">
+        <button class="btn btn-primary" type="submit">Save</button>
+      </span>
     </div>
   </form>
 
-  <form method="POST" action="/admin/knowledge/{{ s.id }}/delete"
-        onsubmit="return confirm('Delete this section? Its previous versions are kept.');"
-        style="margin-top:8px;">
-    <button type="submit"
-            style="padding:5px 12px; background:none; color:#e53e3e;
-                   border:1px solid #fed7d7; border-radius:5px;
-                   font-size:12px; cursor:pointer;">Delete section</button>
-  </form>
+  <div class="section-foot">
+    <span class="meta">Previous versions are kept when a section is deleted.</span>
+    <form method="POST" action="{{ url_for('admin.knowledge_delete', document_id=s.id) }}"
+          onsubmit="return confirm('Delete this section? Its previous versions are kept.');">
+      <button class="btn btn-danger btn-sm" type="submit">Delete section</button>
+    </form>
+  </div>
 </div>
 {% else %}
 <div class="card">
-  <div class="empty"><p>No content yet. Add a section below.</p></div>
+  <div class="empty">
+    <p>Nothing here yet. Until you add a section, the assistant can take bookings
+       but can't answer a single question about your business.</p>
+  </div>
 </div>
 {% endfor %}
 
-<!-- Add a new section -->
-<div class="card" style="border:2px dashed #e2e8f0; background:#fafbfc;">
+<div class="card card-add">
   <div class="card-title">Add a section</div>
+  <div class="card-pad">
+    <div class="guidance">
+      Each section covers one topic. What makes the difference to how well the
+      assistant answers:
+      <ul>
+        <li>Put the words customers actually use in the title</li>
+        <li>State prices, timeframes and policies plainly and specifically</li>
+        <li>Say what you <em>don't</em> offer, and put that in the title too —
+            “Septic tanks (not offered)”</li>
+        <li>Anything you leave out, the assistant will say it doesn't know</li>
+      </ul>
+    </div>
 
-  <div style="font-size:12px; color:#718096; margin-bottom:14px; line-height:1.6;">
-    Each section covers one topic. A few things that make a real difference
-    to how well the assistant answers:
-    <ul style="margin:8px 0 0 18px;">
-      <li>Put words customers would actually use in the title — "Drain
-          Cleaning", not "Our Services"</li>
-      <li>State prices, timeframes and policies plainly and specifically</li>
-      <li>Say what you <em>don't</em> offer, and put that in the title too:
-          "Septic Tanks (Not Offered)"</li>
-      <li>If you don't mention something, the assistant will tell customers
-          it doesn't know</li>
-    </ul>
+    <form method="POST" action="{{ url_for('admin.knowledge_add', business_id=business.id) }}"
+          class="mt-4">
+      <div class="field flush">
+        <label for="new-title">Title</label>
+        <input class="section-title" type="text" id="new-title" name="title"
+               placeholder="Drain cleaning">
+      </div>
+      <div class="field flush no-rule">
+        <label for="new-body">What the assistant should know</label>
+        <textarea id="new-body" name="body" rows="6"
+                  placeholder="Prices, how long it takes, what's included, what isn't."></textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Add section</button>
+    </form>
   </div>
-
-  <form method="POST" action="/admin/business/{{ business.id }}/knowledge/add">
-    <input type="text" name="title" placeholder="Section title"
-           style="width:100%; padding:8px 12px; border:1px solid #e2e8f0;
-                  border-radius:6px; font-size:15px; font-weight:600;
-                  margin-bottom:10px;">
-    <textarea name="body" rows="6"
-              placeholder="What should the assistant know about this topic?"
-              style="width:100%; padding:10px 12px; border:1px solid #e2e8f0;
-                     border-radius:6px; font-size:14px; line-height:1.6;
-                     font-family:inherit;"></textarea>
-    <button type="submit"
-            style="margin-top:10px; padding:8px 20px; background:#38a169;
-                   color:#fff; border:none; border-radius:6px; font-size:13px;
-                   font-weight:600; cursor:pointer;">Add section</button>
-  </form>
 </div>
 {% endblock %}
