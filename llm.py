@@ -123,7 +123,7 @@ Message: "{message}"
         log.info(f"Slot extraction error: {e}")
         return {}
 
-def build_system_prompt(config, channel="sms"):
+def build_system_prompt(config, channel="sms", mid_booking=False):
 
     from datetime import datetime
     today_str = datetime.now().strftime("%A, %B %d, %Y")
@@ -161,19 +161,40 @@ def build_system_prompt(config, channel="sms"):
             asked = "; ".join(q["prompt"] for q in extras)
             extras_text = (f" During booking we also ask: {asked} — so customers "
                            f"don't need to provide these details in advance.")
-        booking_text = (
-            f"\n\nBooking: customers can start a {noun} by texting 'book' or "
-            f"'{noun}' as a short command. The booking flow — a separate system, "
-            f"not you — collects the service, date/time, and any details "
-            f"below.{extras_text}\n"
-            f"CRITICAL: You cannot place, schedule, confirm, or cancel {noun}s "
-            f"yourself. You have no access to the {noun} system. If a customer "
-            f"describes what they want, acknowledge it warmly and tell them to "
-            f"text '{noun}' to start — do NOT collect booking details (dates, "
-            f"times, names) yourself, and NEVER state or imply that a {noun} "
-            f"has been placed, confirmed, or scheduled. A {noun} only exists "
-            f"once the booking flow has run."
-        )
+        if mid_booking:
+            # The customer is ALREADY in the booking flow and has asked a
+            # question in the middle of it. Telling them to "text
+            # 'appointment' to start" — which the normal prompt does — is
+            # both wrong and maddening: they started three questions ago.
+            # All this reply has to do is answer the question; the booking
+            # flow asks its next question straight afterwards.
+            booking_text = (
+                f"\n\nIMPORTANT: this customer is ALREADY part-way through "
+                f"booking a {noun}. The booking flow — a separate system, not "
+                f"you — is collecting their details right now and will ask "
+                f"its next question immediately after your reply.{extras_text}\n"
+                f"Answer their question and nothing more. Do NOT tell them to "
+                f"text '{noun}', 'book', or any other command to start — they "
+                f"have started. Do NOT ask them for a date, a time, an "
+                f"address or any other booking detail; the flow is already "
+                f"asking. Do NOT state or imply that anything has been "
+                f"booked, confirmed or scheduled. If you cannot answer from "
+                f"the facts above, say so briefly and give the phone number."
+            )
+        else:
+            booking_text = (
+                f"\n\nBooking: customers can start a {noun} by texting 'book' or "
+                f"'{noun}' as a short command. The booking flow — a separate system, "
+                f"not you — collects the service, date/time, and any details "
+                f"below.{extras_text}\n"
+                f"CRITICAL: You cannot place, schedule, confirm, or cancel {noun}s "
+                f"yourself. You have no access to the {noun} system. If a customer "
+                f"describes what they want, acknowledge it warmly and tell them to "
+                f"text '{noun}' to start — do NOT collect booking details (dates, "
+                f"times, names) yourself, and NEVER state or imply that a {noun} "
+                f"has been placed, confirmed, or scheduled. A {noun} only exists "
+                f"once the booking flow has run."
+            )
     # Combine universal guardrails with channel-specific ones.
     # The isinstance check keeps backwards-compat with older YAML configs
     # that had guardrails as a single string rather than a dict.
@@ -299,7 +320,8 @@ Message: "{message}"
 # Main LLM + RAG reply path
 # ---------------------------------------------------------------------------
 
-def get_llm_reply(message, history=None, config=None, channel="sms"):
+def get_llm_reply(message, history=None, config=None, channel="sms",
+                  mid_booking=False):
     """Send the customer's message to Claude with full context and return reply.
 
     Context assembled per-request:
@@ -316,7 +338,8 @@ def get_llm_reply(message, history=None, config=None, channel="sms"):
                          "did app.py forget to pass it?")
 
     # Build the system prompt fresh for this request's channel and business.
-    system_for_call = build_system_prompt(config, channel=channel)
+    system_for_call = build_system_prompt(config, channel=channel,
+                                          mid_booking=mid_booking)
 
     # RAG retrieval: find document chunks relevant to this specific message.
     # retrieve() now takes config so it queries the right business collection.

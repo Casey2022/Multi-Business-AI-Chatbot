@@ -12,7 +12,68 @@
 # the simulated backend can't quietly drift from the real one — a demo that
 # schedules differently from production is a demo that lies.
 
+import logging
 from datetime import datetime, timedelta
+
+log = logging.getLogger("scheduling")
+
+
+def _normalise(name):
+    """Lowercase, single-spaced — for comparing two spellings of a service."""
+    return " ".join(str(name or "").lower().split())
+
+
+def duration_for(config, service=None):
+    """How many minutes this service occupies. The single place that decides.
+
+    A business has one default length and, optionally, exceptions:
+
+        calendar:
+          default_duration_minutes: 45
+          service_durations:
+            "color": 120
+            "cut and color": 150
+
+    Matching is exact once case and spacing are normalised, deliberately not
+    the containment matching the booking flow uses on a customer's words.
+    The service reaching this function has already been snapped to the
+    catalogue, and containment here would let "cut" claim the 150 minutes
+    belonging to "cut and color" — an hour and a half of a stylist's day
+    given away by a substring.
+
+    An unknown service falls back to the default rather than raising: an
+    unbookable service is a worse outcome than a slightly wrong length, and
+    unknown_duration_services() below is what makes the mismatch visible.
+    """
+    cal     = config.get("calendar") or {}
+    default = int(cal.get("default_duration_minutes", 60))
+    table   = cal.get("service_durations") or {}
+    if not service or not table:
+        return default
+
+    wanted = _normalise(service)
+    for name, minutes in table.items():
+        if _normalise(name) == wanted:
+            try:
+                return int(minutes)
+            except (TypeError, ValueError):
+                log.warning("service_durations[%r] is %r, not a number — "
+                            "using the default %d", name, minutes, default)
+                return default
+    return default
+
+
+def unknown_duration_services(config):
+    """service_durations keys that name no service this business offers.
+
+    A duration whose key is a typo, or whose service was renamed in settings,
+    does nothing at all — the booking silently gets the default length and
+    nothing anywhere says why. Startup calls this so the mismatch is a log
+    line rather than a mystery.
+    """
+    table = (config.get("calendar") or {}).get("service_durations") or {}
+    offered = {_normalise(s) for s in (config.get("services") or [])}
+    return [name for name in table if _normalise(name) not in offered]
 
 
 def settings(config):
@@ -57,16 +118,18 @@ def within_business_hours(dt, duration_min, sched):
     return True
 
 
-def is_slot_available(config, start_iso, busy):
+def is_slot_available(config, start_iso, busy, service=None):
     """True if a booking can be made at start_iso, given the busy periods.
 
     Honours the business's scheduling model:
       - exclusive: no overlapping event, plus buffer_minutes clearance
       - capacity:  fewer than slots_per_time overlapping events
+
+    service decides how long the booking runs; omitting it means the
+    business's default length.
     """
-    cal      = config["calendar"]
     sched    = settings(config)
-    duration = int(cal.get("default_duration_minutes", 60))
+    duration = duration_for(config, service)
 
     start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)
@@ -95,7 +158,7 @@ def is_slot_available(config, start_iso, busy):
     return True
 
 
-def find_alternatives(config, desired_iso, busy):
+def find_alternatives(config, desired_iso, busy, service=None):
     """Return up to max_alternatives available slots, mixing earlier and later.
 
     Searches forward and backward independently, then interleaves the results
@@ -117,7 +180,7 @@ def find_alternatives(config, desired_iso, busy):
             if candidate < datetime.now():
                 continue
             iso = candidate.strftime("%Y-%m-%d %H:%M")
-            if is_slot_available(config, iso, busy):
+            if is_slot_available(config, iso, busy, service):
                 out.append(iso)
                 if len(out) >= limit:
                     break
@@ -148,11 +211,10 @@ def find_alternatives(config, desired_iso, busy):
     return sorted(seen)
 
 
-def slot_rejection_reason(config, start_iso, busy):
+def slot_rejection_reason(config, start_iso, busy, service=None):
     """Why a slot is unavailable: 'past', 'closed', 'blackout', 'conflict', or None."""
-    cal      = config["calendar"]
     sched    = settings(config)
-    duration = int(cal.get("default_duration_minutes", 60))
+    duration = duration_for(config, service)
 
     start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)
@@ -178,7 +240,7 @@ def slot_rejection_reason(config, start_iso, busy):
         if start.time() < b_end and end.time() > b_start:
             return "blackout"
 
-    if not is_slot_available(config, start_iso, busy):
+    if not is_slot_available(config, start_iso, busy, service):
         return "conflict"
 
     return None

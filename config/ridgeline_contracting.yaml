@@ -1,0 +1,148 @@
+# config/ridgeline_contracting.yaml — Ridgeline Contracting
+#
+# Demo template. What this one is here to show: the long end of the
+# scheduling range. Estimates are 60-90 minute visits booked days out, over
+# a wide service radius — the same address check Bob's Plumbing uses, but
+# with 35 miles of travel behind it instead of 20.
+#
+# Note the bot books the ESTIMATE, not the job. That's the honest shape of
+# the trade: nobody schedules a kitchen remodel from a text message.
+
+business:
+  name: "Ridgeline Contracting"
+  phone: "(585) 555-0166"
+  address: "1840 Lyell Ave, Rochester NY"
+  hours: "Mon-Fri, 7am-4pm"
+  service_area: "Monroe County and surrounding towns, within 35 miles"
+  service_radius:
+    enabled: true
+    miles: 35
+
+services:
+  - "kitchen remodel estimate"
+  - "bathroom remodel estimate"
+  - "deck or porch estimate"
+  - "basement finishing estimate"
+  - "roof or siding estimate"
+  - "general repair quote"
+
+calendar:
+  enabled: true
+  provider: "simulated"
+  timezone: "America/New_York"
+  default_duration_minutes: 60
+  service_durations:
+    # A whole-room remodel walk-through takes longer than a look at a porch.
+    "kitchen remodel estimate": 90
+    "bathroom remodel estimate": 90
+    "basement finishing estimate": 90
+    "general repair quote": 30
+  scheduling:
+    model: "exclusive"         # one estimator, one appointment at a time
+    buffer_minutes: 45         # driving between sites
+    slot_granularity: 30
+    max_alternatives: 3
+    business_hours:
+      0: ["07:00", "16:00"]
+      1: ["07:00", "16:00"]
+      2: ["07:00", "16:00"]
+      3: ["07:00", "16:00"]
+      4: ["07:00", "16:00"]
+    blackout:
+      - days: [0, 1, 2, 3, 4]
+        start: "11:30"
+        end: "12:30"
+        reason: "lunch"
+
+bot:
+  persona_preset: "direct"
+  guardrails:
+    universal: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      timelines, materials, or policies you don't see here.
+      NEVER quote a price for a job. Every project is priced after an
+      on-site estimate. You may repeat the typical ranges in our
+      documents, always described as ranges from past work, never as a
+      quote for this customer's project.
+      Never commit to a start date for work. You book the estimate
+      visit only; scheduling the job itself happens after the quote is
+      accepted.
+      Never apply a fact from one service to a different service.
+      If a policy isn't stated for a specific service, say you're not
+      sure and give the phone number.
+      You cannot cancel, modify, or look up existing appointments. If a
+      customer asks to cancel or change a visit, tell them to call
+      {phone} — never confirm a cancellation or change yourself.
+      If unsure, give the phone number and stop — do not speculate.
+      If a customer says something inappropriate, offensive, or sexual, do not
+      engage with it, joke about it, or acknowledge its content. Reply briefly
+      and neutrally, redirect to how you can help with our actual services, and
+      continue normally if they return to a real question.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+faq:
+  - question: "Do you charge for estimates?"
+    answer: "No — on-site estimates are free, and there's no obligation."
+  - question: "Are you licensed and insured?"
+    answer: "Yes, fully licensed and insured in New York State, and we carry workers' comp on every crew."
+  - question: "How soon can you start?"
+    answer: "That depends on the project and the season. The estimator will give you a realistic window when they visit."
+
+rules:
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey", "yo"]
+    match: "exact"
+    reply: "Hello — thanks for contacting {business_name}. How can I help?"
+
+  - name: "hours"
+    keywords: ["hours", "you open", "are you closed"]
+    match: "any"
+    reply: "Our office hours are {hours}. Leave a message any time and we'll get back to you."
+
+  - name: "location"
+    keywords: ["where are you", "your location", "your address", "directions"]
+    match: "any"
+    reply: "We're based at {address}, working across {service_area}."
+
+  - name: "quote_price"
+    keywords: ["how much", "what would it cost", "price for", "ballpark"]
+    match: "any"
+    reply: "Every project is priced after an on-site look — no two kitchens are the same. Estimates are free; want me to book one?"
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "You're welcome — call {phone} any time. 👍"
+
+  - name: "cancel_existing"
+    keywords: ["cancel my appointment", "change my appointment", "reschedule"]
+    match: "any"
+    reply: "To change or cancel a scheduled visit, please call {phone} and we'll take care of it."
+
+booking:
+  noun: "estimate"
+  noun_plural: "estimates"
+  greeting: "Happy to set up a free estimate. What's the project? (e.g. {services_examples})"
+  service_confirmation: "Got it — {service}."
+  ask_datetime: "When works for a visit? (e.g. 'Tuesday morning' or 'next Thursday at 1pm')"
+  final_confirmation: "Booked: {service} on {datetime}. The estimator will call ahead on the day. To change it, ring {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 9am' or 'June 5 at 1pm'."
+  cancel_reply: "No problem — nothing booked. Message us anytime to set one up."
+  out_of_area_reply: "That address looks like it's outside the area we cover ({service_area}). Give us a call at {phone} — for the right project we do travel further."
+  extra_questions:
+    - key: "service_address"
+      prompt: "What's the address of the property?"
+    - key: "project_scope"
+      prompt: "Briefly, what are you looking to do? (e.g. 'gut the main bath, keep the tub')"
+    - key: "timeframe"
+      prompt: "Any timeframe in mind? (e.g. 'before the holidays', 'no rush')"

@@ -1,0 +1,140 @@
+# config/crosstown_pizza.yaml — Crosstown Pizza Co.
+#
+# Demo template. What this one is here to show: the service radius doing a
+# different job. For Bob's Plumbing the radius answers "will we drive
+# there?"; here it answers "will we deliver there?", and a miss isn't a
+# refusal — out_of_area_reply offers pickup instead. Same check, opposite
+# feeling.
+#
+# Also the fastest clock in the set: 15-minute granularity, six orders in
+# the oven at once, and a "when do you want it" that usually means tonight.
+#
+# Known limitation, deliberately visible: extra questions are asked every
+# time, so this bot takes DELIVERY orders only — it can't skip the address
+# question for a pickup order. Conditional questions are the fix and they
+# don't exist yet; the FAQ points pickup customers at the phone.
+
+business:
+  name: "Crosstown Pizza Co."
+  phone: "(585) 555-0177"
+  address: "88 Culver Rd, Rochester NY"
+  hours: "Tue-Sun, 11am-10pm (closed Mondays)"
+  service_area: "Delivery within 6 miles; pickup anytime at the counter"
+  service_radius:
+    enabled: true
+    miles: 6
+
+services:
+  - "pizza"
+  - "wings"
+  - "subs"
+  - "salads"
+  - "party tray"
+
+calendar:
+  enabled: true
+  provider: "simulated"
+  timezone: "America/New_York"
+  default_duration_minutes: 20      # how long an order occupies the kitchen
+  service_durations:
+    "party tray": 45                # trays tie up the oven
+  scheduling:
+    model: "capacity"               # six orders can be in progress at once
+    slots_per_time: 6
+    buffer_minutes: 0
+    slot_granularity: 15            # people say "7:15", not "7:30"
+    max_alternatives: 3
+    business_hours:
+      1: ["11:00", "22:00"]
+      2: ["11:00", "22:00"]
+      3: ["11:00", "22:00"]
+      4: ["11:00", "22:00"]
+      5: ["11:00", "22:00"]
+      6: ["11:00", "22:00"]
+
+bot:
+  persona_preset: "bubbly"
+  guardrails:
+    universal: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      toppings, sizes, ingredients, allergens, or policies you don't
+      see here.
+      Never apply a fact from one item to a different item — prices and
+      sizes are item-specific.
+      Never guess at a delivery time. If someone asks how long, give
+      the range from our documents and say the kitchen will confirm.
+      Never confirm that an item is free of an allergen. Point them to
+      {phone} to speak to the kitchen.
+      You cannot cancel, modify, or look up existing orders. If a
+      customer asks to cancel or change an order, tell them to call
+      {phone} — never confirm a cancellation or change yourself.
+      If unsure, give the phone number and stop — do not speculate.
+      If a customer says something inappropriate, offensive, or sexual, do not
+      engage with it, joke about it, or acknowledge its content. Reply briefly
+      and neutrally, redirect to how you can help with our actual food, and
+      continue normally if they return to a real question.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+faq:
+  - question: "Do you deliver?"
+    answer: "We deliver within 6 miles, $3 fee, $15 minimum. Outside that, pickup at the counter is always open."
+  - question: "How long does delivery take?"
+    answer: "Usually 30-45 minutes, longer on Friday and Saturday nights. The kitchen will confirm when your order goes in."
+  - question: "Can I order for pickup here?"
+    answer: "Pickup orders go through the phone at (585) 555-0177 — this chat is set up for delivery."
+  - question: "Do you have gluten-free crust?"
+    answer: "Yes, gluten-free 10-inch crust is $3 extra. Our kitchen handles wheat all day, so we can't call it allergen-safe."
+
+rules:
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey", "yo"]
+    match: "exact"
+    reply: "Hey! 🍕 Welcome to {business_name}. Hungry?"
+
+  - name: "hours"
+    keywords: ["hours", "you open", "are you closed", "you close"]
+    match: "any"
+    reply: "We're open {hours}."
+
+  - name: "location"
+    keywords: ["where are you", "your location", "your address", "directions"]
+    match: "any"
+    reply: "We're at {address} — {service_area}."
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "Anytime! 🍕"
+
+  - name: "cancel_existing"
+    keywords: ["cancel my order", "change my order"]
+    match: "any"
+    reply: "To change or cancel an order that's already in, call us at {phone} — the kitchen moves fast!"
+
+booking:
+  noun: "order"
+  noun_plural: "orders"
+  greeting: "Let's get you fed! What are you after? (e.g. {services_examples})"
+  service_confirmation: "Nice choice — {service}."
+  ask_datetime: "When would you like it? (e.g. 'tonight at 7' or 'as soon as possible')"
+  final_confirmation: "Order in! {service} for {datetime}. We'll call if anything's unclear. To change it, ring {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a time. Try something like 'tonight at 7' or 'Friday at 6:30pm'."
+  cancel_reply: "No worries — nothing ordered. Message anytime. 🍕"
+  out_of_area_reply: "Ah — that address is outside our 6-mile delivery zone. You're always welcome to pick up at {address}, or call {phone} and we'll see what we can do."
+  extra_questions:
+    - key: "service_address"
+      prompt: "Where are we delivering to?"
+    - key: "order_details"
+      prompt: "What exactly would you like? (size, toppings, quantity)"
+    - key: "notes"
+      prompt: "Anything else? (buzzer code, no onions, leave at door — or reply 'none')"

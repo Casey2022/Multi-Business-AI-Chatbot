@@ -49,15 +49,12 @@ def _busy_periods(config, window_start, window_end):
         log.warning("Simulated calendar asked for busy time with no business "
                     "id — returning none rather than every business's")
         return []
-    duration = int((config.get("calendar") or {}).get(
-        "default_duration_minutes", 60))
-
     from db import get_connection
     conn = get_connection()
     try:
         rows = conn.execute(
             """
-            SELECT datetime FROM appointments
+            SELECT datetime, service FROM appointments
             WHERE status = 'booked'
               AND (? IS NULL OR business_id = ?)
               AND datetime >= ? AND datetime <= ?
@@ -75,7 +72,11 @@ def _busy_periods(config, window_start, window_end):
             start = datetime.strptime(row["datetime"], "%Y-%m-%d %H:%M")
         except (ValueError, TypeError):
             continue          # a malformed row shouldn't block every booking
-        busy.append((start, start + timedelta(minutes=duration)))
+        # Each booking is as long as ITS OWN service, not the business
+        # default. A salon where a two-hour colour blocked forty-five
+        # minutes would cheerfully double-book the other seventy-five.
+        minutes = scheduling.duration_for(config, row["service"])
+        busy.append((start, start + timedelta(minutes=minutes)))
     return busy
 
 
@@ -83,27 +84,31 @@ def _busy_periods(config, window_start, window_end):
 # The same questions, answered from the same rules
 # ---------------------------------------------------------------------------
 
-def is_slot_available(config, start_iso, busy=None):
+def is_slot_available(config, start_iso, busy=None, service=None):
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
+        # The window has to start far enough back to catch a booking that
+        # began before this slot and is still running. A day of look-back
+        # covers any plausible appointment length with room to spare; the
+        # day it doesn't, the business has bigger problems than this query.
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.is_slot_available(config, start_iso, busy)
+    return scheduling.is_slot_available(config, start_iso, busy, service)
 
 
-def find_alternatives(config, desired_iso):
+def find_alternatives(config, desired_iso, service=None):
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
     busy = _busy_periods(config, desired - timedelta(days=8),
                          desired + timedelta(days=8))
-    return scheduling.find_alternatives(config, desired_iso, busy)
+    return scheduling.find_alternatives(config, desired_iso, busy, service)
 
 
-def slot_rejection_reason(config, start_iso, busy=None):
+def slot_rejection_reason(config, start_iso, busy=None, service=None):
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.slot_rejection_reason(config, start_iso, busy)
+    return scheduling.slot_rejection_reason(config, start_iso, busy, service)
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +134,7 @@ def delete_event(config, event_id):
     return True
 
 
-def update_event_time(config, event_id, new_start_iso):
+def update_event_time(config, event_id, new_start_iso, service=None):
     """Nothing to move — rescheduling rewrites the row's datetime."""
     log.info("Simulated calendar: moved %s to %s", event_id, new_start_iso)
     return True

@@ -15,3 +15,8 @@ twilio==9.10.9
 voyageai==0.5.0
 google-api-python-client==2.198.0
 google-auth==2.56.3
+# Used directly in calendar_google._get_service, to put a timeout on the
+# Calendar transport. Pulled in by google-api-python-client anyway, but it's
+# an import we make ourselves now, so it's named here.
+google-auth-httplib2==0.4.1
+httplib2==0.32.0

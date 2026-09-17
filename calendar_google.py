@@ -36,6 +36,14 @@ SCOPES = [
 
 _service = None
 
+# Seconds before a Calendar API call gives up. Without a timeout, httplib2
+# waits on the socket indefinitely: one request sat inside an availability
+# check for 116 seconds, and everything the customer typed while it hung was
+# later overwritten by its stale view of the conversation. A booking that
+# fails fast is recoverable; one that hangs is not. Tunable because a slow
+# network shouldn't mean no calendar at all.
+API_TIMEOUT_SECONDS = int(os.environ.get("CALENDAR_TIMEOUT_SECONDS", "10"))
+
 
 def _get_service():
     """Return an authenticated Calendar API client, building it lazily.
@@ -57,7 +65,24 @@ def _get_service():
     )
     # cache_discovery=False avoids a noisy warning and a filesystem cache
     # we don't want on an ephemeral container.
-    _service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+    #
+    # The transport is built by hand only to put a timeout on it. If the
+    # httplib2 pieces aren't importable we fall back to the default
+    # transport rather than failing to build a client at all — a calendar
+    # that might hang still beats no calendar — but say so, because that
+    # fallback is the configuration the 116-second stall happened in.
+    try:
+        import httplib2
+        from google_auth_httplib2 import AuthorizedHttp
+        http = AuthorizedHttp(creds,
+                              http=httplib2.Http(timeout=API_TIMEOUT_SECONDS))
+        _service = build("calendar", "v3", http=http, cache_discovery=False)
+        log.info("Calendar client ready (timeout %ds)", API_TIMEOUT_SECONDS)
+    except ImportError as e:
+        log.warning("Building the calendar client without a timeout (%s) — "
+                    "a hung request will block a customer's turn", e)
+        _service = build("calendar", "v3", credentials=creds,
+                         cache_discovery=False)
     return _service
 
 
@@ -79,7 +104,7 @@ def create_event(config, service_name, start_iso, customer_id, details=None):
     cal      = config["calendar"]
     business = config["business"]
     tz       = cal.get("timezone", "America/New_York")
-    duration = int(cal.get("default_duration_minutes", 60))
+    duration = scheduling.duration_for(config, service_name)
 
     start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)
@@ -154,31 +179,31 @@ def _busy_periods(config, window_start, window_end):
 # the busy periods come from. Signatures are unchanged, so every caller and
 # the calendar_sync facade carry on as before.
 
-def is_slot_available(config, start_iso, busy=None):
+def is_slot_available(config, start_iso, busy=None, service=None):
     """True if a booking can be made at start_iso. Fetches busy if not given."""
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.is_slot_available(config, start_iso, busy)
+    return scheduling.is_slot_available(config, start_iso, busy, service)
 
 
-def find_alternatives(config, desired_iso):
+def find_alternatives(config, desired_iso, service=None):
     """Up to max_alternatives nearby openings, mixing earlier and later."""
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
     # One events call covers the whole search window.
     busy = _busy_periods(config, desired - timedelta(days=8),
                          desired + timedelta(days=8))
-    return scheduling.find_alternatives(config, desired_iso, busy)
+    return scheduling.find_alternatives(config, desired_iso, busy, service)
 
 
-def slot_rejection_reason(config, start_iso, busy=None):
+def slot_rejection_reason(config, start_iso, busy=None, service=None):
     """Why a slot is unavailable: 'past', 'closed', 'blackout', 'conflict', or None."""
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.slot_rejection_reason(config, start_iso, busy)
+    return scheduling.slot_rejection_reason(config, start_iso, busy, service)
 
 
 def delete_event(config, event_id):
@@ -211,11 +236,15 @@ def delete_event(config, event_id):
         raise
 
 
-def update_event_time(config, event_id, new_start_iso):
-    """Move an existing event to a new time. Returns the updated event id."""
+def update_event_time(config, event_id, new_start_iso, service=None):
+    """Move an existing event to a new time. Returns the updated event id.
+
+    service keeps the moved event its original length — without it, a
+    rescheduled two-hour job would silently shrink to the default.
+    """
     cal      = config["calendar"]
     tz       = cal.get("timezone", "America/New_York")
-    duration = int(cal.get("default_duration_minutes", 60))
+    duration = scheduling.duration_for(config, service)
 
     start = datetime.strptime(new_start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)

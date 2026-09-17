@@ -28,7 +28,8 @@ import os
 from logging_setup import setup_logging, new_turn
 setup_logging()
 
-from flask import Flask, request, render_template
+from flask import (Flask, request, render_template, redirect, session,
+                   url_for)
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.request_validator import RequestValidator
 
@@ -57,22 +58,46 @@ log_web = logging.getLogger("webchat")
 def bootstrap():
     """Prepare everything the app needs to serve requests.
 
-    Idempotent by design: safe to run on every boot. Creates tables, registers
-    businesses if the registry is empty, seeds an operator account if no users
-    exist, and ingests each business's documents if their vector collection is
-    missing. This is what makes deployment to an ephemeral filesystem work
-    without manual setup steps.
+    Idempotent by design: safe to run on every boot. Creates tables, clears
+    out demo tenants left by the last run, registers any seed business that
+    isn't in the database yet, seeds an operator account if no users exist,
+    imports a knowledge base for any business without one, and ingests each
+    business's documents if their vector collection is missing.
+
+    Every step is 'do this if it isn't already done' rather than 'do this if
+    the database looks brand new'. That distinction is the whole point: the
+    old version only seeded an EMPTY registry, so three businesses added to
+    the seed list never appeared on a machine that already had two, and
+    nothing anywhere said so. Setup steps that only work on a fresh install
+    aren't setup steps, they're a trap for the second install.
     """
     init_db()
 
-    from db import get_all_businesses
-    businesses = get_all_businesses()
+    # Demo tenants don't survive a restart. Their visitor's browser session
+    # is gone, their chat history means nothing to anyone, and on an
+    # ephemeral filesystem any collection they published was lost with the
+    # disk — so a demo that outlived the process is a row that will never be
+    # used again and would otherwise sit there until the idle sweep notices.
+    try:
+        from demo import sweep_all
+        sweep_all()
+    except Exception as e:
+        # Tidying is not worth failing a boot over.
+        log_boot.warning(f"Could not clear old demos: {e}")
 
-    if not businesses:
-        log_boot.info("No businesses registered — running seed.")
-        from seed_businesses import seed
-        seed()
-        businesses = get_all_businesses()
+    # Register any business in the seed list that isn't here yet. This used
+    # to run only when the table was completely EMPTY, which meant adding a
+    # new business to the list did nothing on a machine that already had
+    # one — the row never appeared, nothing said why, and the only way to
+    # find out was to query the database by hand. Seeding is idempotent now,
+    # so a restart is all it takes.
+    from db import get_all_businesses
+    from seed_businesses import seed
+    added = seed(quiet=True)
+    if added:
+        log_boot.info("Registered %d new business(es): %s",
+                      len(added), ", ".join(added))
+    businesses = get_all_businesses()
 
     # Seed a default operator if no users exist. The deployed filesystem is
     # ephemeral, so the database is rebuilt on every boot — without this the
@@ -94,11 +119,36 @@ def bootstrap():
                   "unreachable.")
 
     from rag import ensure_ingested
+    from scheduling import unknown_duration_services
+    from import_documents import import_for_business
     for b in businesses:
         if not b["active"]:
             continue
         try:
-            ensure_ingested(load_config(b["config_path"], b["id"]))
+            config = load_config(b["config_path"], b["id"])
+
+            # A business with no knowledge base yet gets one from its seed
+            # Markdown. Registering a business and giving it something to
+            # know are two halves of the same job; leaving the second half
+            # as a command to remember is how one goes live able to book
+            # appointments but unable to answer a single question about
+            # itself. No-op once the table has sections — the database is
+            # authoritative from then on.
+            imported = import_for_business(b, config)
+            if imported:
+                log_boot.info("Imported %d knowledge section(s) for %s",
+                              imported, b["name"])
+            # A per-service duration whose key names no service does nothing
+            # at all — the booking silently takes the default length. Said
+            # once at startup, it's a typo; left unsaid, it's a stylist
+            # wondering why her afternoon keeps getting double-booked.
+            stale = unknown_duration_services(config)
+            if stale:
+                log_boot.warning(
+                    "%s has service_durations for services it doesn't "
+                    "offer: %s — those bookings will use the default length",
+                    b["name"], ", ".join(repr(s) for s in stale))
+            ensure_ingested(config)
         except Exception as e:
             # A failed ingest shouldn't stop the server from starting —
             # that business just won't have RAG until it's fixed.
@@ -110,6 +160,29 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
 init_db()          # tables only — no ChromaDB access before fork
 app.register_blueprint(admin_bp)
+
+# Run the startup sequence.
+#
+# This call has to be here, at module scope. gunicorn imports `app:app` and
+# then serves; it never calls anything else, and neither does the dev
+# server. So bootstrap() — which registers businesses, imports their
+# knowledge bases and ingests their vector collections — was defined,
+# documented, maintained, and never once executed. Everything it promises
+# to do automatically was in fact being done by hand, and the only symptom
+# was a business whose bot knew nothing about it.
+#
+# Safe here because the Procfile does NOT use --preload: each worker
+# imports this module after forking, so the ChromaDB client is created in
+# the process that uses it. If --preload is ever added, this must move into
+# a post_fork hook or the client will be inherited across the fork and
+# break in ways that look like corruption.
+#
+# Wrapped because a business with a bad config should cost that business
+# its RAG, not cost everyone the server.
+try:
+    bootstrap()
+except Exception as e:
+    log_boot.exception("Bootstrap failed — serving anyway: %s", e)
 
 # ---------------------------------------------------------------------------
 # Security — Twilio webhook signature verification
@@ -328,6 +401,14 @@ def webchat_reply(slug):
     config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
 
+    # A demo is swept once nobody has used it for a while, and this is what
+    # "used" means for a visitor who is chatting rather than clicking around
+    # the portal. Cheap enough to run on every message; skipped entirely for
+    # real businesses, which are never swept.
+    if business.get("is_demo"):
+        from demo import touch
+        touch(business_id)
+
     new_turn()
     log_web.info(f"{business['name']} <- {session_id}: {message!r}")
 
@@ -336,6 +417,55 @@ def webchat_reply(slug):
     )
 
     return {"reply": reply_text}
+
+@app.route("/demo", methods=["GET"])
+def demo_picker():
+    """Pick a business to explore. The front door of the sandbox."""
+    from demo import catalogue
+    return render_template("demo_picker.html", templates=catalogue(),
+                           error=request.args.get("error"))
+
+
+@app.route("/demo/start", methods=["POST"])
+def demo_start():
+    """Mint a demo tenant for this visitor and sign them in as its owner.
+
+    The visitor gets a whole business of their own — settings, knowledge
+    base, diary — cloned from the template they picked. Nothing they do
+    here can reach the business it was cloned from.
+    """
+    slug = (request.form.get("template") or "").strip()
+
+    # This endpoint writes rows, so it's limited harder than chat is. The
+    # other two halves of the same defence live in demo.py: a ceiling on
+    # how many demos exist at once, and a sweep that clears the idle ones.
+    import ratelimit
+    allowed, wait = ratelimit.demo_start(_client_ip())
+    if not allowed:
+        log_web.warning("Demo creation throttled for %s", _client_ip())
+        return redirect(url_for(
+            "demo_picker",
+            error=f"That's a lot of demos. Try again in {max(wait, 1)} seconds."
+        ))
+
+    from demo import clone_template
+    minted = clone_template(slug)
+    if not minted:
+        return redirect(url_for(
+            "demo_picker",
+            error="Couldn't start that demo just now — please try another."
+        ))
+
+    # Sign them in as the clone's owner. Set directly rather than posting
+    # the generated password back through the login form: the password
+    # exists because the users table requires one, and putting it on the
+    # wire would only give it somewhere to leak.
+    session["user_email"] = minted["email"]
+    session.permanent = False
+    log_web.info("Demo started: %s from template %r",
+                 minted["business"]["slug"], slug)
+    return redirect(url_for("demo_page", slug=minted["business"]["slug"]))
+
 
 @app.route("/demo/<slug>", methods=["GET"])
 def demo_page(slug):
@@ -347,11 +477,12 @@ def demo_page(slug):
     return render_template(
         "demo.html",
         business=business,
+        is_demo=bool(business.get("is_demo")),
         greeting=f"Hi! I'm the {config['business']['name']} assistant. How can I help?",
     )
 @app.route("/", methods=["GET"])
 def index():
-    return "Chatbot server is running.", 200
+    return redirect(url_for("demo_picker"))
 
 if __name__ == "__main__":
     app.run(debug=True)

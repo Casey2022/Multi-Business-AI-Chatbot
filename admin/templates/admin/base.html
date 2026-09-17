@@ -40,6 +40,23 @@
       font-size: 13px;
     }
     .topnav .logout:hover { background: #c53030; color: #fff; }
+    /* The way back to the chat. An owner who changes a greeting or a
+       service wants to see what it did, and the only place that shows is
+       the customer-facing chat. Without this the round trip means
+       remembering a URL. */
+    .topnav .try-chat {
+      background: #3182ce;
+      color: #fff;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+    }
+    .topnav .try-chat:hover { background: #2b6cb0; color: #fff; }
+    /* Only shown inside a demo. A visitor deciding this isn't their trade
+       shouldn't have to find their way back to the chat page to find the
+       way back to the picker. */
+    .topnav .switch-demo { font-size: 13px; color: #a0aec0; }
+    .topnav .switch-demo:hover { color: #fff; }
 
     /* ---- Page content ---- */
     .page { flex: 1; padding: 28px 32px; max-width: 1400px; width: 100%; margin: 0 auto; }
@@ -118,12 +135,19 @@
   <a href="/admin/" class="brand">📱 SMS Chatbot Admin</a>
   <div class="nav-links">
     <a href="/admin/">Businesses</a>
+    {% if business is defined and business %}
+      <a class="try-chat" target="_blank" rel="noopener"
+         href="{{ url_for('demo_page', slug=business.slug) }}">💬 Chat as a customer</a>
+      {% if business.is_demo %}
+        <a class="switch-demo"
+           href="{{ url_for('demo_picker') }}">↩ Try a different business</a>
+      {% endif %}
+    {% endif %}
     <a href="/admin/logout" class="logout">Log out</a>
   </div>
 </nav>
 
 <div class="page">
-  <div class="page">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -139,7 +163,6 @@
   {% endwith %}
 
   {% block content %}{% endblock %}
-</div>
 </div>
 
 </body>

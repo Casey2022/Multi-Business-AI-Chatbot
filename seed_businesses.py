@@ -1,38 +1,92 @@
 # seed_businesses.py — register businesses in the database.
 #
-# Run this ONCE after deleting chatbot.db to populate the businesses table.
-# Safe to run again — existing businesses are skipped, not duplicated.
+# Idempotent: a business already registered is left alone, so this is safe
+# to run on every boot and safe to run by hand any number of times. That
+# matters more than it sounds. The old version only ran when the businesses
+# table was completely empty, which meant adding a new business to the list
+# below did nothing at all on a machine that already had two — the row never
+# appeared, nothing said why, and the demo picker quietly showed three cards
+# short.
 #
 # Usage:
 #   python3 seed_businesses.py
 
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Nothing here needs an API key. Running outside the virtualenv should
+    # still seed the database rather than dying on an import three lines in.
+    pass
 
-from db import init_db, add_business, get_connection
+import db
+from db import init_db, add_business, get_business_by_slug, get_connection
 
-def seed():
-    # Make sure all tables exist before we try to insert.
+BUSINESSES = [
+    {
+        "name":           "Bob's Plumbing",
+        "slug":           "bobs_plumbing",
+        "twilio_number":  "+15855550123",   # E.164 — must match Twilio's "To" field exactly
+        "config_path":    "config/bobs_plumbing.yaml",
+    },
+    {
+        "name":           "Sunrise Bakery & Café",
+        "slug":           "sunrise_bakery_and_cafe",
+        "twilio_number":  "+15855550188",
+        "config_path":    "config/sunrise_bakery_and_cafe.yaml",
+    },
+
+    # Demo templates. No Twilio number — they exist to be cloned for
+    # visitors to the public demo, not to answer a real phone. Each one is
+    # here because it exercises something the others don't:
+    #   Ridgeline  — long estimate visits over a wide service radius
+    #   Belmont    — appointments of different lengths sharing 3 chairs
+    #   Crosstown  — the radius deciding delivery rather than travel,
+    #                on a 15-minute clock with 6 orders at a time
+    {
+        "name":           "Ridgeline Contracting",
+        "slug":           "ridgeline_contracting",
+        "twilio_number":  None,
+        "config_path":    "config/ridgeline_contracting.yaml",
+    },
+    {
+        "name":           "Belmont Hair Studio",
+        "slug":           "belmont_hair_studio",
+        "twilio_number":  None,
+        "config_path":    "config/belmont_hair_studio.yaml",
+    },
+    {
+        "name":           "Crosstown Pizza Co.",
+        "slug":           "crosstown_pizza",
+        "twilio_number":  None,
+        "config_path":    "config/crosstown_pizza.yaml",
+    },
+]
+
+
+def seed(quiet=False):
+    """Register any business in BUSINESSES that isn't in the database yet.
+
+    Returns the list of slugs added. Existing businesses are checked by slug
+    and skipped — not re-inserted and caught as a constraint error, which is
+    what the old version did and which made a normal run look like a failure.
+    """
     init_db()
 
-    businesses = [
-        {
-            "name":           "Bob's Plumbing",
-            "slug":           "bobs_plumbing",
-            "twilio_number":  "+15855550123",   # E.164 — must match Twilio's "To" field exactly
-            "config_path":    "config/bobs_plumbing.yaml",
-        },
-        {
-            "name":           "Sunrise Bakery & Café",
-            "slug":           "sunrise_bakery_and_cafe",
-            "twilio_number":  "+15855550188",
-            "config_path":    "config/sunrise_bakery_and_cafe.yaml",
-        },
-    ]
+    def say(*args):
+        if not quiet:
+            print(*args)
 
-    print("\n[seed] Registering businesses...\n")
+    # Printed because getting this wrong is silent and expensive: run from
+    # the wrong directory with the old relative path and you seeded a
+    # different file than the one the app reads.
+    say(f"\n[seed] Database: {db.DB_PATH}\n")
 
-    for b in businesses:
+    added = []
+    for b in BUSINESSES:
+        if get_business_by_slug(b["slug"]):
+            say(f"  · {b['name']} — already registered")
+            continue
         try:
             business_id = add_business(
                 name          = b["name"],
@@ -40,29 +94,36 @@ def seed():
                 config_path   = b["config_path"],
                 twilio_number = b["twilio_number"],
             )
-            print(f"  ✓ {b['name']} registered (id={business_id})")
-            print(f"    slug:          {b['slug']}")
-            print(f"    twilio_number: {b['twilio_number']}")
-            print(f"    config_path:   {b['config_path']}\n")
-
+            added.append(b["slug"])
+            say(f"  + {b['name']} registered (id={business_id}, "
+                f"slug={b['slug']})")
         except Exception as e:
-            # Most likely a UNIQUE constraint violation — business already exists.
-            print(f"  ⚠ Skipped '{b['name']}' — already registered or error: {e}\n")
+            say(f"  ! Could not register '{b['name']}': {e}")
 
-    # Print the current state of the businesses table so we can verify.
+    say(f"\n[seed] {len(added)} added, "
+        f"{len(BUSINESSES) - len(added)} already present.")
+    return added
+
+
+def show():
+    """Print the businesses table, so a run ends with the actual state."""
     conn = get_connection()
     rows = conn.execute(
-        "SELECT id, name, slug, twilio_number, config_path, active FROM businesses"
+        "SELECT id, name, slug, twilio_number, active, "
+        "COALESCE(is_demo, 0) AS is_demo FROM businesses ORDER BY id"
     ).fetchall()
     conn.close()
 
-    print("[seed] Current businesses table:")
-    print(f"  {'id':<4} {'name':<28} {'twilio_number':<16} {'active'}")
-    print(f"  {'-'*4} {'-'*28} {'-'*16} {'-'*6}")
+    print("\n[seed] Businesses now in the database:")
+    print(f"  {'id':<4} {'name':<28} {'twilio':<16} {'active':<7} kind")
+    print(f"  {'-'*4} {'-'*28} {'-'*16} {'-'*7} ----")
     for row in rows:
-        print(f"  {row['id']:<4} {row['name']:<28} {str(row['twilio_number']):<16} {row['active']}")
-
+        kind = "demo clone" if row["is_demo"] else "business"
+        print(f"  {row['id']:<4} {row['name']:<28} "
+              f"{str(row['twilio_number'] or '—'):<16} {row['active']:<7} {kind}")
+    print()
 
 
 if __name__ == "__main__":
     seed()
+    show()

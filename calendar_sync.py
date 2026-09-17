@@ -79,24 +79,32 @@ def create_event(config, service_name, start_iso, customer_id, details=None):
     )
 
 
-def is_slot_available(config, start_iso, busy=None):
-    return _backend(config).is_slot_available(config, start_iso, busy=busy)
+def is_slot_available(config, start_iso, busy=None, service=None):
+    return _backend(config).is_slot_available(
+        config, start_iso, busy=busy, service=service
+    )
 
 
-def find_alternatives(config, desired_iso):
-    return _backend(config).find_alternatives(config, desired_iso)
+def find_alternatives(config, desired_iso, service=None):
+    return _backend(config).find_alternatives(
+        config, desired_iso, service=service
+    )
 
 
-def slot_rejection_reason(config, start_iso, busy=None):
-    return _backend(config).slot_rejection_reason(config, start_iso, busy=busy)
+def slot_rejection_reason(config, start_iso, busy=None, service=None):
+    return _backend(config).slot_rejection_reason(
+        config, start_iso, busy=busy, service=service
+    )
 
 
 def delete_event(config, event_id):
     return _backend(config).delete_event(config, event_id)
 
 
-def update_event_time(config, event_id, new_start_iso):
-    return _backend(config).update_event_time(config, event_id, new_start_iso)
+def update_event_time(config, event_id, new_start_iso, service=None):
+    return _backend(config).update_event_time(
+        config, event_id, new_start_iso, service=service
+    )
 
 
 def fetch_changes(config, sync_token=None):

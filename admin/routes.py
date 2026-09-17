@@ -5,7 +5,7 @@ from admin import admin_bp
 from admin.auth import login_required, operator_required, require_business_access, current_user
 from config import load_config
 import calendar_sync
-from db import (get_all_businesses, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
+from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
 
 import logging
 log = logging.getLogger("admin")
@@ -36,8 +36,7 @@ def conversations(business_id):
 
     With ?phone=<number>: shows the full message thread for that number.
     """
-    businesses  = get_all_businesses()
-    business    = next((b for b in businesses if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
 
     if not business:
         abort(404)
@@ -62,8 +61,7 @@ def conversations(business_id):
 def appointments(business_id):
     require_business_access(business_id)
     """Show all appointments/orders for a business."""
-    businesses = get_all_businesses()
-    business   = next((b for b in businesses if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
 
     if not business:
         abort(404)
@@ -111,8 +109,7 @@ def cancel(appointment_id):
         abort(404)
     require_business_access(appt["business_id"])
 
-    business = next((b for b in get_all_businesses()
-                     if b["id"] == appt["business_id"]), None)
+    business = get_business_by_id(appt["business_id"])
     if not business:
         abort(404)
 
@@ -150,14 +147,18 @@ def reschedule(appointment_id):
         return redirect(url_for("admin.appointments",
                                 business_id=appt["business_id"]))
 
-    business = next((b for b in get_all_businesses()
-                     if b["id"] == appt["business_id"]), None)
+    business = get_business_by_id(appt["business_id"])
     config = load_config(business["config_path"], business["id"])
 
     if appt.get("external_event_id") and calendar_sync.is_enabled(config):
         try:
+            # Pass the service: the moved event has to keep its own
+            # length. Without it a three-hour install rescheduled by the
+            # owner would quietly become a one-hour one on the calendar,
+            # and the next booking would be let into time that isn't free.
             calendar_sync.update_event_time(
-                config, appt["external_event_id"], new_dt
+                config, appt["external_event_id"], new_dt,
+                service=appt.get("service"),
             )
         except Exception as e:
             log.warning(f"Calendar update FAILED for appt {appointment_id}: {e}")
@@ -177,7 +178,7 @@ def settings(business_id):
     """Let an owner edit the safe subset of their configuration."""
     require_business_access(business_id)
 
-    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
     if not business:
         abort(404)
 
@@ -287,7 +288,7 @@ def knowledge(business_id):
     """Show and edit the document sections the assistant answers from."""
     require_business_access(business_id)
 
-    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
     if not business:
         abort(404)
 
@@ -385,13 +386,23 @@ def knowledge_publish(business_id):
     """
     require_business_access(business_id)
 
-    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
     if not business:
         abort(404)
 
     from rag import ingest_documents
     from db import set_documents_clean
     from config import load_config
+    from demo import fork_collection
+
+    # Before anything reads the config, make sure this business owns the
+    # collection it is about to rebuild. A demo clone shares its template's
+    # collection until this moment; publishing without forking first would
+    # rebuild a real client's knowledge base out of a visitor's edits. It has
+    # to happen before load_config, not after, because load_config is what
+    # stamps the collection name onto the config — the same ordering trap as
+    # writing into pending after set_state. No-op for a real business.
+    fork_collection(business_id)
 
     try:
         ingest_documents(load_config(business["config_path"], business_id),
@@ -424,8 +435,7 @@ def knowledge_history(document_id):
     doc = dict(doc)
     require_business_access(doc["business_id"])
 
-    business = next((b for b in get_all_businesses()
-                     if b["id"] == doc["business_id"]), None)
+    business = get_business_by_id(doc["business_id"])
 
     return render_template(
         "admin/knowledge_history.html",
@@ -447,7 +457,7 @@ def calendar_view(business_id):
     """
     require_business_access(business_id)
 
-    business = next((b for b in get_all_businesses() if b["id"] == business_id), None)
+    business = get_business_by_id(business_id)
     if not business:
         abort(404)
 
@@ -537,8 +547,7 @@ def appointment_detail(appointment_id):
         abort(404)
     require_business_access(appt["business_id"])
 
-    business = next((b for b in get_all_businesses()
-                     if b["id"] == appt["business_id"]), None)
+    business = get_business_by_id(appt["business_id"])
 
     # details is stored as JSON text; parse for display.
     import json

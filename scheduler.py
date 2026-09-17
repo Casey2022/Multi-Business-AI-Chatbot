@@ -19,6 +19,7 @@ from llm import parse_datetime
 from llm import parse_datetime, extract_booking_slots
 
 import logging
+from contextvars import ContextVar
 import re
 
 log = logging.getLogger("scheduler")
@@ -38,6 +39,39 @@ ADDRESS_MAX_ATTEMPTS = 2
 # Where a checked address is stored. Matches the key Bob's config already
 # used, so appointments booked before this change keep reading correctly.
 ADDRESS_SLOT_KEY = "service_address"
+
+class StaleTurn(Exception):
+    """Raised when this turn's state write is refused as out of date.
+
+    It means another request for the same conversation finished while this
+    one was still working, so everything computed here — including the reply
+    about to be sent — describes a conversation that has moved on. The only
+    safe thing to do is throw the work away.
+    """
+
+
+# The revision this turn read at the start. A ContextVar for the same reason
+# the log's turn id is one: it has to follow the call stack through a dozen
+# functions without every signature growing an argument.
+_turn_revision = ContextVar("booking_revision", default=None)
+
+
+def _save_state(phone, business_id, state, pending=None):
+    """Persist booking state, refusing to overwrite a newer write.
+
+    Every set_state inside a booking turn goes through here. On success the
+    turn's held revision moves forward, so several saves in one turn (the
+    address check saves, then the slot loop saves) still chain correctly.
+    """
+    expected = _turn_revision.get()
+    revision = set_state(phone, business_id, state, pending=pending,
+                         expect_revision=expected)
+    if revision is None:
+        raise StaleTurn(f"state for {phone} changed under us "
+                        f"(held revision {expected})")
+    _turn_revision.set(revision)
+    return revision
+
 
 def get_slot_definitions(config):
     """Return the ordered list of slots this business collects.
@@ -148,8 +182,12 @@ def _finalize_booking(phone, business_id, pending, config):
 
     if calendar_sync.is_enabled(config):
         try:
-            if not calendar_sync.is_slot_available(config, parsed):
-                set_state(phone, business_id, "idle", pending={})
+            # The service decides how long this booking runs, so it has to
+            # travel with every availability question — a two-hour job asked
+            # about as a forty-five-minute one gets a yes it shouldn't.
+            if not calendar_sync.is_slot_available(config, parsed,
+                                                   service=service):
+                _save_state(phone, business_id, "idle", pending={})
                 return ("Sorry — that time was just taken while we were "
                         "talking. Please start again and I'll find you "
                         "another slot.")
@@ -160,13 +198,17 @@ def _finalize_booking(phone, business_id, pending, config):
                 customer_id=phone,
                 details=extras,
             )
-            calendar_id = config["calendar"]["calendar_id"]
+            # .get, not [...]: the simulated backend has no external
+            # calendar to name, and a KeyError here would fire AFTER the
+            # event was written — telling the customer their booking failed
+            # while the slot sat there taken.
+            calendar_id = config["calendar"].get("calendar_id")
             sync_status = "synced"
         except Exception as e:
             log.warning(f"Calendar write FAILED: {e}")
             # Reset state so the customer isn't stuck mid-booking, and be
             # honest that nothing was booked.
-            set_state(phone, business_id, "idle", pending={})
+            _save_state(phone, business_id, "idle", pending={})
             phone_number = config["business"].get("phone", "us")
             return (f"Sorry — I couldn't complete that booking just now. "
                     f"Please give us a call at {phone_number} and we'll "
@@ -184,6 +226,11 @@ def _finalize_booking(phone, business_id, pending, config):
         "%A, %B %-d at %-I:%M %p"
     )
 
+    # Unguarded on purpose. Everywhere else a stale turn is discarded, but
+    # the appointment above is already written to the calendar and the
+    # database — the conversation IS over, whoever else wrote while we
+    # worked. Refusing here would leave the flow believing it still needs a
+    # time for a booking that exists.
     set_state(phone, business_id, "idle", pending={})
 
     final = BOOKING.get(
@@ -248,7 +295,7 @@ def _check_addresses(phone, business_id, pending, config, slots):
             pending["_checks"] = checks
             log.info("Booking stopped — %r is outside the service area (%s mi)",
                      answer, result["miles"])
-            set_state(phone, business_id, "idle", pending={})
+            _save_state(phone, business_id, "idle", pending={})
             return substitute(BOOKING.get(
                 "out_of_area_reply",
                 "That address looks like it's outside our service area "
@@ -264,7 +311,7 @@ def _check_addresses(phone, business_id, pending, config, slots):
                 pending.pop(slot["key"], None)      # ask the slot again
                 log.info("Address %r not usable (%s) — asking again (%d/%d)",
                          answer, result["reason"], attempts, ADDRESS_MAX_ATTEMPTS)
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 return BOOKING.get(
                     "address_clarify",
                     "I couldn't find that address. Could you give it to me "
@@ -290,7 +337,7 @@ def _check_addresses(phone, business_id, pending, config, slots):
             }
             log.info("Address %r resolved to %r — confirming with the customer",
                      answer, result["formatted"])
-            set_state(phone, business_id, "collecting", pending=pending)
+            _save_state(phone, business_id, "collecting", pending=pending)
             return BOOKING.get(
                 "address_confirm",
                 "Just to make sure I have the right place — did you mean "
@@ -305,7 +352,7 @@ def _check_addresses(phone, business_id, pending, config, slots):
         # handle_booking saved the state before calling us, so a check
         # recorded above would be lost — and re-run on every later message in
         # this booking. Persist it here instead.
-        set_state(phone, business_id, "collecting", pending=pending)
+        _save_state(phone, business_id, "collecting", pending=pending)
 
     return None
 
@@ -316,6 +363,24 @@ def _check_addresses(phone, business_id, pending, config, slots):
 QUESTION_OPENERS = ("what", "when", "where", "why", "how", "who", "can you",
                     "could you", "do you", "does", "are you", "is there",
                     "will you", "would you", "any chance")
+
+
+# Things a customer says that are not answers to anything: the command that
+# starts a booking (they're already in one), and the noises people make at a
+# bot that has gone quiet. Filing one of these as a slot value is how
+# "appointment" became someone's requested date and time.
+NON_ANSWERS = {
+    "book", "booking", "appointment", "appointments", "order", "schedule",
+    "reschedule", "hi", "hello", "hey", "yo", "hello there", "you there",
+    "are you there", "anyone there", "anybody there", "still there",
+    "help", "ping", "test",
+}
+
+
+def _is_not_an_answer(message):
+    """True if this message can't sensibly be the answer to any question."""
+    text = _normalise(message)
+    return bool(text) and text in NON_ANSWERS
 
 
 def _looks_like_a_question(message):
@@ -337,7 +402,7 @@ def _answer_mid_booking(phone, message, config, business_id):
         from llm import get_llm_reply
         history = get_recent_messages(phone, business_id, limit=6)
         return get_llm_reply(message, history=history, config=config,
-                             channel="webchat")
+                             channel="webchat", mid_booking=True)
     except Exception as e:
         log.warning("Couldn't answer a mid-booking question (%s)", e)
         return None
@@ -529,7 +594,7 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
     if parsed is None:
         # Unparseable: clear it so the loop asks again next turn.
         pending.pop("datetime", None)
-        set_state(phone, business_id, "collecting", pending=pending)
+        _save_state(phone, business_id, "collecting", pending=pending)
         return substitute(
             BOOKING.get(
                 "fallback_after_bad_date",
@@ -543,20 +608,23 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
     # Availability check before we offer to confirm.
     if calendar_sync.is_enabled(config):
         try:
-            reason = calendar_sync.slot_rejection_reason(config, parsed)
+            service = pending.get("service")
+            reason = calendar_sync.slot_rejection_reason(config, parsed,
+                                                         service=service)
             if reason:
-                alts = calendar_sync.find_alternatives(config, parsed)
+                alts = calendar_sync.find_alternatives(config, parsed,
+                                                       service=service)
                 pending.pop("datetime", None)
                 pending.pop("datetime_parsed", None)
                 # Record what we're about to offer BEFORE saving: anything
                 # written into pending after set_state is thrown away.
                 pending["_offered"] = list(alts)
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 return _unavailable_message(parsed, alts, config, reason=reason)
         except Exception as e:
             log_cal.warning(f"Availability check failed (continuing): {e}")
 
-    set_state(phone, business_id, "confirming", pending=pending)
+    _save_state(phone, business_id, "confirming", pending=pending)
     return _confirmation_question(pending, config)
 
 
@@ -708,16 +776,39 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
 
     candidate = parse_datetime(pending["datetime"], config)
     if not candidate:
-        return None          # unparseable — the normal fallback handles it
+        # Say so NOW, on the message that caused it. Leaving the unparseable
+        # value in place meant the slot counted as filled: the flow moved on
+        # to the remaining questions and only complained about the date
+        # three messages later, by which point the customer had answered two
+        # other things and had no idea which reply the error belonged to.
+        # That is exactly what happened when someone typed "appointment" at
+        # the "when works for you?" prompt.
+        log.info("Unparseable datetime %r — clearing it and asking again",
+                 pending.get("datetime"))
+        pending.pop("datetime", None)
+        pending.pop("datetime_parsed", None)
+        _save_state(phone, business_id, "collecting", pending=pending)
+        BOOKING = config.get("booking", {})
+        return substitute(
+            BOOKING.get(
+                "fallback_after_bad_date",
+                "Sorry, I couldn't read that as a date and time. "
+                "Try something like 'Tuesday at 3pm'."
+            ),
+            config
+        )
 
     try:
-        reason = calendar_sync.slot_rejection_reason(config, candidate)
+        service = pending.get("service")
+        reason = calendar_sync.slot_rejection_reason(config, candidate,
+                                                     service=service)
         if not reason:
             return None
-        alts = calendar_sync.find_alternatives(config, candidate)
+        alts = calendar_sync.find_alternatives(config, candidate,
+                                               service=service)
         pending.pop("datetime", None)
         pending["_offered"] = list(alts)          # before the save, not after
-        set_state(phone, business_id, "collecting", pending=pending)
+        _save_state(phone, business_id, "collecting", pending=pending)
         return _unavailable_message(candidate, alts, config, reason=reason)
     except Exception as e:
         log_cal.warning(f"Early availability check failed: {e}")
@@ -731,9 +822,35 @@ def handle_booking(phone, message, config, business_id, prefilled=None):
     rejections, and confirmations were the one part of the conversation you
     couldn't see without opening a browser.
     """
-    reply = _handle_booking_inner(phone, message, config, business_id, prefilled)
+    try:
+        reply = _handle_booking_inner(phone, message, config, business_id,
+                                      prefilled)
+    except StaleTurn as e:
+        # Another request for this conversation finished while we were
+        # working, so our reply is about a conversation that has moved on.
+        # Sending it is how the customer ends up answering the same question
+        # twice. Ask what's actually outstanding now instead.
+        log.warning("Discarding a stale turn for %s: %s", phone, e)
+        reply = _current_question(phone, business_id, config)
     log.debug(f"Reply: {reply!r}")
     return reply
+
+
+def _current_question(phone, business_id, config):
+    """The question this conversation is waiting on, read fresh.
+
+    Used when a turn is thrown away: whatever we computed is out of date,
+    but the database knows where the booking actually stands.
+    """
+    current = get_state(phone, business_id)
+    if current["state"] == "idle":
+        return ("Sorry — that took longer than it should have. "
+                "What can I help you with?")
+    slots   = get_slot_definitions(config)
+    missing = _first_missing_slot(current["pending"], slots)
+    if missing:
+        return substitute(missing["prompt"], config)
+    return _confirmation_question(current["pending"], config)
 
 def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
     """Advance the booking using slot extraction plus a fill-the-gaps loop.
@@ -753,9 +870,13 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
     pending = current["pending"]
     text    = message.strip().lower()
 
+    # Everything this turn writes is checked against the revision we read
+    # here. If it moved, this turn lost the race and is discarded.
+    _turn_revision.set(current.get("revision", 0))
+
     # --- Cancel: transversal, checked before anything else ---
     if text in ("cancel", "stop", "nevermind", "never mind"):
-        set_state(phone, business_id, "idle", pending={})
+        _save_state(phone, business_id, "idle", pending={})
         noun = BOOKING.get("noun", "appointment")
         return substitute(
             BOOKING.get("cancel_reply", f"No problem — {noun} cancelled."),
@@ -778,7 +899,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         if early:
             return early
 
-        set_state(phone, business_id, "collecting", pending=pending)
+        _save_state(phone, business_id, "collecting", pending=pending)
         return _ask_next_or_finalize(phone, business_id, pending, config, slots,
                                      first_turn=True)
 
@@ -801,7 +922,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 pending["_checks"] = checks
                 pending.pop("_address_attempts", None)
                 log.info("Customer confirmed %r", awaiting["formatted"])
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 return _ask_next_or_finalize(phone, business_id, pending,
                                              config, slots)
 
@@ -811,7 +932,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 pending.pop(awaiting["key"], None)
                 log.info("Customer rejected %r (attempt %d)",
                          awaiting["formatted"], attempts)
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 if attempts > ADDRESS_MAX_ATTEMPTS:
                     # Stop asking. Keep what they originally typed and let
                     # the owner sort it out.
@@ -838,7 +959,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 pending.pop(awaiting["key"], None)
             else:
                 pending["_address_confirm"] = awaiting
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 return (f"Sorry — I want to be sure before I book it. Is "
                         f"{awaiting['formatted']} the right address? "
                         f"Yes or no is fine.")
@@ -855,7 +976,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 pending["datetime_parsed"] = chosen
                 pending.pop("_offered", None)
                 log.info("Customer accepted an offered slot: %s", chosen)
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 return _ask_next_or_finalize(phone, business_id, pending,
                                              config, slots)
 
@@ -876,9 +997,16 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 log.info("Question mid-booking: %r — answering, not storing",
                          message.strip()[:60])
                 answer = _answer_mid_booking(phone, message, config, business_id)
-                set_state(phone, business_id, "collecting", pending=pending)
+                _save_state(phone, business_id, "collecting", pending=pending)
                 prompt = substitute(missing["prompt"], config)
                 return f"{answer} {prompt}" if answer else prompt
+            if missing and _is_not_an_answer(message):
+                # A nudge or the booking command itself. Storing it would
+                # fill a slot with a word the customer never meant as an
+                # answer; the polite thing is to repeat what we asked.
+                log.info("Non-answer %r mid-booking — re-asking '%s'",
+                         message.strip()[:40], missing["key"])
+                return substitute(missing["prompt"], config)
             if missing:
                 extracted = {missing["key"]: message.strip()[:200]}
                 log.info(f"No slots extracted — "
@@ -890,7 +1018,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         early = _check_datetime_now(phone, business_id, pending, extracted, config)
         if early:
             return early
-        set_state(phone, business_id, "collecting", pending=pending)
+        _save_state(phone, business_id, "collecting", pending=pending)
         return _ask_next_or_finalize(phone, business_id, pending, config, slots)
     # --- Confirming: read-back accepted, rejected, or corrected ---
     if state == "confirming":
@@ -905,13 +1033,13 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
         if extracted:
             pending.update(extracted)
             pending.pop("datetime_parsed", None)   # force a re-parse
-            set_state(phone, business_id, "collecting", pending=pending)
+            _save_state(phone, business_id, "collecting", pending=pending)
             return _ask_next_or_finalize(phone, business_id, pending, config, slots)
 
         if _is_negative(message):
             pending.pop("datetime", None)
             pending.pop("datetime_parsed", None)
-            set_state(phone, business_id, "collecting", pending=pending)
+            _save_state(phone, business_id, "collecting", pending=pending)
             return "No problem — what date and time would work better?"
 
         # Unclear response — ask again rather than guessing.
@@ -919,5 +1047,5 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
 
     # --- Unknown state: reset gracefully ---
     log.warning(f"Unknown state '{state}' for {phone} — resetting.")
-    set_state(phone, business_id, "idle", pending={})
+    _save_state(phone, business_id, "idle", pending={})
     return "Something went wrong on my end. Let's start over — how can I help?"

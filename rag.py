@@ -142,9 +142,14 @@ def chunk_text(text):
 def collection_for(config):
     """The ChromaDB collection this business's knowledge lives in.
 
-    Prefers the immutable slug stamped on the config by load_config. Falls
-    back to slugifying the business name for callers that load a YAML file
-    directly with no business_id — the offline scripts.
+    Prefers the collection name stamped on the config by load_config, then
+    the immutable slug, then slugifies the business name for callers that
+    load a YAML file directly with no business_id — the offline scripts.
+
+    The collection is a separate column from the slug because two businesses
+    can legitimately share one: a demo clone reads its template's knowledge
+    base until the visitor edits it, which is what makes cloning a tenant
+    cost nothing in embedding calls.
 
     Why this matters: the business NAME is owner-editable. Keying a
     collection on it meant that renaming a business in settings pointed
@@ -153,7 +158,9 @@ def collection_for(config):
     stopped knowing anything. The slug is a database column nobody can edit.
     """
     business = config.get("business", {})
-    return business.get("slug") or _slugify(business.get("name", ""))
+    return (business.get("collection")
+            or business.get("slug")
+            or _slugify(business.get("name", "")))
 
 
 def ingest_documents(config, business_id=None):

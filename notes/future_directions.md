@@ -441,3 +441,61 @@ Likely buckets, to be confirmed against the transcripts rather than assumed:
 Do this *after* file logging, so the odd replies can be traced back to
 which path produced them (rules engine, RAG hit, RAG miss, scheduler) —
 without that, judging a reply means guessing at where it came from.
+
+---
+
+## Admin UI visual overhaul (wanted)
+
+The portal is functionally complete and looks it: every style is inline,
+there's no stylesheet, and the nav markup is copy-pasted into each
+template. Fine for building, wrong for a portfolio piece — and the
+sandbox demo will put this in front of people whose first judgement is
+visual.
+
+Scope when it's picked up:
+
+- Extract the inline styles into a real stylesheet with design tokens
+  (colour, spacing, type scale) rather than repeating hex values.
+- Replace the duplicated per-page nav with a Jinja macro or a block in
+  `base.html`.
+- Settle a small component vocabulary — card, table, button, form row,
+  flash message — and use it consistently rather than restyling per page.
+- Shorten the dashboard action labels.
+- Make it legible on a phone; the appointment and conversation tables
+  currently assume a wide window.
+
+Worth doing BEFORE the sandbox demo goes public, since the demo's whole
+purpose is that someone looks at it. Worth doing AFTER the demo's
+tenancy work, because that adds screens (a demo landing page, a reset
+banner) that would otherwise need restyling twice.
+
+---
+
+## Conditional booking questions ("ask X only if Y")
+
+Found while building the pizza-shop demo template. Extra questions are
+asked every time, unconditionally, so a takeaway bot that needs a
+delivery address has no way to skip that question for a pickup order —
+and worse, the service-radius check then refuses a pickup customer for
+living too far away to deliver to.
+
+Crosstown Pizza ships as delivery-only because of this, with the FAQ
+pointing pickup customers at the phone. That's honest but it's a visible
+seam in a demo whose job is to look finished.
+
+What it needs: a question that can depend on an earlier answer. The
+smallest useful version is one branch — a question with an `ask_if` naming
+another question's key and the answers that trigger it, e.g.
+
+    - key: "service_address"
+      prompt: "Where are we delivering to?"
+      ask_if: {key: "fulfilment", equals: ["delivery"]}
+
+The address slot is injected by the radius setting rather than written by
+the owner, so the radius check would have to learn the same condition —
+"check the address if we asked for one" rather than "check it if a radius
+is set". Those are the same switch today, which is deliberate (it's what
+stopped the check silently defaulting to off), so this needs care.
+
+Useful well beyond pizza: any business with a pickup/delivery,
+in-person/virtual, or new/returning-customer split.

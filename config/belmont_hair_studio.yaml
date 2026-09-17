@@ -1,0 +1,131 @@
+# config/belmont_hair_studio.yaml — Belmont Hair Studio
+#
+# Demo template. What this one is here to show: appointments that are not
+# all the same length. A blowout is half an hour, a balayage is three —
+# see calendar.service_durations, and scheduling.duration_for, which is the
+# single place that answers "how long is this?".
+
+business:
+  name: "Belmont Hair Studio"
+  phone: "(585) 555-0142"
+  address: "212 Monroe Ave, Rochester NY"
+  hours: "Tue-Sat, 9am-6pm (closed Sun & Mon)"
+  service_area: "Walk-in studio on Monroe Ave — no travel"
+
+services:
+  - "haircut"
+  - "blowout"
+  - "colour"
+  - "cut and colour"
+  - "balayage"
+  - "kids cut"
+
+calendar:
+  enabled: true
+  provider: "simulated"        # demo template — never a real calendar
+  timezone: "America/New_York"
+  default_duration_minutes: 45
+  # The exceptions to that default. Keys must match a service above exactly;
+  # startup warns about any that don't, because a duration nobody matches is
+  # invisible — the booking just quietly takes 45 minutes.
+  service_durations:
+    "blowout": 30
+    "kids cut": 30
+    "colour": 120
+    "cut and colour": 150
+    "balayage": 180
+  scheduling:
+    model: "capacity"          # three stylists work the floor
+    slots_per_time: 3
+    buffer_minutes: 0          # the next client sits in the same chair
+    slot_granularity: 30
+    max_alternatives: 3
+    business_hours:            # 0 = Monday ... 6 = Sunday; omit = closed
+      1: ["09:00", "18:00"]
+      2: ["09:00", "18:00"]
+      3: ["09:00", "18:00"]
+      4: ["09:00", "18:00"]
+      5: ["09:00", "18:00"]
+
+bot:
+  persona_preset: "warm"
+  guardrails:
+    universal: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      timings, products, or policies you don't see here.
+      Never apply a fact from one service to a different service —
+      prices and timings are service-specific. A colour is not a cut.
+      If a policy isn't stated for a specific service, say you're not
+      sure and give the phone number.
+      Never promise a specific stylist is available — note the request
+      and say the front desk will confirm it.
+      Colour services need a patch test for new clients; say so when
+      someone books colour for the first time.
+      You cannot cancel, modify, or look up existing appointments. If a
+      client asks to cancel or change an appointment, tell them to call
+      {phone} — never confirm a cancellation or change yourself.
+      If unsure, give the phone number and stop — do not speculate.
+      If a client says something inappropriate, offensive, or sexual, do not
+      engage with it, joke about it, or acknowledge its content. Reply briefly
+      and neutrally, redirect to how you can help with our actual services, and
+      continue normally if they return to a real question.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+faq:
+  - question: "How long does a colour take?"
+    answer: "Colour is about 2 hours, and a cut and colour together is about 2.5. Balayage runs closer to 3."
+  - question: "Do you take walk-ins?"
+    answer: "We take walk-ins when a chair is free, but booking ahead is the only way to be sure."
+  - question: "Do I need a patch test?"
+    answer: "Yes — new colour clients need a patch test at least 48 hours before the appointment. It takes five minutes."
+
+rules:
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey", "yo"]
+    match: "exact"
+    reply: "Hi! 👋 Thanks for reaching out to {business_name}. How can I help?"
+
+  - name: "hours"
+    keywords: ["hours", "you open", "are you closed", "you close"]
+    match: "any"
+    reply: "We're open {hours}."
+
+  - name: "location"
+    keywords: ["where are you", "your location", "your address", "directions", "parking"]
+    match: "any"
+    reply: "We're at {address} — street parking out front, and a small lot behind the building."
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "You're very welcome! 😊"
+
+  - name: "cancel_existing"
+    keywords: ["cancel my appointment", "change my appointment", "reschedule"]
+    match: "any"
+    reply: "To change or cancel an appointment, give us a call at {phone} and we'll sort it out."
+
+booking:
+  noun: "appointment"
+  noun_plural: "appointments"
+  greeting: "Happy to book you in! What are you coming in for? (e.g. {services_examples})"
+  service_confirmation: "Lovely — {service}."
+  ask_datetime: "When suits you? (e.g. 'Thursday at 2pm' or 'next Saturday morning')"
+  final_confirmation: "You're booked: {service} on {datetime}. See you then! To change or cancel, just call {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Thursday at 2pm' or 'June 5 at 10am'."
+  cancel_reply: "No problem — nothing booked. Message us anytime to start again."
+  extra_questions:
+    - key: "stylist_preference"
+      prompt: "Anyone you'd like to see in particular? (or reply 'no preference')"
+    - key: "first_visit"
+      prompt: "Have you been to us before? (yes/no — it helps us allow the right time)"

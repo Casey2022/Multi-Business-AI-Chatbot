@@ -1041,3 +1041,62 @@ Prints that stayed prints: the CLI blocks in `rag.py`, `seed_businesses.py`,
 `project_stats.py` and friends. Those talk to a person reading a terminal
 right now, which is exactly what `print` is for. Logging is for the record
 you read later.
+
+---
+
+## The slow request that undid three fast ones (2026-09-16)
+
+**Symptom.** A Bob's Plumbing chat went haywire: the bot asked "Briefly,
+what's the issue?" twice, complained "I couldn't read that as a date and
+time" in reply to the word "no", and told a customer three questions into a
+booking to "text 'appointment'" to start booking. Four separate-looking
+bugs.
+
+**What the log said.** One turn id told the whole story:
+
+    19:01:03  9137  [webchat] Bob's Plumbing <- web_32rp96w6: 'How about Tomorrow?'
+    19:02:59  9137  [calendar] Early availability check failed: The read operation timed out
+    19:02:59  9137  [scheduler] Reply: "Briefly, what's the issue?"
+
+That request ran for **116 seconds**. In the gap, three other turns
+(f361, 253e, 0c61) read the state, advanced it, and saved. Then 9137 came
+back and wrote its 19:01:03 `pending` over the top — deleting two answers
+the customer had given in the meantime and re-asking a question they'd
+already answered.
+
+**Three causes, one incident.**
+
+1. *No timeout on the Google Calendar transport.* httplib2 waits on a
+   socket forever unless told not to. A booking that fails fast is
+   recoverable; one that hangs is not. Now `CALENDAR_TIMEOUT_SECONDS`
+   (default 10).
+2. *Last-writer-wins state.* `set_state` was an unconditional
+   `INSERT OR REPLACE`. A state machine whose writes don't check what
+   they're overwriting isn't a state machine, it's a race. Now
+   `conversation_state.revision`: a turn reads a revision, every write
+   checks it, and a turn whose write is refused throws its reply away
+   rather than sending something about a conversation that has moved on.
+3. *The browser raced itself.* The Send button was disabled while waiting;
+   Enter wasn't. The customer, facing silence, pressed Enter four more
+   times. The server should survive that — and now does — but the honest
+   fix is also not to start the race.
+
+**The lesson worth keeping.** Four weird replies, one cause. The instinct
+was to fix each symptom where it appeared — a better date error here, a
+better prompt there — and every one of those fixes would have been real
+work that left the bug in place. What found it was reading one conversation
+in the log by *turn id* rather than by timestamp. Timestamps interleave;
+turn ids don't. A log you can't group by turn is a log that shows you four
+bugs where there is one.
+
+**Two genuine bugs it was hiding**, found in the same pass and fixed
+separately: an unparseable date stayed in the slot (so the slot counted as
+filled and the complaint arrived three questions late), and the mid-booking
+Q&A prompt had no idea a booking was in progress, so it kept telling people
+to start one.
+
+**Also a reminder about blanket replacements.** The regex that routed every
+`set_state(phone, business_id,` call through the new guard also rewrote the
+call *inside* the guard, making it call itself. Same mistake as the
+`AFFIRMATIVE` replace in August. Reading the resulting function is what
+caught it; the compiler never would have.

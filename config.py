@@ -266,6 +266,24 @@ def load_config(config_path, business_id=None):
             # other business's bookings — multi-tenancy quietly undone by a
             # missing key.
             config["business"]["id"] = row["id"]
+            # Which vector collection this business retrieves from. Normally
+            # its own slug; a demo clone borrows its template's collection
+            # until the visitor publishes a knowledge-base change of their
+            # own. NULL on rows created before the column existed, which is
+            # why the fallback is the slug rather than an error.
+            config["business"]["collection"] = (
+                row["rag_collection"] or row["slug"]
+            )
+
+            # And a demo can never reach a real calendar. Both template
+            # businesses carry a live Google calendar_id in their YAML, and a
+            # clone shares that file — so without this, a visitor's pretend
+            # 9am booking would land in the calendar a real business runs its
+            # week from, and their cancellation would delete a real job.
+            # Forced here, after the overrides, for the same reason the slug
+            # is: it has to be unreachable from anything anyone can type.
+            if row.get("is_demo"):
+                config.setdefault("calendar", {})["provider"] = "simulated"
 
     # Resolve the persona preset into actual persona text.
     preset = config.get("bot", {}).get("persona_preset")

@@ -104,6 +104,10 @@ def hit(bucket, limit, window_seconds):
     return True, resets_in
 
 
+DEMO_PER_MINUTE = int(os.environ.get("DEMO_PER_MINUTE", "3"))
+DEMO_PER_HOUR   = int(os.environ.get("DEMO_PER_HOUR", "20"))
+
+
 def check_all(checks):
     """Apply several limits at once. Returns (allowed, seconds_until_reset).
 
@@ -127,6 +131,21 @@ def webchat(slug, session_id, ip):
         (f"webchat:{slug}:{session_id}", WEBCHAT_PER_DAY, 86400),
         (f"webchat-ip:{ip}",             WEBCHAT_IP_PER_MINUTE, 60),
         (f"webchat-ip:{ip}",             WEBCHAT_IP_PER_DAY, 86400),
+    ])
+
+
+def demo_start(ip):
+    """Limits for minting a demo tenant.
+
+    Stricter than the chat limits because this endpoint creates database
+    rows rather than just spending tokens, and nobody legitimately needs a
+    fresh demo business every twenty seconds. The idle sweep and the live
+    ceiling in demo.py are the other two halves of the same defence: this
+    caps the rate, the ceiling caps the total, the sweep clears the past.
+    """
+    return check_all([
+        (f"demo-ip:{ip}", DEMO_PER_MINUTE, 60),
+        (f"demo-ip:{ip}", DEMO_PER_HOUR, 3600),
     ])
 
 

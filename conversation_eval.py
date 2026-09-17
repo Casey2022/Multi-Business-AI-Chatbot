@@ -240,10 +240,58 @@ def question_gets_a_real_reply(t):
                     f"{reply[:60]!r}")
 
 
+def no_command_advice_mid_booking(t):
+    """Mid-booking, the bot must never tell them to text a command to start.
+
+    They have started. On 2026-09-16 a customer three questions into a
+    booking asked "Can you come out tomorrow?" and was told to "text
+    'appointment' and our booking system will walk you through it" — advice
+    that was both wrong and, to someone already answering its questions,
+    slightly insulting. The Q&A prompt didn't know a booking was in
+    progress; now it does.
+    """
+    started = False
+    for who, text in t.exchange:
+        if who == "cust":
+            started = True
+            continue
+        if not started:
+            continue
+        low = text.lower()
+        for phrase in ("text 'appointment'", 'text "appointment"',
+                       "text 'book'", "text 'order'", "texting 'book'",
+                       "to start the booking", "start a booking by texting"):
+            if phrase in low:
+                return f"told a customer mid-booking to {phrase}: {text[:70]!r}"
+
+
+def bad_date_rejected_immediately(t):
+    """An unreadable date is queried on the message that caused it.
+
+    The complaint used to arrive three questions later, after the flow had
+    moved on to other slots — so the customer saw "I couldn't read that as a
+    date" directly after answering something that wasn't a date at all, and
+    had no way to tell which of their messages was the problem.
+    """
+    marker = "couldn't read that as a date"
+    for i, (who, text) in enumerate(t.exchange):
+        if who != "bot" or marker not in text.lower():
+            continue
+        # The customer message this complains about is the one immediately
+        # before it. Find what the bot asked before THAT.
+        if i < 2:
+            continue
+        asked = t.exchange[i - 2][1].lower()
+        if "when" not in asked and "date" not in asked and "time" not in asked:
+            return (f"complained about a date in reply to {t.exchange[i-1][1]!r}, "
+                    f"which answered {asked[:60]!r}")
+
+
 CHECKS = {f.__name__: f for f in (
     no_repeated_reply, service_in_catalog, offer_honoured,
     question_not_absorbed, no_stacked_greeting, booking_completed,
     answer_not_duplicated, question_gets_a_real_reply,
+    no_command_advice_mid_booking, bad_date_rejected_immediately,
 )}
 
 
@@ -252,9 +300,34 @@ CHECKS = {f.__name__: f for f in (
 # ---------------------------------------------------------------------------
 
 ALWAYS = ["no_repeated_reply", "no_stacked_greeting", "question_not_absorbed",
-          "answer_not_duplicated", "question_gets_a_real_reply"]
+          "answer_not_duplicated", "question_gets_a_real_reply",
+          "no_command_advice_mid_booking", "bad_date_rejected_immediately"]
 
 SCENARIOS = [
+    {
+        "name": "the booking command typed mid-booking (2026-09-16)",
+        "why":  "Asked when they wanted the visit, the customer typed "
+                "'appointment' — the word that starts a booking, not an "
+                "answer to anything. It was filed as the requested date and "
+                "time, which made the slot look answered, so the flow moved "
+                "on and only complained about the date three questions "
+                "later.",
+        "script": ["I'd like to schedule something", "leak repair",
+                   "1738 William St, Rochester NY", "appointment",
+                   "Monday at 11", "a pipe is leaking", "no", "yes"],
+        "checks": ALWAYS,
+    },
+    {
+        "name": "nudging a bot that has gone quiet (2026-09-16)",
+        "why":  "'Hello?' mid-booking was answered with advice to text "
+                "'appointment' to start booking — which they were already "
+                "doing — and the nudge itself risks being filed as a slot "
+                "answer.",
+        "script": ["book", "drain cleaning", "1738 William St, Rochester NY",
+                   "Hello?", "Can you come out Monday at 11?",
+                   "a pipe is leaking", "no", "yes"],
+        "checks": ALWAYS,
+    },
     {
         "name": "short service answer — 'pipe leak' (2026-09-15)",
         "why":  "Answered with a service the config words differently. Both "
