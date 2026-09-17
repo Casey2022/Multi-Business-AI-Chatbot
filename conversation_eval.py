@@ -287,11 +287,75 @@ def bad_date_rejected_immediately(t):
                     f"which answered {asked[:60]!r}")
 
 
+def extra_answer_is_not_the_service(t):
+    """An extra question's answer must say something the service didn't.
+
+    "I need a leak fixed" came back from extraction as service "leak repair"
+    AND problem description "leak". The second is the first restated, but it
+    made the slot count as filled, so the customer was never asked to
+    describe the problem — and when a later question arrived out of nowhere,
+    they answered the one they'd been expecting. Their real description
+    ended up filed under "Visibility" and the owner's problem description
+    read "leak".
+    """
+    source = dict(t.pending or {})
+    if t.booked:
+        source.update(t.booked.get("details") or {})
+        source["service"] = t.booked.get("service")
+    service = " ".join(str(source.get("service") or "").lower().split())
+    if not service:
+        return
+    for key, value in source.items():
+        if key in ("service", "datetime", "datetime_parsed") or key.startswith("_"):
+            continue
+        text = " ".join(str(value or "").lower().split())
+        if text and text in service:
+            return (f"{key} is {value!r}, which only restates the service "
+                    f"{source['service']!r} — that question should have been asked")
+
+
+def answers_are_read_back(t):
+    """Everything stored on the booking appears in the read-back.
+
+    The customer says yes to what they were shown, and what they were shown
+    becomes what the business acts on — so anything stored but not shown is
+    a detail nobody ever agreed to. This caught a "no" to "Can the issue be
+    clearly seen?" being filtered out of the confirmation as though it meant
+    "nothing to add", while being stored on the appointment.
+
+    An answer the question itself invited the customer to skip ("or reply
+    'none'") is allowed to go unread — that's an absence, not a fact.
+    """
+    if not t.booked:
+        return
+    confirmations = [text for who, text in t.exchange
+                     if who == "bot" and "is that right" in text.lower()]
+    if not confirmations:
+        return
+    shown = confirmations[-1].lower()
+    skippable = {"none", "n/a", "na", "no", "nope", "nothing", "-", "n"}
+    # Which questions offered a way out — asked of the same config the bot
+    # used, rather than kept as a second list that can drift from it.
+    from scheduler import _slots_that_invite_skipping
+    optional = _slots_that_invite_skipping(t.config)
+
+    for key, value in (t.booked.get("details") or {}).items():
+        if key.startswith("_") or not value:
+            continue
+        text = str(value).strip()
+        if text.lower() in skippable and key in optional:
+            continue
+        if text.lower() not in shown:
+            return (f"{key}={text!r} was stored on the booking but never "
+                    f"read back for the customer to check")
+
+
 CHECKS = {f.__name__: f for f in (
     no_repeated_reply, service_in_catalog, offer_honoured,
     question_not_absorbed, no_stacked_greeting, booking_completed,
     answer_not_duplicated, question_gets_a_real_reply,
     no_command_advice_mid_booking, bad_date_rejected_immediately,
+    extra_answer_is_not_the_service, answers_are_read_back,
 )}
 
 
@@ -301,9 +365,23 @@ CHECKS = {f.__name__: f for f in (
 
 ALWAYS = ["no_repeated_reply", "no_stacked_greeting", "question_not_absorbed",
           "answer_not_duplicated", "question_gets_a_real_reply",
-          "no_command_advice_mid_booking", "bad_date_rejected_immediately"]
+          "no_command_advice_mid_booking", "bad_date_rejected_immediately",
+          "extra_answer_is_not_the_service", "answers_are_read_back"]
 
 SCENARIOS = [
+    {
+        "name": "the opening sentence restates itself (2026-09-17)",
+        "why":  "'I need a leak fixed' extracted as service 'leak repair' "
+                "AND problem description 'leak'. The second filled the slot "
+                "without adding anything, so the customer was never asked "
+                "to describe the problem — and the next question, arriving "
+                "with no lead-in, collected their description into the "
+                "wrong field.",
+        "script": ["I need a leak fixed", "1738 William St, Rochester NY",
+                   "Monday at 11", "a pipe is leaking under the sink",
+                   "no", "yes"],
+        "checks": ALWAYS,
+    },
     {
         "name": "the booking command typed mid-booking (2026-09-16)",
         "why":  "Asked when they wanted the visit, the customer typed "

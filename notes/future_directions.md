@@ -499,3 +499,29 @@ stopped the check silently defaulting to off), so this needs care.
 
 Useful well beyond pizza: any business with a pickup/delivery,
 in-person/virtual, or new/returning-customer split.
+
+---
+
+## Prompt caching — checked, and it doesn't apply
+
+Looked at caching the system prompt to cut API spend. It doesn't work here,
+and the reason is worth writing down so nobody re-proposes it.
+
+Claude Haiku 4.5 won't cache a prompt shorter than 4,096 tokens. Measured
+from the logged request bodies, the largest prompt this app ever sends is
+about 1,566 tokens (a Q&A reply with RAG chunks); slot extraction is ~510
+and date parsing ~307. Marking those cacheable would be accepted by the API
+and silently never cache anything — the worst kind of change, one that
+looks like a saving in the diff and is a no-op at runtime.
+
+It only becomes worth revisiting if a prompt grows past 4k, which would
+mean either a much longer guardrails block or many more RAG chunks per
+reply. Neither is on the roadmap.
+
+The cost picture it turned up instead: roughly $0.001–0.002 per customer
+message, one to two cents for a full booking conversation. The spend risk
+isn't per-message price, it's a public /demo endpoint multiplied by
+strangers — which is what the rate limits, the live-demo ceiling and an
+account-level spend cap are for. Per-turn token usage is now logged (see
+the `cost` logger), so the question is answerable from the log rather than
+from a vendor dashboard the next day.

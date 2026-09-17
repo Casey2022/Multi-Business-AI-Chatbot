@@ -1100,3 +1100,52 @@ to start one.
 call *inside* the guard, making it call itself. Same mistake as the
 `AFFIRMATIVE` replace in August. Reading the resulting function is what
 caught it; the compiler never would have.
+
+---
+
+## The decorator that slid onto the wrong function (2026-09-17)
+
+**Symptom.** `werkzeug.routing.exceptions.BuildError: Could not build url
+for endpoint 'admin.login'. Did you mean 'admin._login_ip' instead?` — on
+any attempt to reach the login page.
+
+**Cause.** In the rate-limiting work (653fac2) I added a `_login_ip()`
+helper and inserted it directly beneath the existing
+
+    @admin_bp.route("/login", methods=["GET", "POST"])
+
+decorator, which was sitting above `login()`. A decorator binds to whatever
+function comes next, so `_login_ip` became the login view. Flask was
+entirely happy: `GET /admin/login` returned the caller's IP address as the
+page body, and no endpoint named `admin.login` existed any more.
+
+**Why it survived a commit, a push and a week.** Nothing visits the login
+page while you're logged in, and `url_for("admin.login")` is only built by
+`login_required` when someone *isn't*. Casey had a live session throughout,
+and the demo flow signs visitors in by setting the session directly rather
+than by posting the login form. The first person to be logged out was the
+first person to see it — which happened because a demo sweep deleted the
+demo user his session pointed at.
+
+**Why no test caught it.** A BuildError is raised at render time, by the
+specific page that references the missing endpoint. Unit tests don't reach
+it, the conversation harness doesn't render templates, and the app starts
+perfectly — Flask doesn't validate that url_for targets exist until one is
+built.
+
+**What now catches it.** `routes_test.py` — a static check, no Flask import
+and no running server. It reads the route decorators with `ast` (so it sees
+what Flask will *actually* register, not what the code looks like it
+means), collects every `url_for()` in the Python and the templates, and
+fails on any reference with no matching endpoint. It also fails any route
+attached to a function whose name starts with an underscore, which is the
+shape of this exact accident. Verified by putting the bug back and watching
+both checks go red.
+
+**The lesson.** Two of this week's bugs — this and `bootstrap()` never being
+called — are the same thing: code that is *defined* but not *wired*, where
+the wiring is invisible at rest and only observable by exercising the exact
+path. Import-time correctness proves nothing about registration-time
+correctness. When something is connected by a decorator, a naming
+convention, or a call from somewhere else entirely, there should be a check
+that the connection exists — not just that the code does.

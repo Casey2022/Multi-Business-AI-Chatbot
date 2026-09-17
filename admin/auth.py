@@ -66,15 +66,23 @@ def require_business_access(business_id):
         abort(403)
 
 
-@admin_bp.route("/login", methods=["GET", "POST"])
 def _login_ip():
-    """The caller's address, honouring the proxy header Render sets."""
+    """The caller's address, honouring the proxy header Render sets.
+
+    A plain helper, NOT a view. It was once accidentally sitting directly
+    under the /login route decorator, which made it the login view: GET
+    /admin/login returned the caller's IP address as the page, and
+    url_for("admin.login") raised BuildError because no endpoint by that
+    name existed. Nothing noticed for a week, because a logged-in session
+    never visits the login page and the demo signs people in directly.
+    """
     forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.remote_addr or "unknown"
 
 
+@admin_bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user():
         return redirect(url_for("admin.dashboard"))

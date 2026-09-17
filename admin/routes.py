@@ -56,6 +56,32 @@ def conversations(business_id):
         thread            = thread,
     )
 
+def _detail_rows(raw, labels):
+    """Stored booking answers as [(label, value)], ready to render.
+
+    Returns [] for anything unparseable rather than raising: a malformed
+    details blob on one appointment should cost that row its detail line,
+    not cost the owner the page.
+    """
+    import json as _json
+    from config import humanize
+    if not raw or raw == "{}":
+        return []
+    try:
+        stored = _json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(stored, dict):
+        return []
+
+    rows = []
+    for key, value in stored.items():
+        if key.startswith("_") or value in (None, "", []):
+            continue
+        rows.append((labels.get(key) or humanize(key), str(value)))
+    return rows
+
+
 @admin_bp.route("/business/<int:business_id>/appointments")
 @login_required
 def appointments(business_id):
@@ -74,6 +100,22 @@ def appointments(business_id):
         reconcile_business(business)
     except Exception as e:
         log_rec.warning(f"Failed for {business['name']}: {e}")
+
+    # Sweep expired rate-limit counters while we're already doing
+    # housekeeping. The table only ever grows: every window a caller opens
+    # leaves a row behind, and nothing had ever deleted one — the function
+    # to do it was written and then never called, which is becoming a
+    # recognisable shape in this codebase. Riding the same opportunistic
+    # hook as reconciliation rather than a timer, for the same reason:
+    # there is no scheduler here, and a late prune costs some dead rows.
+    try:
+        from db import prune_rate_limits
+        removed = prune_rate_limits()
+        if removed:
+            log_rec.info("Pruned %d expired rate-limit row(s)", removed)
+    except Exception as e:
+        # Housekeeping must never cost someone their appointments page.
+        log_rec.warning("Could not prune rate limits: %s", e)
     appointment_list = get_appointments(business_id)
 
     # Which week each appointment falls in, relative to the current one, so
@@ -91,6 +133,27 @@ def appointments(business_id):
 
         except (ValueError, TypeError):
             appt["week_offset"] = 0
+
+    # Turn the stored answers into something a person reads. The column used
+    # to print the raw JSON — {"service_address": "522 Penbrooke Dr", ...} —
+    # braces, quotes, underscored keys and all. The labels come from
+    # question_labels(), which is the one place that decides how a stored
+    # answer is named to a human: the customer's confirmation, the calendar
+    # event description and the appointment page all read from it, so an
+    # owner who renames a question in settings sees the new name here too.
+    # Anything with no configured label falls back to humanize(), which is
+    # where the underscores go.
+    from config import load_config, question_labels, humanize
+    labels = {}
+    try:
+        labels = question_labels(load_config(business["config_path"], business_id))
+    except Exception as e:
+        # A broken config shouldn't cost the owner their appointments list;
+        # humanize() alone still produces readable labels.
+        log.warning("Couldn't load labels for %s: %s", business["name"], e)
+
+    for appt in appointment_list:
+        appt["detail_rows"] = _detail_rows(appt.get("details"), labels)
 
     return render_template(
         "admin/appointments.html",

@@ -1102,10 +1102,17 @@ def get_geocode_usage(usage_key, day):
 
 
 def prune_rate_limits(older_than_seconds=172800):
-    """Drop counters from closed windows. Cheap, and keeps the table small."""
+    """Drop counters from closed windows. Returns how many rows went.
+
+    Returning the count rather than nothing so the caller can say whether it
+    did anything — housekeeping that runs silently is housekeeping nobody
+    can tell has stopped running.
+    """
     import time
     conn = get_connection()
-    conn.execute("DELETE FROM rate_limits WHERE window_start < ?",
-                 (int(time.time()) - older_than_seconds,))
+    cursor = conn.execute("DELETE FROM rate_limits WHERE window_start < ?",
+                          (int(time.time()) - older_than_seconds,))
+    removed = cursor.rowcount
     conn.commit()
     conn.close()
+    return removed

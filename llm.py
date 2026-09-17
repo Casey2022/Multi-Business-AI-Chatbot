@@ -14,6 +14,7 @@ from config import substitute
 from rag import retrieve
 
 import logging
+from contextvars import ContextVar
 log = logging.getLogger("llm")
 
 # ---------------------------------------------------------------------------
@@ -21,6 +22,61 @@ log = logging.getLogger("llm")
 # ---------------------------------------------------------------------------
 
 MODEL = "claude-haiku-4-5-20251001"
+
+# ---------------------------------------------------------------------------
+# What a conversation costs
+# ---------------------------------------------------------------------------
+#
+# Every customer message spends money — usually two API calls, sometimes
+# three — and /demo is a public endpoint, so "what does this cost per
+# conversation?" stops being idle curiosity the moment strangers can use it.
+# Answering it used to mean reading a vendor dashboard the next day. Now
+# every turn ends with one line saying what it spent.
+#
+# Prices are for the log line only, and they WILL go stale; the token counts
+# beside them come from the API and won't. Check the current rates at
+# https://platform.claude.com/docs/en/about-claude/pricing
+PRICE_IN_PER_MTOK  = float(os.environ.get("LLM_PRICE_IN",  "1.00"))
+PRICE_OUT_PER_MTOK = float(os.environ.get("LLM_PRICE_OUT", "5.00"))
+
+# Per-turn totals. A ContextVar for the same reason the log's turn id is
+# one: the four call sites below are scattered across this module and none
+# of them knows which customer message it belongs to.
+_turn_usage = ContextVar("llm_turn_usage", default=None)
+
+
+def start_turn_accounting():
+    """Begin counting API spend for one inbound customer message."""
+    _turn_usage.set({"calls": 0, "in": 0, "out": 0})
+
+
+def _note_usage(response, purpose):
+    """Record one call's token usage. Never raises — this is bookkeeping."""
+    try:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        tokens_in  = getattr(usage, "input_tokens", 0) or 0
+        tokens_out = getattr(usage, "output_tokens", 0) or 0
+        log.debug("%s: %d in / %d out", purpose, tokens_in, tokens_out)
+        running = _turn_usage.get()
+        if running is not None:
+            running["calls"] += 1
+            running["in"]    += tokens_in
+            running["out"]   += tokens_out
+    except Exception as e:                      # pragma: no cover
+        log.debug("Could not record usage for %s: %s", purpose, e)
+
+
+def turn_cost_summary():
+    """One line describing what this turn spent, or None if nothing was spent."""
+    running = _turn_usage.get()
+    if not running or not running["calls"]:
+        return None
+    dollars = (running["in"] / 1e6 * PRICE_IN_PER_MTOK
+               + running["out"] / 1e6 * PRICE_OUT_PER_MTOK)
+    return (f"{running['calls']} call(s), {running['in']:,} in / "
+            f"{running['out']:,} out ≈ ${dollars:.5f}")
 
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
@@ -96,6 +152,7 @@ Message: "{message}"
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
+        _note_usage(response, "slot extraction")
         raw = response.content[0].text.strip()
         # Strip markdown fences if the model adds them despite instructions.
         raw = raw.replace("```json", "").replace("```", "").strip()
@@ -292,6 +349,7 @@ Message: "{message}"
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
+        _note_usage(response, "intent + extraction")
         raw = response.content[0].text.strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
 
@@ -373,6 +431,7 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
             system=effective_system,
             messages=messages,
         )
+        _note_usage(response, "Q&A reply")
         reply = response.content[0].text.strip()
         log.debug(f"Claude replied: {reply!r}")
         return reply
@@ -456,6 +515,7 @@ User: "{user_input}"
             max_tokens=20,
             messages=[{"role": "user", "content": prompt}],
         )
+        _note_usage(response, "date parsing")
         result = response.content[0].text.strip()
         log.debug(f"Date parse result: {result!r}")
 

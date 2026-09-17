@@ -13,7 +13,8 @@
 # module can serve any business simultaneously.
 
 import calendar_sync
-from config import substitute, question_labels, humanize
+from config import (substitute, question_labels, humanize,
+                    RESERVED_SLOT_KEYS)
 from db import get_state, set_state, save_appointment, get_recent_messages
 from llm import parse_datetime
 from llm import parse_datetime, extract_booking_slots
@@ -392,17 +393,23 @@ def _looks_like_a_question(message):
     return text.startswith(QUESTION_OPENERS) and len(text.split()) > 2
 
 
-def _answer_mid_booking(phone, message, config, business_id):
+def _answer_mid_booking(phone, message, config, business_id, channel="sms"):
     """Answer a question asked during booking, using the normal Q&A path.
 
     Best-effort: if the model is unavailable the booking continues without
     an answer rather than failing. Never lets a question become a slot value.
+
+    channel matters: it picks the guardrails. Hardcoded to "webchat", an SMS
+    customer asking a question mid-booking got the web rules — three
+    sentences and emoji welcome — instead of the 320-character limit their
+    carrier actually enforces. The reply was fine on screen and truncated on
+    a phone.
     """
     try:
         from llm import get_llm_reply
         history = get_recent_messages(phone, business_id, limit=6)
         return get_llm_reply(message, history=history, config=config,
-                             channel="webchat", mid_booking=True)
+                             channel=channel, mid_booking=True)
     except Exception as e:
         log.warning("Couldn't answer a mid-booking question (%s)", e)
         return None
@@ -421,6 +428,54 @@ def _service_description(config, noun):
             f"listed service. If the customer clearly wants something not on "
             f"that list, return their words unchanged rather than forcing a "
             f"match.")
+
+
+def _drop_restated_service(extracted, config):
+    """Remove extra-question answers that merely say the service again.
+
+    The opening sentence gets mined for everything at once, which is usually
+    a gift — "book a drain cleaning for Tuesday" fills three slots and saves
+    three questions. But "I need a leak fixed" came back as
+
+        {"service": "leak repair", "problem_description": "leak"}
+
+    and that second value is not an answer, it's the first one restated. The
+    damage is that the slot now counts as filled, so the customer is never
+    asked to describe the problem. The owner gets "Problem description:
+    leak", which tells them nothing they didn't already know from the
+    service line — and worse, the customer, asked a later question out of
+    nowhere, answers the one they were expecting instead. In the
+    conversation that found this, "a pipe is leaking" ended up filed under
+    "Visibility".
+
+    So: an extra answer whose words are already inside the service name is
+    dropped, and the question gets asked properly. Containment is the right
+    test here (unlike duration matching, where it was the wrong one) because
+    the thing being detected IS a restatement — a fuller description like
+    "kitchen sink draining slowly" isn't inside "drain cleaning" and
+    survives. Directional on purpose: the service inside a longer answer
+    means the customer added something, and that's kept.
+
+    Never touches service, datetime, or the address — only the owner's own
+    extra questions, which are the ones a stray fragment can silently fill.
+    """
+    service = _normalise(extracted.get("service") or "")
+    if not service:
+        return extracted
+
+    protected = set(RESERVED_SLOT_KEYS) | {ADDRESS_SLOT_KEY}
+    kept = {}
+    for key, value in extracted.items():
+        if key in protected or key.startswith("_"):
+            kept[key] = value
+            continue
+        if _normalise(value) and _normalise(value) in service:
+            log.info("Dropping %s=%r — it only restates the service %r; "
+                     "asking the question instead", key, value,
+                     extracted.get("service"))
+            continue
+        kept[key] = value
+    return kept
 
 
 def _snap_to_catalogue(value, config):
@@ -692,6 +747,30 @@ def _is_affirmative(message):
     return text.split()[0] in AFFIRMATIVE
 
 
+# Answers that mean "nothing to add" — but only where the question offered
+# that as an option. See _confirmation_question.
+SKIPPABLE_ANSWERS = {"none", "n/a", "na", "no", "nope", "nothing", "-", "n"}
+
+# Cues in an owner's prompt that invite a non-answer. Matched loosely and on
+# purpose: an owner writes "(or reply 'none')" or "if any" or "optional" in
+# whatever words they like, and the cost of missing one is a read-back line
+# saying "Notes: none", which is mild. The cost of the opposite mistake —
+# treating a real "no" as an absence — is a detail the customer never got to
+# check, which is not.
+OPT_OUT_CUES = ("none", "n/a", "nothing", "if any", "optional",
+                "leave blank", "skip")
+
+
+def _slots_that_invite_skipping(config):
+    """Keys whose prompt offers the customer a way to say 'nothing'."""
+    keys = set()
+    for question in (config.get("booking", {}).get("extra_questions") or []):
+        prompt = (question.get("prompt") or "").lower()
+        if any(cue in prompt for cue in OPT_OUT_CUES):
+            keys.add(question.get("key"))
+    return keys
+
+
 def _confirmation_question(pending, config):
     """Read the booking back to the customer — every slot, not just two.
 
@@ -713,17 +792,31 @@ def _confirmation_question(pending, config):
 
     lines = [f"Just to confirm: {service} on {friendly}."]
 
-    # Every extra slot that was actually filled. Skip the bookkeeping keys
-    # and skip "none"-style answers, which add nothing for the customer.
-    skip_keys   = {"service", "datetime", "datetime_parsed",
-                   *INTERNAL_PENDING_KEYS}
-    skip_values = {"none", "n/a", "no", "nothing", "-"}
-    labels      = question_labels(config)
+    # Every extra slot that was actually filled. Skip the bookkeeping keys,
+    # and skip a "none" only where the question invited one.
+    #
+    # The subtlety: this used to skip any answer of "none", "no", "nothing"
+    # and friends, by value alone. That's right for "Anything else we should
+    # know? (or reply 'none')" — reading back "Notes: none." is noise. It's
+    # wrong for "Can the issue be clearly seen?", where "no" IS the answer,
+    # and hiding it meant the customer confirmed a booking containing an
+    # answer they couldn't see — the exact thing this function exists to
+    # prevent, per the paragraph above.
+    #
+    # So the test is the question, not the answer. A prompt that offers a
+    # way out treats a "none" as taking it; every other prompt gets its
+    # answer read back whatever the answer was.
+    skip_keys = {"service", "datetime", "datetime_parsed",
+                 *INTERNAL_PENDING_KEYS}
+    labels    = question_labels(config)
+    optional  = _slots_that_invite_skipping(config)
 
     for key, value in pending.items():
         if key in skip_keys:
             continue
-        if not value or str(value).strip().lower() in skip_values:
+        if not value:
+            continue
+        if key in optional and str(value).strip().lower() in SKIPPABLE_ANSWERS:
             continue
         label = labels.get(key) or humanize(key)
         lines.append(f"{label}: {value}.")
@@ -814,7 +907,8 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
         log_cal.warning(f"Early availability check failed: {e}")
         return None
 
-def handle_booking(phone, message, config, business_id, prefilled=None):
+def handle_booking(phone, message, config, business_id, prefilled=None,
+                   channel="sms"):
     """Advance the booking flow and log the reply.
 
     Wraps the real handler so every outgoing scheduler message is visible in
@@ -824,7 +918,7 @@ def handle_booking(phone, message, config, business_id, prefilled=None):
     """
     try:
         reply = _handle_booking_inner(phone, message, config, business_id,
-                                      prefilled)
+                                      prefilled, channel=channel)
     except StaleTurn as e:
         # Another request for this conversation finished while we were
         # working, so our reply is about a conversation that has moved on.
@@ -852,7 +946,8 @@ def _current_question(phone, business_id, config):
         return substitute(missing["prompt"], config)
     return _confirmation_question(current["pending"], config)
 
-def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
+def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
+                          channel="sms"):
     """Advance the booking using slot extraction plus a fill-the-gaps loop.
 
     Every message runs through extraction, so customers can volunteer or
@@ -887,12 +982,14 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
     # The trigger itself may carry information ("book a drain cleaning").
     if state == "idle":
         # Slots the intent classifier already found in the triggering
-        # message — no point extracting them twice.
+        # message — no point extracting them twice. Filtered first: one
+        # sentence answering two questions usually means it only answered
+        # one (see _drop_restated_service).
         if prefilled:
-            pending.update(prefilled)
+            pending.update(_drop_restated_service(prefilled, config))
         else:
             extracted = extract_booking_slots(message, slots, config)
-            pending.update(extracted)
+            pending.update(_drop_restated_service(extracted, config))
 
         early = _check_datetime_now(phone, business_id, pending,
                                     prefilled or {}, config)
@@ -996,7 +1093,8 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None):
                 # then ask again for what's still missing.
                 log.info("Question mid-booking: %r — answering, not storing",
                          message.strip()[:60])
-                answer = _answer_mid_booking(phone, message, config, business_id)
+                answer = _answer_mid_booking(phone, message, config,
+                                             business_id, channel=channel)
                 _save_state(phone, business_id, "collecting", pending=pending)
                 prompt = substitute(missing["prompt"], config)
                 return f"{answer} {prompt}" if answer else prompt

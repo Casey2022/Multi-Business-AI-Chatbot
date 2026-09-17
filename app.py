@@ -42,7 +42,7 @@ from db import (
     get_business_by_slug,
 )
 from rules import get_reply, BOOK_INTENT
-from llm import get_llm_reply
+from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
 from scheduler import handle_booking, is_mid_booking
 from phone_utils import normalize as normalize_phone
 from admin import admin_bp
@@ -51,6 +51,7 @@ log_boot = logging.getLogger("bootstrap")
 log_sec = logging.getLogger("security")
 log = logging.getLogger("app")
 log_web = logging.getLogger("webchat")
+log_cost = logging.getLogger("cost")
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -245,6 +246,9 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
 
     Returns the reply text string.
     """
+    # Open the books for this turn; turn_cost_summary() closes them below.
+    start_turn_accounting()
+
     reply_text = None
     source = "unknown"   # which layer produced the reply
 
@@ -252,7 +256,8 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
     # If the customer is mid-booking, bypass rules entirely — every message
     # in a booking flow is an answer to the bot's last question.
     if is_mid_booking(sender_id, business_id):
-        reply_text = handle_booking(sender_id, message, config, business_id)
+        reply_text = handle_booking(sender_id, message, config, business_id,
+                                    channel=channel)
         source = "scheduler"
 
     else:
@@ -262,7 +267,8 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
         if reply_text == BOOK_INTENT:
             # Rule matched a booking trigger — start the booking flow.
             log.info(f"Booking intent detected for {sender_id}")
-            reply_text = handle_booking(sender_id, message, config, business_id)
+            reply_text = handle_booking(sender_id, message, config,
+                                        business_id, channel=channel)
             source = "scheduler"
 
         elif reply_text is None:
@@ -281,7 +287,7 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
                 extracted = {k: v for k, v in result.items() if k != "intent"}
                 reply_text = handle_booking(
                     sender_id, message, config, business_id,
-                    prefilled=extracted
+                    prefilled=extracted, channel=channel
                 )
                 source = "scheduler"
             else:
@@ -295,6 +301,13 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
     # Save after all logic — preserves the fetch-before-save ordering above.
     save_message(sender_id, "user",      message,    business_id, source ="customer")
     save_message(sender_id, "assistant", reply_text, business_id, source =source)
+
+    # What this one message cost. Grouped under the turn id like every other
+    # line, so the log answers "what does a booking conversation cost?" by
+    # reading rather than by waiting a day for a vendor dashboard.
+    spent = turn_cost_summary()
+    if spent:
+        log_cost.info("business %s — %s", business_id, spent)
 
     return reply_text
 
@@ -464,12 +477,23 @@ def demo_start():
     session.permanent = False
     log_web.info("Demo started: %s from template %r",
                  minted["business"]["slug"], slug)
-    return redirect(url_for("demo_page", slug=minted["business"]["slug"]))
+    return redirect(url_for("chat_page", slug=minted["business"]["slug"]))
 
 
-@app.route("/demo/<slug>", methods=["GET"])
-def demo_page(slug):
-    """Serve the demo chat UI for a business."""
+@app.route("/chat/<slug>", methods=["GET"])
+def chat_page(slug):
+    """Serve the customer-facing chat page for a business.
+
+    This lives at /chat, not /demo, because "demo" had quietly come to mean
+    two different things: a demo OF the chatbot (this page, for any
+    business, including real clients) and a demo TENANT (a throwaway clone
+    with is_demo = 1). /demo/bobs_plumbing was the real Bob's Plumbing while
+    /demo/demo-bobs_plumbing-0fe37a was a clone, and nothing in the URL said
+    which. One word doing two jobs is how the wrong business gets opened.
+
+    Now /chat/<slug> is the chat page for anyone, and "demo" means only the
+    sandbox: /demo picks a business, /demo/start mints a clone.
+    """
     business = get_business_by_slug(slug)
     if not business:
         return "Unknown business", 404
@@ -480,6 +504,18 @@ def demo_page(slug):
         is_demo=bool(business.get("is_demo")),
         greeting=f"Hi! I'm the {config['business']['name']} assistant. How can I help?",
     )
+@app.route("/demo/<slug>", methods=["GET"])
+def demo_page_legacy(slug):
+    """The old address for the chat page. Kept working, not kept as truth.
+
+    It's in the README, on the deployed site and in whatever bookmarks and
+    links already exist; breaking those to tidy a name would be a poor
+    trade. A 302 rather than a 301 because a permanent redirect is cached
+    hard by browsers and is a genuine nuisance to take back.
+    """
+    return redirect(url_for("chat_page", slug=slug), code=302)
+
+
 @app.route("/", methods=["GET"])
 def index():
     return redirect(url_for("demo_picker"))
