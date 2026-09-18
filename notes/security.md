@@ -159,20 +159,67 @@ Not everything needed changing, and it's worth recording what didn't:
   deliberately slow, so an unthrottled login form is a denial-of-service
   hole as well as a guessing one.
 
+## Dependency audit
+
+Run 2026-09-18. 20 unique advisories across three
+packages (the tool printed 35 because it queries two sources and doesn't
+dedupe). Triaged by reachability rather than by count:
+
+| package | advisories | reachable here? | action |
+|---|---|---|---|
+| `aiohttp` 3.13.5 | 14 | No — we never import it | floor at `>=3.14.3` |
+| `anyio` 4.13.0 | 2 | No — sync client path, ASCII hostnames | floor at `>=4.14.2` |
+| `chromadb` 1.5.9 | 4 | No — server-mode only | documented, see below |
+
+**aiohttp and anyio are transitive.** Nothing in this repo imports either;
+they arrive underneath twilio, voyageai and chromadb. The aiohttp
+advisories are client-side parser and header bugs that need a hostile
+*server* to trigger, and the only servers we call are Anthropic, Google,
+Twilio and Nominatim. `anyio`'s critical one (CVE-2026-63374, CVSS 9.3) is
+TLS host name spoofing through IDNA 2003 encoding in `TLSStream.wrap()` —
+it needs an internationalized domain name, and it lives in the *async*
+path, which the sync Anthropic client never enters.
+
+Both are fixed upstream and neither exposes an API we call, so the fix is
+free and taking it beats arguing about reachability. `requirements.txt`
+now carries floors, not pins: a floor says "not this known-bad build", a
+pin would say "this exact build forever", and for a dependency we don't
+import the second is a maintenance debt with no payoff. Note that these
+versions were only ever in the local virtualenv — `requirements.txt`
+doesn't pin transitives, so a fresh install on Render was already
+resolving to patched builds. The floors make that deliberate instead of
+lucky.
+
+**chromadb is the interesting one, and it has no fix.** 1.5.9 is the
+latest stable release; all four advisories show a blank Fix Versions
+column because there is nothing to upgrade to. Two are pre-auth and
+authenticated code injection through `trust_remote_code` on
+`/api/v2/tenants/{tenant}/databases/{db}/collections` (CVSS 9.8 and
+critical), and two are authorization-scoping failures in
+`SimpleRBACAuthorizationProvider` letting one tenant reach another's
+collections.
+
+Every one of them is an attack on the Chroma **HTTP server**. We call
+`chromadb.PersistentClient(path=...)` — an embedded store, in our own
+process, reading a directory on disk. There is no listener, no auth
+provider, no RBAC, and no tenant boundary for anyone to cross. The code
+those advisories describe never runs here.
+
+> **This stops being true the moment Chroma moves out of process.** Running
+> `chroma run` or switching to `HttpClient` — the natural step when the
+> vector store outgrows one dyno — turns all four live at once, including
+> a 9.8 pre-auth RCE, and the multi-tenant ones matter *especially* here,
+> because demo tenants and real clients would share that server. If that
+> migration ever gets planned, a patched Chroma is a precondition for it,
+> not a follow-up.
+
+Re-run it before any deploy that changes `requirements.txt`:
+
+```
+cd ~/chatbot && source venv/bin/activate && pip-audit
+```
+
 ## Still to do
-
-- **`pip-audit`** — has to run on your machine. Neither this shell nor the
-  cloud sandbox can reach PyPI or the OSV advisory database, so I couldn't
-  do it from here:
-
-  ```
-  pip install pip-audit
-  pip-audit
-  ```
-
-  The installed set is 122 packages and the versions all looked current
-  when I read them off `site-packages`, but "looked current" is not an
-  audit.
 
 - **A real secrets story.** `.env` on the box is fine for one deploy and
   stops being fine at two.

@@ -20,3 +20,13 @@ google-auth==2.56.3
 # an import we make ourselves now, so it's named here.
 google-auth-httplib2==0.4.1
 httplib2==0.32.0
+
+# Security floors on transitive dependencies. Neither is imported by our
+# code; both arrive underneath twilio, voyageai and chromadb, and the
+# versions pip resolved back in May carried advisories. Nothing here asks
+# for a feature — these lines exist only to stop a fresh install landing
+# on a known-bad build, which is why they're floors (>=) and not pins.
+#   aiohttp <3.14.3 — 14 advisories, client-side parser and header bugs
+#   anyio   <4.14.2 — CVE-2026-63374, TLS host name spoofing via IDNA 2003
+aiohttp>=3.14.3
+anyio>=4.14.2
