@@ -213,6 +213,14 @@ those advisories describe never runs here.
 > migration ever gets planned, a patched Chroma is a precondition for it,
 > not a follow-up.
 
+After taking the floors, the audit reports four findings, all chromadb,
+all the server-mode ones above. That is the expected steady state, not an
+outstanding task — and they are deliberately *not* added to a
+`--ignore-vuln` list. An ignore list is how a report stops being read, and
+these four are the standing reminder attached to the Chroma migration
+note. Four lines of known, explained output is a cheaper price than a
+suppression file nobody revisits.
+
 Re-run it before any deploy that changes `requirements.txt`:
 
 ```
