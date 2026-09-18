@@ -129,6 +129,20 @@ def main():
     check("no literal \\uXXXX escapes in templates", not stray,
           "write the character itself: " + ", ".join(stray))
 
+    # The greeting is the only chat bubble written in the template rather
+    # than appended by script, so it's the only one where the side and the
+    # colour can disagree with who actually said it. It shipped marked as a
+    # customer message: the bot's own hello, on the right, in the customer's
+    # blue. Nothing about that is an error -- it renders perfectly, it just
+    # tells the visitor the wrong thing about who is talking.
+    chat = (ROOT / "templates" / "demo.html").read_text(encoding="utf-8")
+    greeting_line = [l for l in chat.split("\n") if "{{ greeting }}" in l]
+    check("the greeting bubble exists", len(greeting_line) == 1)
+    if greeting_line:
+        check("the greeting is marked as coming from the bot",
+              "msg-from-bot" in greeting_line[0],
+              "the bot says hello, so it takes the bot's side and colour")
+
     print("\nRules nothing uses (a report, not a failure)")
     print("-" * 44)
     # Only report component-looking classes: state and element selectors
