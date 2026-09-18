@@ -26,6 +26,50 @@ def current_user():
     return get_user_by_email(email) if email else None
 
 
+@admin_bp.context_processor
+def viewer():
+    """Who's looking, available to every admin template.
+
+    A context processor rather than an argument threaded through fifteen
+    render_template calls: this is a property of the session, not of the
+    page, and a page that forgot to pass it would silently render the
+    wrong nav.
+
+    home_url is where the wordmark goes, which depends on the role.
+    Operators have a list of businesses to go back to; an owner has one
+    business, and sending them to a list that immediately redirects them
+    back is a link that does nothing twice.
+    """
+    # Set when starting a demo displaced somebody's real login — see
+    # demo_start in app.py. It's what puts "Back to your account" in the nav.
+    displaced = session.get("displaced_user")
+
+    user = current_user()
+    if not user:
+        return {"viewer": None, "is_operator": False, "home_url": None,
+                "displaced_user": displaced}
+
+    if user["is_operator"]:
+        home = url_for("admin.dashboard")
+    elif user["business_id"]:
+        home = url_for("admin.appointments", business_id=user["business_id"])
+    else:
+        # An owner with no business — a malformed row, or one whose demo was
+        # swept while they were signed in. Without this guard url_for raises
+        # and takes down every admin page for them, which turns a bad row
+        # into a broken portal.
+        log_sec.warning("User %s has neither a business nor operator rights",
+                        user["email"])
+        home = None
+
+    return {
+        "viewer": user,
+        "is_operator": bool(user["is_operator"]),
+        "home_url": home,
+        "displaced_user": displaced,
+    }
+
+
 def login_required(f):
     """Require a logged-in user."""
     @wraps(f)

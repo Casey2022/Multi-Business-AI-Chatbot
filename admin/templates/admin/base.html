@@ -17,13 +17,25 @@
 <body>
 
 <nav class="topnav">
-  <a href="{{ url_for('admin.dashboard') }}" class="wordmark">Simon<em> Says</em></a>
+  {# The wordmark goes home, and home depends on who you are: an operator
+     has a list of businesses, an owner has one business. See the `viewer`
+     context processor in admin/auth.py. #}
+  {% if home_url %}
+    <a href="{{ home_url }}" class="wordmark">Simon<em> Says</em></a>
+  {% else %}
+    <span class="wordmark">Simon<em> Says</em></span>
+  {% endif %}
 
   <div class="nav-links">
-    {# The login page has no session, so "Businesses" and "Log out" would be
-       links to nowhere. It empties this block. #}
+    {# The login page has no session, so "Log out" would be a link to
+       nowhere. It empties this block. #}
     {% block navlinks %}
-    <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Businesses</a>
+    {# Only an operator has more than one business to switch between. To an
+       owner — and to a demo visitor — "Businesses" is a link to a page that
+       exists to bounce them straight back here. #}
+    {% if is_operator %}
+      <a class="nav-link" href="{{ url_for('admin.dashboard') }}">Businesses</a>
+    {% endif %}
 
     {% if business is defined and business %}
       {# The way to see what a change did. An owner who edits a greeting
@@ -36,12 +48,34 @@
       {% endif %}
     {% endif %}
 
+    {# Starting a demo signs you in as that sandbox's owner. Without this,
+       someone who was already logged in finds their own dashboard
+       redirecting them into a business they don't recognise, with nothing
+       explaining it. #}
+    {% if displaced_user %}
+      <a class="nav-link" href="{{ url_for('demo_leave') }}">Back to your account</a>
+    {% endif %}
+
     <a class="nav-link" href="{{ url_for('admin.logout') }}">Log out</a>
     {% endblock %}
   </div>
 </nav>
 
 <div class="page">
+  {% if business is defined and business and business.is_demo %}
+    <div class="demobar">
+      <span class="chip chip-pending">Demo</span>
+      <span>
+        This is a sandbox copy of {{ business.name }}, yours alone. Change
+        anything you like — it's cleared when you're done and touches no
+        real business.
+        {% if displaced_user %}
+          You're signed in as this demo, not as {{ displaced_user }}.
+        {% endif %}
+      </span>
+    </div>
+  {% endif %}
+
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
       <div class="flash flash-{{ 'error' if category == 'error' else 'success' }}">

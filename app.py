@@ -473,7 +473,17 @@ def demo_start():
     # the generated password back through the login form: the password
     # exists because the users table requires one, and putting it on the
     # wire would only give it somewhere to leak.
+    #
+    # If somebody was already signed in, remember who. Starting a demo used
+    # to replace their session with no warning and no way back: an operator
+    # who clicked a demo out of curiosity found their own dashboard
+    # redirecting them into a sandbox business, with nothing on screen
+    # saying why. The nav offers them a way back now.
+    displaced = session.get("user_email")
     session["user_email"] = minted["email"]
+    if displaced and displaced != minted["email"]:
+        session["displaced_user"] = displaced
+        log_web.info("Demo replaced the session of %s", displaced)
     session.permanent = False
     log_web.info("Demo started: %s from template %r",
                  minted["business"]["slug"], slug)
@@ -504,6 +514,21 @@ def chat_page(slug):
         is_demo=bool(business.get("is_demo")),
         greeting=f"Hi! I'm the {config['business']['name']} assistant. How can I help?",
     )
+@app.route("/demo/leave", methods=["GET"])
+def demo_leave():
+    """Give someone their own account back after a demo.
+
+    Their demo tenant is left alone — the idle sweep takes it, the same as
+    if they'd closed the tab. This only swaps the session back.
+    """
+    displaced = session.pop("displaced_user", None)
+    if displaced:
+        session["user_email"] = displaced
+        log_web.info("Returned %s to their own account", displaced)
+        return redirect(url_for("admin.dashboard"))
+    return redirect(url_for("demo_picker"))
+
+
 @app.route("/demo/<slug>", methods=["GET"])
 def demo_page_legacy(slug):
     """The old address for the chat page. Kept working, not kept as truth.

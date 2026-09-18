@@ -777,3 +777,23 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .split-baseline {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
 }
+
+/* ---------------------------------------------------------------------- *
+ * Demo bar
+ * ---------------------------------------------------------------------- *
+ * A demo portal is otherwise identical to a real one, which is how an
+ * operator ends up editing a sandbox thinking it's their client. Amber
+ * because it means "this isn't what you think it is" — not an error, not a
+ * success.
+ */
+.demobar {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--pending);
+  border-left-width: 3px;
+  background: var(--pending-wash);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--pending);
+}
+.demobar span:last-child { flex: 1; min-width: 220px; }

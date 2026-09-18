@@ -1149,3 +1149,97 @@ path. Import-time correctness proves nothing about registration-time
 correctness. When something is connected by a decorator, a naming
 convention, or a call from somewhere else entirely, there should be a check
 that the connection exists — not just that the code does.
+
+---
+
+## The demo that signed me out of my own account (2026-09-18)
+
+**Symptom.** "The admin page is broken now. It is acting like the demo
+page." Every admin URL either showed a demo business or redirected to one.
+
+**It wasn't broken.** One line of the access log had the whole answer:
+
+    19:18:05  GET /admin/  ->  302  ->  /admin/business/13/appointments
+
+Business 13 is `demo-ridgeline_contracting-0d8663`. Clicking "Explore this
+one" on the picker runs `demo_start`, which signs the visitor in as the
+clone's owner by setting `session["user_email"]` — **replacing whatever
+session was already there.** An operator who clicked a demo out of
+curiosity became a demo owner, and `/admin/` then correctly redirected that
+non-operator to their own business. Every component behaved exactly as
+designed. The session simply wasn't who I thought it was.
+
+**Why it surfaced only now.** The nav had shown a "Businesses" link
+unconditionally, so the wrong session was survivable: you clicked it, got
+the dashboard, and never noticed you'd been logged out of your own account.
+Making that link operator-only — a cosmetic change — removed the cover and
+the underlying problem became visible. A tidy-up exposing a real bug is a
+good trade, but worth recognising for what it is: the tidy-up didn't cause
+it, it stopped hiding it.
+
+**Three fixes, because "invisible" was the actual defect:**
+
+1. A demo portal now carries a banner saying it's a sandbox. Before, it was
+   pixel-identical to a real portal apart from one nav link — which is how
+   an operator ends up editing a demo believing it's a client.
+2. `demo_start` records whose session it displaced, and the nav offers
+   "Back to your account", naming the account by email.
+3. The wordmark and "Businesses" now resolve by role instead of pointing at
+   a dashboard that bounces anyone who isn't an operator.
+
+**The lesson.** An action that changes *who the user is* — or what they're
+looking at — has to say so on screen. Not in a log, not by implication.
+`demo_start` did exactly what its code said and what its comment promised;
+nothing anywhere told the person it had happened to them.
+
+---
+
+## Meta-lesson: four bugs in one week, all living in a connection
+
+Worth writing down together, because individually each looked like a
+different kind of mistake and collectively they are one:
+
+| what | where it lived |
+|---|---|
+| `bootstrap()` defined, documented, maintained, never called | a call that didn't exist |
+| `@admin_bp.route("/login")` bound to the helper beneath it | a decorator attached to the wrong thing |
+| `prune_rate_limits()` written, never called | a call that didn't exist |
+| `demo_start` silently replacing a live session | an effect with no signal |
+
+None is a logic error. Every one of them compiled, imported cleanly, passed
+the suite, and read correctly in review. The bug in each case was not in
+any line of code — it was in the **seam between two things**: a definition
+and its caller, a decorator and its function, an action and the user's
+model of what just happened.
+
+**Seams have no error message.** A function nobody calls raises nothing. A
+decorator on the wrong function registers a route successfully. A session
+swap completes without complaint. Absence and silence both look exactly
+like everything being fine, which is why all four survived commits, pushes,
+and in two cases a week of use.
+
+**So the rule: when something is connected by a decorator, a naming
+convention, a call from somewhere else, or a user's assumption — write a
+check that the connection exists.** Not that the code works; that it is
+*attached*. The checks that came out of this week are all that shape:
+
+- `routes_test.py` — does every `url_for` name an endpoint that exists? Is
+  any route bound to a function whose name starts with an underscore? Do
+  the URLs we've promised to keep still resolve?
+- `styles_test.py` — does every class a template uses have a rule behind
+  it? Does every `var()` read a token that was actually declared?
+- The startup warning for `service_durations` keys that name no service.
+- `prune_rate_limits()` returning a count, so a caller can say whether it
+  did anything.
+- The per-turn `[cost]` line — an effect that used to be invisible until
+  the vendor's dashboard caught up the next day.
+
+Each is cheap, static, and catches a class rather than an instance. The
+common property: they assert a *relationship*, not a value. Unit tests
+verify what a function returns. These verify that anything is calling it.
+
+**Corollary for review:** "it compiles" and "the tests pass" say nothing
+about whether the thing is wired up. When reading a diff that adds a
+function, a route, a class or a template, the question isn't "is this
+right?" — it's "what calls this, and is that visible from here?" Three of
+these four would have been caught by asking it.
