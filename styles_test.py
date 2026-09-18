@@ -114,6 +114,21 @@ def main():
         check(token, False, "         used with var() but never declared on :root")
     check("no undeclared custom properties", not undeclared)
 
+    # A Python escape sequence that reached a template is text, not a
+    # character: Jinja never interprets it, so the browser prints a literal
+    # \u2026 in the placeholder. It renders, it passes every other check,
+    # and it just looks wrong -- the same failure mode as a misspelled
+    # class name. The cause is always the same: a patch script wrote the
+    # escape instead of the character it stands for.
+    stray = []
+    for d in TEMPLATE_DIRS:
+        for t in d.rglob("*.html"):
+            for n, line in enumerate(t.read_text(encoding="utf-8").split("\n"), 1):
+                if re.search(r"\\u[0-9a-fA-F]{4}", line):
+                    stray.append(f"{t.relative_to(ROOT)}:{n}")
+    check("no literal \\uXXXX escapes in templates", not stray,
+          "write the character itself: " + ", ".join(stray))
+
     print("\nRules nothing uses (a report, not a failure)")
     print("-" * 44)
     # Only report component-looking classes: state and element selectors
