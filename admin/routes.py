@@ -109,13 +109,16 @@ def appointments(business_id):
     # hook as reconciliation rather than a timer, for the same reason:
     # there is no scheduler here, and a late prune costs some dead rows.
     try:
-        from db import prune_rate_limits
+        from db import prune_rate_limits, prune_personal_data
         removed = prune_rate_limits()
         if removed:
             log_rec.info("Pruned %d expired rate-limit row(s)", removed)
+        # And personal data past its retention window — messages, abandoned
+        # booking state, cached addresses. Same hook for the same reason.
+        prune_personal_data()
     except Exception as e:
         # Housekeeping must never cost someone their appointments page.
-        log_rec.warning("Could not prune rate limits: %s", e)
+        log_rec.warning("Housekeeping failed: %s", e)
     appointment_list = get_appointments(business_id)
 
     # Which week each appointment falls in, relative to the current one, so

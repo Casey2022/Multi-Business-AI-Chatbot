@@ -13,7 +13,7 @@ from getpass import getpass
 from dotenv import load_dotenv
 load_dotenv()
 
-from db import init_db, create_user, get_all_businesses
+from db import init_db, create_user, get_all_businesses, password_problem
 
 
 def main():
@@ -44,8 +44,9 @@ def main():
     if password != getpass("Confirm: "):
         print("Passwords don't match.")
         return
-    if len(password) < 8:
-        print("Password must be at least 8 characters.")
+    problem = password_problem(password, email)
+    if problem:
+        print(problem)
         return
 
     try:

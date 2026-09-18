@@ -11,6 +11,7 @@
     <div class="card-title login-title">Sign in</div>
 
     <form method="POST">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       {% if error %}
         <div class="field"><div class="flash flash-error">{{ error }}</div></div>
       {% endif %}

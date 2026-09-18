@@ -17,6 +17,7 @@
 {{ ui.destinations(business, 'settings') }}
 
 <form method="POST" class="stack">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
   <div class="card">
     <div class="card-title">Business details</div>

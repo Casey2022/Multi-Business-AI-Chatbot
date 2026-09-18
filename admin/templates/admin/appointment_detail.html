@@ -91,6 +91,7 @@
   <div class="card-pad">
     <form method="POST" action="{{ url_for('admin.reschedule', appointment_id=appt.id) }}"
           class="toolbar">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <label class="sr-only" for="new_datetime">New date and time</label>
       <input class="w-auto" type="datetime-local" id="new_datetime" name="new_datetime">
       <button class="btn btn-primary" type="submit">Move appointment</button>
@@ -106,6 +107,7 @@
   <div class="card-pad">
     <form method="POST" action="{{ url_for('admin.cancel', appointment_id=appt.id) }}"
           onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger" type="submit">Cancel appointment</button>
     </form>
     <p class="danger-note mt-3">

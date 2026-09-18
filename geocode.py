@@ -248,7 +248,7 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
 
     key = api_key()
     if not key:
-        log.warning("GOOGLE_MAPS_API_KEY not set — skipping geocode of %r", query)
+        log.warning("GOOGLE_MAPS_API_KEY not set — skipping an address lookup")
         return None, "no API key"
 
     cache_key = f"{query.lower()}|{bias or ''}"
@@ -289,19 +289,21 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
     except Exception as e:
         # Network trouble is not the customer's problem. Return None and let
         # the caller fall through to "unverified".
-        log.warning("Geocode request failed for %r: %s", query, e)
+        log.warning("Geocode request failed: %s", e)
+        log.debug("The address that failed: %r", query)
         return None, "lookup failed"      # not cached: a transient error
 
     status = body.get("status")
     if status != "OK" or not body.get("results"):
         if status == "ZERO_RESULTS":
-            log.info("Geocode for %r found nothing", query)
+            log.info("Geocode found nothing for the address given")
+            log.debug("No match for: %r", query)
             _remember(cache_key, None, use_cache, "address not found")
             return None, "address not found"
         # OVER_QUERY_LIMIT / REQUEST_DENIED / INVALID_REQUEST are our
         # problems, not the address's — and they must not be cached, or a
         # billing hiccup would poison every address it touched.
-        log.warning("Geocode for %r returned %s: %s",
+        log.debug("Geocode for %r returned %s: %s",
                     query, status, body.get("error_message", ""))
         return None, "geocoder unavailable"
 
@@ -316,7 +318,7 @@ def _geocode_detailed(query, bias=None, use_cache=True, usage_key=None):
                       and top["geometry"].get("location_type") in CONFIDENT_TYPES),
     }
     result.update(_area_of(top.get("address_components") or []))
-    log.info("Geocoded %r -> %s (confident=%s)",
+    log.debug("Geocoded %r -> %s (confident=%s)",
              query, result["formatted"], result["confident"])
     _remember(cache_key, result, use_cache)
     return result, None
@@ -413,9 +415,10 @@ def check_service_area(address, config, business_id=None):
 
     implausible = max(radius_miles * IMPLAUSIBLE_MULTIPLE, IMPLAUSIBLE_FLOOR_MILES)
     if miles > implausible:
-        log.warning("Address %r resolved to %s — %.0f mi away, past the %.0f mi "
-                    "plausibility limit.", typed, match["formatted"], miles,
-                    implausible)
+        log.warning("An address resolved %.0f mi away, past the %.0f mi "
+                    "plausibility limit — asking again in local terms.",
+                    miles, implausible)
+        log.debug("Implausible: %r -> %r", typed, match["formatted"])
 
         # Ask again in local terms. A customer typing "56 Test street" means
         # the one in their town; Google answered globally because nothing
@@ -428,7 +431,8 @@ def check_service_area(address, config, business_id=None):
         area = _area_hint(origin)
         retried = None
         if area and area.split(",")[0].lower() not in typed.lower():
-            log.info("Re-asking as %r", f"{typed}, {area}")
+            log.info("Retrying the lookup with the business's own town appended")
+            log.debug("Re-asking as %r", f"{typed}, {area}")
             retried, retried_detail = _geocode_detailed(
                 f"{typed}, {area}", bias=bias, usage_key=usage_key)
 
@@ -436,7 +440,7 @@ def check_service_area(address, config, business_id=None):
             retried_miles = haversine_miles(origin["lat"], origin["lon"],
                                             retried["lat"], retried["lon"])
             if retried_miles <= implausible and retried["confident"]:
-                log.info("Local re-ask resolved %r -> %s (%.1f mi)",
+                log.debug("Local re-ask resolved %r -> %s (%.1f mi)",
                          typed, retried["formatted"], retried_miles)
                 match = retried
                 miles = retried_miles
@@ -459,6 +463,7 @@ def check_service_area(address, config, business_id=None):
 
     outcome["status"] = "inside" if miles <= radius_miles else "outside"
     outcome["reason"] = f"{outcome['miles']} mi from {origin_address}"
-    log.info("Service area check: %r -> %s (%.1f mi, radius %.0f)",
-             typed, outcome["status"], miles, radius_miles)
+    log.info("Service area check: %s (%.1f mi, radius %.0f)",
+             outcome["status"], miles, radius_miles)
+    log.debug("Checked address: %r", typed)
     return outcome

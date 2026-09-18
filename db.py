@@ -3,6 +3,7 @@
 # Every function that reads or writes data accepts a business_id so records
 # are always scoped to the correct business.
 
+import os
 import sqlite3
 import json
 from pathlib import Path
@@ -846,11 +847,44 @@ def set_sync_token(business_id, token):
     conn.commit()
     conn.close()
 
+# Long enough that guessing is hopeless, short enough that nobody reaches
+# for a sticky note. Length alone, deliberately: composition rules ("one
+# capital, one symbol") push people toward Password1! and stop them using a
+# passphrase, which is both stronger and easier to remember.
+MIN_PASSWORD_LENGTH = int(os.environ.get("MIN_PASSWORD_LENGTH", "12"))
+
+
+def password_problem(password, email=""):
+    """Why this password can't be used, or None if it's fine.
+
+    Returns a sentence meant to be shown to a person, not a code.
+    """
+    if not password or len(password) < MIN_PASSWORD_LENGTH:
+        return (f"Passwords need at least {MIN_PASSWORD_LENGTH} characters. "
+                f"A short sentence you'll remember works well.")
+    if email and password.strip().lower() == email.strip().lower():
+        return "The password can't be the same as the email address."
+    if password.strip().lower() in ("password", "changeme", "letmein",
+                                    "admin", "secret", "password123",
+                                    "administrator", "qwertyuiop"):
+        return "That password is one of the first anyone would try."
+    return None
+
+
 def create_user(email, password, business_id=None, is_operator=False):
     """Create a user with a bcrypt-hashed password.
     business_id=None + is_operator=True → operator, sees all businesses.
     business_id=N   + is_operator=False → owner, scoped to that business.
+
+    Raises ValueError on a password that shouldn't be allowed. Raising
+    rather than warning because this is the only place accounts are made:
+    a warning here would be a weak password created anyway, with a line in
+    a log nobody reads.
     """
+    problem = password_problem(password, email)
+    if problem:
+        raise ValueError(problem)
+
     import bcrypt
     from datetime import datetime as _dt
 
@@ -1099,6 +1133,82 @@ def get_geocode_usage(usage_key, day):
     ).fetchone()
     conn.close()
     return row["calls"] if row else 0
+
+
+# ---------------------------------------------------------------------------
+# Retention
+# ---------------------------------------------------------------------------
+#
+# Everything below deletes personal data that has stopped being useful.
+#
+# What's kept and why, because "how long do you keep my details?" is a
+# question a real client will ask and "forever, we never thought about it"
+# is not an answer:
+#
+#   messages            90 days. Long enough to review how the assistant is
+#                       answering and to settle a dispute about what was
+#                       said; short enough that a year of strangers' phone
+#                       numbers and problems isn't sitting in a file on a
+#                       hosted disk.
+#   conversation_state  7 days. It's the half-finished booking someone
+#                       abandoned — working state, not a record. It also
+#                       holds the address under _checks.
+#   geocode_cache       30 days. Keyed BY the address, so it is a list of
+#                       every place a customer has asked to be visited. The
+#                       cache exists to avoid paying twice for the same
+#                       lookup in the same week, not to build that list.
+#
+# Appointments are deliberately NOT pruned. They're the business's own
+# records — an owner looking up what they did for a customer last spring is
+# the normal case, and deleting that to satisfy a tidiness impulse would be
+# destroying their books. When a real retention policy is needed it belongs
+# there as a per-business setting, not as a default this code picks.
+
+MESSAGE_RETENTION_DAYS = int(os.environ.get("MESSAGE_RETENTION_DAYS", "90"))
+STATE_RETENTION_DAYS   = int(os.environ.get("STATE_RETENTION_DAYS", "7"))
+GEOCODE_RETENTION_DAYS = int(os.environ.get("GEOCODE_RETENTION_DAYS", "30"))
+
+
+def _cutoff(days):
+    """An ISO timestamp `days` in the past — the format these columns use."""
+    from datetime import datetime as _dt, timedelta as _td
+    return (_dt.now() - _td(days=days)).isoformat()
+
+
+def prune_personal_data(now=None):
+    """Delete personal data past its retention window. Returns the counts.
+
+    Opportunistic, like the rate-limit prune and calendar reconciliation:
+    there's no scheduler here, and a late prune costs a few extra days of
+    retention rather than anything worse.
+
+    Returns a dict so the caller can say what it did. Silent housekeeping
+    is housekeeping nobody can tell has stopped — that's now happened twice
+    in this codebase.
+    """
+    conn = get_connection()
+    removed = {}
+    try:
+        cur = conn.execute("DELETE FROM messages WHERE timestamp < ?",
+                           (_cutoff(MESSAGE_RETENTION_DAYS),))
+        removed["messages"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM conversation_state WHERE last_updated < ?",
+                           (_cutoff(STATE_RETENTION_DAYS),))
+        removed["conversation_state"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM geocode_cache WHERE fetched_at < ?",
+                           (_cutoff(GEOCODE_RETENTION_DAYS),))
+        removed["geocode_cache"] = cur.rowcount
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if any(removed.values()):
+        log.info("Retention: removed %s",
+                 ", ".join(f"{v} {k}" for k, v in removed.items() if v))
+    return removed
 
 
 def prune_rate_limits(older_than_seconds=172800):

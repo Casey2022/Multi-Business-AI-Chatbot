@@ -36,6 +36,7 @@
     <div class="pickgrid">
       {% for t in templates %}
         <form class="card pickcard" method="POST" action="{{ url_for('demo_start') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
           <span class="eyebrow pick-kind">{{ t.kind }}</span>
           <span class="pick-name">{{ t.name }}</span>
           <p class="pick-blurb">{{ t.blurb }}</p>

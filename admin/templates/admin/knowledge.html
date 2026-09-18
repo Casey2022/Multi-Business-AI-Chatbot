@@ -23,6 +23,7 @@
   <div><strong>Unpublished changes.</strong> Customers are still being answered
     from the previous version.</div>
   <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <button class="btn btn-primary" type="submit">Publish changes</button>
   </form>
 </div>
@@ -31,6 +32,7 @@
 {% for s in sections %}
 <div class="card">
   <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label for="title-{{ s.id }}">Title</label>
       <input class="section-title" type="text" id="title-{{ s.id }}" name="title" value="{{ s.title }}">
@@ -55,6 +57,7 @@
     <span class="meta">Previous versions are kept when a section is deleted.</span>
     <form method="POST" action="{{ url_for('admin.knowledge_delete', document_id=s.id) }}"
           onsubmit="return confirm('Delete this section? Its previous versions are kept.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger btn-sm" type="submit">Delete section</button>
     </form>
   </div>
@@ -85,6 +88,7 @@
 
     <form method="POST" action="{{ url_for('admin.knowledge_add', business_id=business.id) }}"
           class="mt-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <div class="field flush">
         <label for="new-title">Title</label>
         <input class="section-title" type="text" id="new-title" name="title"

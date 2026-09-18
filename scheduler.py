@@ -13,6 +13,7 @@
 # module can serve any business simultaneously.
 
 import calendar_sync
+from logging_setup import scrub
 from config import (substitute, question_labels, humanize,
                     RESERVED_SLOT_KEYS)
 from db import get_state, set_state, save_appointment, get_recent_messages
@@ -221,7 +222,9 @@ def _finalize_booking(phone, business_id, pending, config):
                      address_check=checks or None)
 
     noun = BOOKING.get("noun", "appointment")
-    log.info(f"Saved {noun}: {phone} | {service} | {parsed} | extras={extras}")
+    log.info("Saved %s: %s | %s | %s | %d extra answer(s)",
+             noun, phone, service, parsed, len(extras))
+    log.debug("Extras for %s: %r", phone, extras)
 
     friendly_when = _dt.strptime(parsed, "%Y-%m-%d %H:%M").strftime(
         "%A, %B %-d at %-I:%M %p"
@@ -286,7 +289,8 @@ def _check_addresses(phone, business_id, pending, config, slots):
             result = geocode.check_service_area(answer, config,
                                                 business_id=business_id)
         except Exception as e:
-            log.warning("Address check failed for %r (continuing): %s", answer, e)
+            log.warning("Address check failed (continuing): %s", e)
+            log.debug("The address that failed: %r", answer)
             result = {"status": "unverified", "reason": f"checker error: {e}",
                       "address": answer, "miles": None, "formatted": None,
                       "customer_can_fix": False}
@@ -294,8 +298,9 @@ def _check_addresses(phone, business_id, pending, config, slots):
         if result["status"] == "outside":
             checks[slot["key"]] = result
             pending["_checks"] = checks
-            log.info("Booking stopped — %r is outside the service area (%s mi)",
-                     answer, result["miles"])
+            log.info("Booking stopped — the address is outside the service "
+                     "area (%s mi)", result["miles"])
+            log.debug("Out of area: %r", answer)
             _save_state(phone, business_id, "idle", pending={})
             return substitute(BOOKING.get(
                 "out_of_area_reply",
@@ -310,8 +315,9 @@ def _check_addresses(phone, business_id, pending, config, slots):
             if attempts <= ADDRESS_MAX_ATTEMPTS:
                 pending["_address_attempts"] = attempts
                 pending.pop(slot["key"], None)      # ask the slot again
-                log.info("Address %r not usable (%s) — asking again (%d/%d)",
-                         answer, result["reason"], attempts, ADDRESS_MAX_ATTEMPTS)
+                log.info("Address not usable (%s) — asking again (%d/%d)",
+                         result["reason"], attempts, ADDRESS_MAX_ATTEMPTS)
+                log.debug("Unusable address: %r", answer)
                 _save_state(phone, business_id, "collecting", pending=pending)
                 return BOOKING.get(
                     "address_clarify",
@@ -321,8 +327,9 @@ def _check_addresses(phone, business_id, pending, config, slots):
             # Out of attempts. Take what they typed, flag it, keep going —
             # the promise from the start was that a geocoder can't block a
             # booking outright.
-            log.info("Address %r still unusable after %d attempts — "
-                     "booking it unverified", answer, ADDRESS_MAX_ATTEMPTS)
+            log.info("Address still unusable after %d attempts — booking it "
+                     "unverified", ADDRESS_MAX_ATTEMPTS)
+            log.debug("Unverified address: %r", answer)
             checks[slot["key"]] = result
             pending["_checks"] = checks
             recorded = True
@@ -336,8 +343,9 @@ def _check_addresses(phone, business_id, pending, config, slots):
                 "formatted": result["formatted"],
                 "check": result,
             }
-            log.info("Address %r resolved to %r — confirming with the customer",
-                     answer, result["formatted"])
+            log.info("Address resolved to a fuller form — confirming with "
+                     "the customer")
+            log.debug("Resolved %r -> %r", answer, result["formatted"])
             _save_state(phone, business_id, "collecting", pending=pending)
             return BOOKING.get(
                 "address_confirm",
@@ -496,7 +504,8 @@ def _snap_to_catalogue(value, config):
         if listed == text:
             return service
         if listed in text or text in listed:
-            log.info("Service %r recorded as %r", value, service)
+            log.info("Service snapped to the catalogue: %r", service)
+            log.debug("Customer said %r -> %r", value, service)
             return service
     return value
 
@@ -876,8 +885,9 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
         # other things and had no idea which reply the error belonged to.
         # That is exactly what happened when someone typed "appointment" at
         # the "when works for you?" prompt.
-        log.info("Unparseable datetime %r — clearing it and asking again",
-                 pending.get("datetime"))
+        log.info("Unparseable datetime (%s) — clearing it and asking again",
+                 scrub(pending.get("datetime")))
+        log.debug("Unparseable: %r", pending.get("datetime"))
         pending.pop("datetime", None)
         pending.pop("datetime_parsed", None)
         _save_state(phone, business_id, "collecting", pending=pending)
@@ -1018,7 +1028,8 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                 checks[awaiting["key"]] = awaiting["check"]
                 pending["_checks"] = checks
                 pending.pop("_address_attempts", None)
-                log.info("Customer confirmed %r", awaiting["formatted"])
+                log.info("Customer confirmed the resolved address")
+                log.debug("Confirmed: %r", awaiting["formatted"])
                 _save_state(phone, business_id, "collecting", pending=pending)
                 return _ask_next_or_finalize(phone, business_id, pending,
                                              config, slots)
@@ -1027,8 +1038,9 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                 attempts = pending.get("_address_attempts", 0) + 1
                 pending["_address_attempts"] = attempts
                 pending.pop(awaiting["key"], None)
-                log.info("Customer rejected %r (attempt %d)",
-                         awaiting["formatted"], attempts)
+                log.info("Customer rejected the resolved address (attempt %d)",
+                         attempts)
+                log.debug("Rejected: %r", awaiting["formatted"])
                 _save_state(phone, business_id, "collecting", pending=pending)
                 if attempts > ADDRESS_MAX_ATTEMPTS:
                     # Stop asking. Keep what they originally typed and let
@@ -1091,8 +1103,9 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                 # as the problem description and move on as though the
                 # customer had answered. They asked something; answer it,
                 # then ask again for what's still missing.
-                log.info("Question mid-booking: %r — answering, not storing",
-                         message.strip()[:60])
+                log.info("Question mid-booking (%s) — answering, not storing",
+                         scrub(message))
+                log.debug("The question was: %r", message.strip()[:200])
                 answer = _answer_mid_booking(phone, message, config,
                                              business_id, channel=channel)
                 _save_state(phone, business_id, "collecting", pending=pending)
@@ -1102,8 +1115,9 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                 # A nudge or the booking command itself. Storing it would
                 # fill a slot with a word the customer never meant as an
                 # answer; the polite thing is to repeat what we asked.
-                log.info("Non-answer %r mid-booking — re-asking '%s'",
-                         message.strip()[:40], missing["key"])
+                log.info("Non-answer mid-booking — re-asking '%s'",
+                         missing["key"])
+                log.debug("The non-answer was: %r", message.strip()[:80])
                 return substitute(missing["prompt"], config)
             if missing:
                 extracted = {missing["key"]: message.strip()[:200]}

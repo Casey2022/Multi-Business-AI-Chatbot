@@ -155,7 +155,13 @@ def login():
         user = verify_password(email, password)
         if user:
             session["user_email"] = user["email"]
-            session.permanent = False
+            # permanent=True is what arms PERMANENT_SESSION_LIFETIME. It
+            # reads backwards: permanent=False means a browser-session
+            # cookie, which sounds safer but has no timeout at all — it
+            # lives as long as the browser does, and browsers restore
+            # sessions after a restart. permanent=True plus a lifetime is
+            # an idle timeout, refreshed on each request.
+            session.permanent = True
             log.info(f"Login: {user['email']} "
                   f"(operator={bool(user['is_operator'])})")
             return redirect(url_for("admin.dashboard"))

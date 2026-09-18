@@ -36,4 +36,4 @@ def friendly_time(iso_string):
 
 
 # Import routes and auth AFTER creating the blueprint.
-from admin import auth, routes  # noqa: E402, F401
+from admin import auth, csrf, routes  # noqa: E402, F401

@@ -322,8 +322,9 @@ def retrieve(query, config):
         if dist <= DISTANCE_THRESHOLD
     ]
 
-    log.info(f"Query: {query!r} -> {len(filtered)} usable chunks "
-          f"(of {len(documents)} returned)")
+    log.info("Retrieval: %d usable chunk(s) of %d returned",
+             len(filtered), len(documents))
+    log.debug("Query was: %r", query)
     for doc, dist in filtered:
         preview = doc[:80] + ("..." if len(doc) > 80 else "")
         log.debug(f"distance={dist:.4f}  {preview}")

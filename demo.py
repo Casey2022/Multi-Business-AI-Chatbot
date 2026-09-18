@@ -24,6 +24,7 @@ from db import (
     add_business,
     add_document_section,
     create_user,
+    MIN_PASSWORD_LENGTH,
     delete_business,
     get_business_by_id,
     get_business_by_slug,
@@ -180,7 +181,9 @@ def clone_template(template_slug, now=None):
     set_documents_clean(business_id)
 
     email = f"{slug}@demo.invalid"
-    password = secrets.token_urlsafe(12)
+    # Long enough to satisfy the password policy whatever it is set to;
+    # token_urlsafe(n) yields roughly 1.3 characters per byte.
+    password = secrets.token_urlsafe(max(16, MIN_PASSWORD_LENGTH))
     create_user(email, password, business_id=business_id, is_operator=False)
 
     business = get_business_by_id(business_id)

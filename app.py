@@ -19,13 +19,14 @@ load_dotenv()  # Must run before any module reads os.environ
 
 import logging
 import os
+from datetime import timedelta
 
 # Logging is configured BEFORE our own modules are imported, and that order
 # is load-bearing. rag.py announces its embedding backend at import time, so
 # that line is emitted *during* the import statement below. Anything logged
 # before handlers exist falls to logging's last-resort handler, which passes
 # only WARNING and above — so the line vanished with no error to explain it.
-from logging_setup import setup_logging, new_turn
+from logging_setup import setup_logging, new_turn, scrub
 setup_logging()
 
 from flask import (Flask, request, render_template, redirect, session,
@@ -112,8 +113,17 @@ def bootstrap():
         email    = os.environ.get("ADMIN_EMAIL")
         password = os.environ.get("ADMIN_PASSWORD")
         if email and password:
-            create_user(email, password, business_id=None, is_operator=True)
-            log_boot.info(f"Seeded operator account: {email}")
+            # create_user enforces the password policy. A weak ADMIN_PASSWORD
+            # must not take the whole app down on boot -- it should fail the
+            # same way missing credentials do: loudly, with the portal left
+            # unseeded until the environment is corrected.
+            try:
+                create_user(email, password, business_id=None, is_operator=True)
+                log_boot.info(f"Seeded operator account: {email}")
+            except ValueError as e:
+                log_boot.warning("ADMIN_PASSWORD was rejected (%s) -- the admin "
+                                 "portal is unreachable until it is set to a "
+                                 "stronger value and the app restarted.", e)
         else:
             log_boot.warning("No users exist and ADMIN_EMAIL / "
                   "ADMIN_PASSWORD are not set — the admin portal is "
@@ -124,6 +134,15 @@ def bootstrap():
     from import_documents import import_for_business
     for b in businesses:
         if not b["active"]:
+            continue
+        # A demo clone shares its template's vector collection until it
+        # publishes. sweep_all() above should already have deleted every
+        # demo, but that call is wrapped in a try/except that swallows —
+        # so if it ever fails, this loop would reach a clone and call
+        # ensure_ingested on a collection belonging to a real client, with
+        # the clone's documents as the source. Skipping demos here costs
+        # nothing and removes the dependency on the sweep having worked.
+        if b["is_demo"]:
             continue
         try:
             config = load_config(b["config_path"], b["id"])
@@ -158,7 +177,61 @@ def bootstrap():
     log_boot.info(f"Ready — {len(businesses)} business(es) registered.")
     
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+
+# ---------------------------------------------------------------------------
+# Session security
+# ---------------------------------------------------------------------------
+#
+# The secret key signs the session cookie, and the session cookie is the only
+# thing separating a stranger from the admin portal. This used to fall back
+# to the literal string "dev-secret-change-in-production" — which lives in a
+# public GitHub repository. Anyone who noticed could have signed a cookie
+# claiming to be the operator and had write access to every business, and
+# nothing would have looked wrong from the outside.
+#
+# So it fails closed. A missing secret is a configuration error, and a
+# configuration error should stop the program rather than let it serve
+# requests it can't actually secure. A deployment that refuses to boot is a
+# problem you find in a minute; a deployment signing cookies with a public
+# string is one you find when someone tells you.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY is not set. It signs the session cookie, so without it "
+        "anyone could forge a login. Generate one with:\n"
+        "    python3 -c 'import secrets; print(secrets.token_hex(32))'\n"
+        "and set it in .env locally, or in the environment on the host."
+    )
+app.secret_key = SECRET_KEY
+
+app.config.update(
+    # Never send the session cookie over plain HTTP. Off by default in
+    # Flask; the deployed site is HTTPS-only, and on a local HTTP dev server
+    # this would stop logins working, hence the env switch.
+    SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "true").lower() == "true",
+    # Not readable from JavaScript. Already Flask's default — set explicitly
+    # so a future config change can't quietly turn it off.
+    SESSION_COOKIE_HTTPONLY=True,
+    # Not sent on cross-site POSTs. This is real CSRF defence in modern
+    # browsers, and it does not replace a token — an older browser, or a
+    # same-site subdomain, gets none of it.
+    SESSION_COOKIE_SAMESITE="Lax",
+    # A signed-in session goes stale after a day of inactivity. Sessions
+    # were browser-session cookies with no expiry at all, so an owner who
+    # signed in on a shared machine stayed signed in until it rebooted.
+    PERMANENT_SESSION_LIFETIME=timedelta(
+        hours=int(os.environ.get("SESSION_HOURS", "24"))),
+)
+
+# Secure-by-default is right for the deployed site and a trap for local
+# development: over plain http://127.0.0.1 the browser silently refuses to
+# store the cookie, so logging in appears to work and then doesn't stick,
+# with nothing on screen or in the log explaining it. Say so at boot.
+if app.config["SESSION_COOKIE_SECURE"]:
+    log_boot.info("Session cookies are HTTPS-only. Testing over plain "
+                  "http://127.0.0.1? Set COOKIE_SECURE=false in .env or "
+                  "logins won't stick.")
+
 init_db()          # tables only — no ChromaDB access before fork
 app.register_blueprint(admin_bp)
 
@@ -348,7 +421,9 @@ def sms_reply():
     to_number    = normalize_phone(request.form.get("To",   "unknown"))
 
     new_turn()      # every line logged for this message shares one id
-    log.info(f"Incoming message from {from_number}: {incoming_msg!r}")
+    log.info("Incoming SMS for %s from %s (%s)", business["name"],
+             from_number, scrub(incoming_msg))
+    log.debug("SMS content from %s: %r", from_number, incoming_msg)
 
      # Identify which business this webhook is for.
     business = get_business_by_number(to_number)
@@ -423,7 +498,8 @@ def webchat_reply(slug):
         touch(business_id)
 
     new_turn()
-    log_web.info(f"{business['name']} <- {session_id}: {message!r}")
+    log_web.info("%s <- %s (%s)", business["name"], session_id, scrub(message))
+    log_web.debug("Web chat content from %s: %r", session_id, message)
 
     reply_text = process_message(
         message, session_id, business_id, config, channel="webchat"
@@ -484,7 +560,13 @@ def demo_start():
     if displaced and displaced != minted["email"]:
         session["displaced_user"] = displaced
         log_web.info("Demo replaced the session of %s", displaced)
-    session.permanent = False
+    # permanent=True is what arms PERMANENT_SESSION_LIFETIME. It reads
+    # backwards: permanent=False means a browser-session cookie, which
+    # sounds safer but has no timeout at all — it lives as long as the
+    # browser does, and every modern browser restores sessions after a
+    # restart. permanent=True plus a lifetime is an idle timeout, refreshed
+    # on each request, which is what we actually want.
+    session.permanent = True
     log_web.info("Demo started: %s from template %r",
                  minted["business"]["slug"], slug)
     return redirect(url_for("chat_page", slug=minted["business"]["slug"]))
