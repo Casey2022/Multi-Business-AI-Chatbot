@@ -181,6 +181,37 @@ def main():
         check(f"{rule} — {why}", rule in rules,
               f"no route serves {rule} any more")
 
+    heading("Scripts and the fields they govern are connected")
+    base_src     = (ROOT / "admin" / "templates" / "admin" / "base.html").read_text(encoding="utf-8")
+    settings_src = (ROOT / "admin" / "templates" / "admin" / "settings.html").read_text(encoding="utf-8")
+    routes_src   = (ROOT / "admin" / "routes.py").read_text(encoding="utf-8")
+
+    # A script nobody includes is the same bug as a route nobody registers.
+    for script in ("table-resize.js", "field-deps.js"):
+        check(f"{script} exists", (ROOT / "static" / script).exists())
+        check(f"{script} is loaded by base.html",
+              f"filename='{script}'" in base_src,
+              "written, shipped, and never reaching a page")
+
+    # data-enabled-by names another field by name. A typo there is silent:
+    # the script finds nothing, returns, and the dependency simply never
+    # happens -- no error, no console warning, a control that stays live
+    # when it shouldn't.
+    import re as _re
+    for dependent in _re.finditer(r'data-enabled-by="([^"]+)"', settings_src):
+        controller = dependent.group(1)
+        check(f"data-enabled-by names a real field ({controller})",
+              f'name="{controller}"' in settings_src,
+              "no field by that name on this page, so the rule never fires")
+
+    # The template asks a question only the route can answer.
+    for name in ("address_check_ready",):
+        check(f"settings.html reads {name}", name in settings_src)
+        check(f"the settings route passes {name}",
+              f"{name} =" in routes_src or f"{name}=" in routes_src,
+              "the template would treat a missing value as false and "
+              "quietly tell every owner their address checking is off")
+
     heading("Endpoints nothing links to")
     # Not a failure: /sms and /webchat are called by Twilio and by fetch(),
     # never by url_for. Printed because an unreferenced admin page is

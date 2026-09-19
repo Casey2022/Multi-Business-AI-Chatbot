@@ -209,6 +209,19 @@ def is_enabled(config):
     return bool(api_key()) and radius_config(config) is not None
 
 
+def key_configured():
+    """True when this deployment could check an address for anyone.
+
+    is_enabled() answers "will this business's addresses be checked", which
+    folds two different questions together: whether the owner asked for it,
+    and whether the deployment can do it. The settings page needs them
+    apart. An owner who turned the limit on and got nothing deserves to be
+    told which of the two is missing -- and only one of them is theirs to
+    fix.
+    """
+    return bool(api_key())
+
+
 # ---------------------------------------------------------------------------
 # Geocoding
 # ---------------------------------------------------------------------------

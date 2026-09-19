@@ -333,8 +333,14 @@ def settings(business_id):
         return redirect(url_for("admin.settings", business_id=business_id))
 
     config = load_config(business["config_path"], business_id)
+
+    # Whether this deployment can check an address at all. The service-area
+    # controls are the only settings whose effect depends on something the
+    # owner can't see or set, so they're the only ones that have to say so.
+    from geocode import key_configured
     return render_template(
         "admin/settings.html",
+        address_check_ready = key_configured(),
         business = business,
         config   = config,
         fields   = EDITABLE_FIELDS,

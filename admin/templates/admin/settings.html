@@ -32,26 +32,52 @@
       </div>
     {% endfor %}
 
+    {% set limiting = choice_values['business.service_radius.enabled'] == 'yes' %}
     <div class="field">
       <div class="field-row">
-        {% for field in ['business.service_radius.enabled',
-                         'business.service_radius.miles'] %}
-          <div class="field">
-            <label for="r-{{ loop.index }}">{{ fields[field].label }}</label>
-            <select id="r-{{ loop.index }}" name="{{ field }}">
-              {% for value, caption in fields[field].options.items() %}
-                <option value="{{ value }}" {{ 'selected' if choice_values[field] == value }}>{{ caption }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        {% endfor %}
+        <div class="field">
+          <label for="r-limit">{{ fields['business.service_radius.enabled'].label }}</label>
+          <select id="r-limit" name="business.service_radius.enabled"
+                  {{ 'disabled' if not address_check_ready }}>
+            {% for value, caption in fields['business.service_radius.enabled'].options.items() %}
+              <option value="{{ value }}"
+                {{ 'selected' if choice_values['business.service_radius.enabled'] == value }}>{{ caption }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {# The distance only means something when the limit is on. Rendered
+           inert by the server so it is already right before any script runs,
+           and re-synced by field-deps.js the moment the answer above
+           changes. A disabled select submits nothing, so switching the limit
+           off leaves the stored distance alone rather than wiping it. #}
+        <div class="field {{ 'is-inert' if not limiting or not address_check_ready }}">
+          <label for="r-miles">{{ fields['business.service_radius.miles'].label }}</label>
+          <select id="r-miles" name="business.service_radius.miles"
+                  data-enabled-by="business.service_radius.enabled"
+                  data-enabled-when="yes"
+                  {{ 'disabled' if not limiting or not address_check_ready }}>
+            {% for value, caption in fields['business.service_radius.miles'].options.items() %}
+              <option value="{{ value }}"
+                {{ 'selected' if choice_values['business.service_radius.miles'] == value }}>{{ caption }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <span class="hint">
-        With this on, the assistant asks for the customer's address early in the
-        booking — right after the service, before offering any times — and checks
-        it against the distance above. Anyone further out is told you don't cover
-        their area and given your phone number.
-      </span>
+      {% if address_check_ready %}
+        <span class="hint">
+          With this on, the assistant asks for the customer's address early in the
+          booking — right after the service, before offering any times — and checks
+          it against the distance above. Anyone further out is told you don't cover
+          their area and given your phone number.
+        </span>
+      {% else %}
+        <span class="hint hint-blocked">
+          Address checking is switched off for this deployment — it needs a Google
+          Maps API key, which isn't configured. Bookings are still taken and the
+          address is still recorded; it just isn't checked against a distance, and
+          the appointment says so. Nothing you can change here fixes it.
+        </span>
+      {% endif %}
     </div>
   </div>
 

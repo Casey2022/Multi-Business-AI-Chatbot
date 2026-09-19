@@ -297,6 +297,18 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .field > label { font-size: var(--text-sm); font-weight: 600; }
 .field .hint { font-size: var(--text-sm); color: var(--ink-faint); }
 
+/* A field that can't apply yet. Dimmed rather than hidden: an owner who
+   wonders where the distance went is worse off than one who can see it
+   sitting there, greyed, next to the answer that would wake it up. */
+.field.is-inert > label { opacity: .5; }
+.field.is-inert > select,
+.field.is-inert > input { opacity: .5; cursor: not-allowed; background: var(--surface-sunk); }
+
+/* Said in the refused colour because it is a refusal: the control above is
+   showing an answer the system cannot act on, and no amount of editing on
+   this page changes that. */
+.hint-blocked { color: var(--refused); }
+
 input[type="text"], input[type="email"], input[type="password"],
 input[type="datetime-local"], input[type="date"], select, textarea {
   font-family: var(--body);
