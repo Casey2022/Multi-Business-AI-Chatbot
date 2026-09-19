@@ -158,6 +158,31 @@
                    name="booking.extra_questions[{{ row.index }}].prompt"
                    value="{{ row.prompt }}" placeholder="What should the assistant ask?">
           </div>
+          {% if offered_services %}
+            {# Nothing ticked means every booking. Said out loud on the row,
+               because an empty set of checkboxes could just as easily read
+               as "no services" — and a question silently asked of nobody is
+               the failure this whole feature exists to avoid. #}
+            <div class="qwhen">
+              <span class="qwhen-label">Ask&nbsp;for</span>
+              {% for service in offered_services %}
+                <label class="chip-check">
+                  <input type="checkbox"
+                         name="booking.extra_questions[{{ row.index }}].services"
+                         value="{{ service }}"
+                         {{ 'checked' if service in row.services }}>
+                  <span>{{ service }}</span>
+                </label>
+              {% endfor %}
+              <span class="qwhen-note">
+                {% if row.services %}
+                  only these
+                {% else %}
+                  every {{ config.booking.noun or 'booking' }} — tick services to narrow it
+                {% endif %}
+              </span>
+            </div>
+          {% endif %}
         {% endfor %}
       </div>
     </div>

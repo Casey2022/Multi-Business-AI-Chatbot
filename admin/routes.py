@@ -270,7 +270,9 @@ def settings(business_id):
             # Extra questions post one input per row rather than a single
             # named field, so they're read from the whole form.
             if spec["type"] == "questions":
-                value, errors = parse_extra_questions(request.form)
+                value, errors = parse_extra_questions(
+                    request.form,
+                    offered_services=base.get("services") or [])
                 if value is None:
                     continue        # this form doesn't carry the questions
                 if errors:
@@ -341,6 +343,8 @@ def settings(business_id):
     return render_template(
         "admin/settings.html",
         address_check_ready = key_configured(),
+        # The catalogue the per-question service checkboxes are drawn from.
+        offered_services    = config.get("services") or [],
         business = business,
         config   = config,
         fields   = EDITABLE_FIELDS,

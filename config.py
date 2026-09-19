@@ -147,11 +147,15 @@ def extra_question_rows(config):
             "key":    question["key"] if question else "",
             "label":  question_label(question) if question else "",
             "prompt": (question.get("prompt") or "") if question else "",
+            # Empty means "every service", which is how the editor shows an
+            # unconditional question: nothing ticked.
+            "services": list((question.get("services") or []) if question else []),
         })
     return rows
 
 
-def parse_extra_questions(form, field="booking.extra_questions"):
+def parse_extra_questions(form, field="booking.extra_questions",
+                          offered_services=None):
     """Read the settings editor's rows back into a booking.extra_questions list.
 
     Each row posts three inputs — 'field[i].label', 'field[i].prompt', and a
@@ -161,9 +165,20 @@ def parse_extra_questions(form, field="booking.extra_questions"):
     therefore relabels its past answers instead of orphaning them under a
     key nobody asks for anymore.
 
+    A row may also post 'field[i].services' any number of times, once per
+    ticked service. None ticked means the question applies to every booking,
+    which is both the default and what every question meant before
+    conditions existed.
+
     Returns (questions, errors); when errors is non-empty the caller should
     reject the whole field rather than save a partly-understood list.
     """
+    # The catalogue the checkboxes were drawn from. A posted service that
+    # isn't in it means the page was built before a service was renamed --
+    # saving it would store a condition that can never match, and the owner
+    # would never be asked the question again with nothing to explain why.
+    catalogue = {" ".join(str(s).lower().split()): s
+                 for s in (offered_services or []) if s}
     # If the form carries no question rows at all, it isn't the questions
     # editor — say so with None rather than reading "no rows" as "delete
     # every question this business has".
@@ -205,8 +220,27 @@ def parse_extra_questions(form, field="booking.extra_questions"):
             errors.append(f"Row {row}: '{label}' repeats an earlier question.")
             continue
 
+        picked, unknown = [], []
+        for name in form.getlist(f"{field}[{index}].services"):
+            match = catalogue.get(" ".join(str(name).lower().split()))
+            if match:
+                picked.append(match)
+            elif catalogue:
+                unknown.append(name)
+        if unknown:
+            errors.append(f"Row {row}: '{label}' is set for "
+                          f"{', '.join(repr(u) for u in unknown)}, which this "
+                          f"business doesn't offer any more. Reload the page "
+                          f"and pick again.")
+            continue
+
         seen.add(key)
         question = {"key": key, "prompt": prompt}
+        # Only write the key when there's a condition: a question that
+        # applies to everything should stay byte-identical to the YAML, so
+        # the override clears and the business keeps inheriting the file.
+        if picked:
+            question["services"] = picked
         # Store the label only when the key can't produce it. Keeps a config
         # that matches its YAML byte-identical, so the override gets cleared
         # and the business goes back to inheriting from the file.

@@ -690,12 +690,29 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .qrow .num { flex: 0 0 18px; text-align: right; font-size: var(--text-sm); color: var(--ink-faint); }
 .qrow .qlabel { flex: 0 0 180px; }
 .qrow .qprompt { flex: 1; min-width: 0; }
+
+/* The condition row, tucked under its question and indented to the same
+   place the question text starts, so it reads as part of that row rather
+   than a setting of its own. */
+.qwhen {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1);
+  margin: 2px 0 var(--s3) 200px;
+}
+.qwhen-label { font-size: var(--text-sm); color: var(--ink-faint); margin-right: 2px; }
+.qwhen-note  { font-size: var(--text-sm); color: var(--ink-faint); margin-left: var(--s1); }
+.chip-check { display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border: 1px solid var(--rule); border-radius: 999px;
+  font-size: var(--text-sm); cursor: pointer; background: var(--surface); }
+.chip-check:has(input:checked) { border-color: var(--pen); color: var(--pen);
+  background: var(--pen-wash); }
+.chip-check input { margin: 0; }
 .quota { font-size: var(--text-sm); color: var(--ink-faint); }
 .quota.is-full { color: var(--pending); font-weight: 600; }
 
 @media (max-width: 640px) {
   .qhead { display: none; }   /* the boxes carry their own placeholders */
   .qrow { flex-wrap: wrap; }
+  .qwhen { margin-left: 18px; }   /* no label column to line up with */
   .qrow .qlabel, .qrow .qprompt { flex: 1 1 100%; }
   .qrow .num { flex: 0 0 100%; text-align: left; }
 }

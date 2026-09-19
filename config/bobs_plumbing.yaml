@@ -132,4 +132,11 @@ booking:
       prompt: "What's the address we're coming to?"
     - key: "problem_description"
       prompt: "Briefly, what's the issue? (e.g. 'kitchen sink draining slowly')"
+    # Only worth asking when the job is the water heater. Every other
+    # customer would be answering a question about equipment nobody is
+    # going to touch.
+    - key: "water_heater_age"
+      prompt: "Roughly how old is the water heater, and is it gas or electric?"
+      services:
+        - "water heater installation"
 

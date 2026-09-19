@@ -139,6 +139,11 @@ def get_slot_definitions(config):
             "key": q["key"],
             "prompt": q["prompt"],
             "type": q.get("type", "text"),
+            # Which services this question is for. Empty or absent means
+            # every booking, which is what every config had before
+            # conditions existed and what an owner who never opens this
+            # setting keeps getting.
+            "services": list(q.get("services") or []),
             # Reuse the prompt as the description — it already explains
             # what we're asking for, which is exactly what the extractor
             # needs to know.
@@ -599,9 +604,43 @@ def _question_part(prompt):
     return prompt
 
 
+def _slot_applies(slot, pending):
+    """Whether this slot is one to ask about for this particular booking.
+
+    A slot naming no services applies to every booking. That is the default,
+    and deliberately so: a question an owner wrote before conditions existed
+    keeps being asked exactly as it was.
+
+    A slot naming services applies only when the booking's service is one of
+    them. Before the service is known the question is held back rather than
+    asked -- service is the first slot the flow fills, so nothing is delayed
+    by waiting, and asking a gate-code question on the chance that it might
+    turn out to matter is the behaviour conditions exist to remove.
+
+    Matching goes through scheduling.same_service, the same rule that
+    decides how long a service takes. A question and a duration disagreeing
+    about what counts as the same service would be a very quiet bug.
+    """
+    wanted = slot.get("services")
+    if not wanted:
+        return True
+    chosen = pending.get("service")
+    if not chosen:
+        return False
+    from scheduling import same_service
+    return any(same_service(chosen, name) for name in wanted)
+
+
 def _first_missing_slot(pending, slots):
-    """Return the first slot definition with no value in pending, or None."""
+    """Return the first slot this booking still needs an answer for, or None.
+
+    The single gate. Everything that asks "what next?" and everything that
+    decides "are we done?" comes through here, so a conditional question is
+    skipped consistently rather than in three places that might disagree.
+    """
     for slot in slots:
+        if not _slot_applies(slot, pending):
+            continue
         if not pending.get(slot["key"]):
             return slot
     return None

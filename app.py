@@ -130,7 +130,8 @@ def bootstrap():
                   "unreachable.")
 
     from rag import ensure_ingested
-    from scheduling import unknown_duration_services
+    from scheduling import (unknown_duration_services,
+                            unknown_condition_services)
     from import_documents import import_for_business
     for b in businesses:
         if not b["active"]:
@@ -168,6 +169,16 @@ def bootstrap():
                     "%s has service_durations for services it doesn't "
                     "offer: %s — those bookings will use the default length",
                     b["name"], ", ".join(repr(s) for s in stale))
+            # Same failure one layer over: a question conditioned on a
+            # service that was renamed is never asked again, for anyone,
+            # and the owner's only clue is an answer that stopped arriving.
+            orphaned = unknown_condition_services(config)
+            if orphaned:
+                log_boot.warning(
+                    "%s has booking questions set for services it doesn't "
+                    "offer: %s — those questions will never be asked",
+                    b["name"],
+                    ", ".join(f"{key} -> {name!r}" for key, name in orphaned))
             ensure_ingested(config)
         except Exception as e:
             # A failed ingest shouldn't stop the server from starting —

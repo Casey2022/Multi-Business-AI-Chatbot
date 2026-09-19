@@ -179,6 +179,31 @@ def main():
             check(f"{path.name}: {service!r} has a sane length",
                   0 < minutes <= 480, f"{minutes} minutes")
 
+    heading("A question asks about the same service a duration does")
+    # The point of same_service existing at all: if a question and a
+    # duration disagreed about what "cut and colour" matches, a booking
+    # could be asked the colour questions and scheduled for a trim.
+    check("case and spacing don't matter",
+          scheduling.same_service("Cut  And  COLOUR", "cut and colour"))
+    check("a substring is not a match",
+          not scheduling.same_service("colour", "cut and colour"),
+          "containment here would let 'cut' claim what 'cut and colour' owns")
+    check("blank matches nothing real",
+          not scheduling.same_service("", "colour"))
+
+    heading("Every configured condition names a service that exists")
+    for path in sorted(Path("config").glob("*.yaml")):
+        if path.name == "personas.yaml":
+            continue
+        config = yaml.safe_load(path.read_text())
+        orphaned = scheduling.unknown_condition_services(config)
+        # A condition naming a service the business doesn't offer is never
+        # satisfied, so the question is never asked -- for anyone, forever,
+        # with nothing anywhere saying why.
+        check(f"{path.name}: no question is set for a service it doesn't offer",
+              orphaned == [],
+              "; ".join(f"{k} -> {v!r}" for k, v in orphaned))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

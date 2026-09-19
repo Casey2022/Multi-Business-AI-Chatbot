@@ -63,6 +63,36 @@ def duration_for(config, service=None):
     return default
 
 
+def same_service(a, b):
+    """True when two service names mean the same service.
+
+    The same exact-once-normalised rule duration_for uses, exposed so that
+    anything deciding "is this booking's service the one the owner named"
+    gets the same answer. Two notions of service identity in one codebase is
+    how a job ends up asked one set of questions and scheduled for the
+    length of another.
+    """
+    return _normalise(a) == _normalise(b)
+
+
+def unknown_condition_services(config):
+    """Services named by a booking question that this business doesn't offer.
+
+    Same failure as unknown_duration_services, one layer over: a question
+    conditioned on "water heater repair" when the catalogue says "water
+    heater installation" is never asked, for anyone, forever. Nothing errors
+    and nothing looks wrong -- the owner just never sees the answer they
+    thought they were collecting. Startup calls this so it's a log line.
+    """
+    offered  = {_normalise(s) for s in (config.get("services") or [])}
+    stale    = []
+    for q in ((config.get("booking") or {}).get("extra_questions") or []):
+        for name in (q.get("services") or []):
+            if _normalise(name) not in offered:
+                stale.append((q.get("key") or "?", name))
+    return stale
+
+
 def unknown_duration_services(config):
     """service_durations keys that name no service this business offers.
 

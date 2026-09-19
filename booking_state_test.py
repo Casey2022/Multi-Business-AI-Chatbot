@@ -40,6 +40,44 @@ def heading(text):
 PHONE, BIZ = "web_test", 1
 
 
+def _load_scheduler():
+    """Import scheduler without the integrations it only needs at runtime.
+
+    scheduler pulls in the calendar and the vector store at import time, and
+    neither has anything to do with the question of which slots a booking
+    should ask about. Stubbing them keeps this file what the rest of it
+    already is: no network, no API keys, no flakiness.
+    """
+    import importlib.machinery as mach, types
+
+    class Stub(types.ModuleType):
+        def __getattr__(self, name):
+            if name.startswith("__"):
+                raise AttributeError(name)
+            child = Stub(f"{self.__name__}.{name}")
+            setattr(self, name, child)
+            return child
+        def __call__(self, *a, **k): return Stub(self.__name__)
+        def __getitem__(self, k):    return Stub(self.__name__)
+
+    class Finder:
+        ROOTS = {"google", "googleapiclient", "anthropic", "chromadb",
+                 "phonenumbers", "flask", "twilio", "numpy"}
+        def find_spec(self, name, path=None, target=None):
+            if name.split(".")[0] in self.ROOTS:
+                spec = mach.ModuleSpec(name, self, is_package=True)
+                spec.submodule_search_locations = []
+                return spec
+        def create_module(self, spec):
+            module = Stub(spec.name); module.__path__ = []; return module
+        def exec_module(self, module): pass
+
+    sys.meta_path.append(Finder())
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import scheduler
+    return scheduler
+
+
 def main():
     init_db()
 
@@ -115,6 +153,44 @@ def main():
     check("each write chains onto the one before", b == a + 1, (a, b))
     check("the last one is what's stored",
           get_state(PHONE, BIZ)["state"] == "confirming")
+
+    heading("A question set for some services is asked for those only")
+    import yaml
+    scheduler = _load_scheduler()
+    config = yaml.safe_load(Path("config/belmont_hair_studio.yaml").read_text())
+    slots  = scheduler.get_slot_definitions(config)
+
+    def asked_for(service):
+        """Every question this booking ends up answering, in order."""
+        pending, order = ({"service": service} if service else {}), []
+        while True:
+            nxt = scheduler._first_missing_slot(pending, slots)
+            if not nxt:
+                return order
+            if nxt["key"] != "service":
+                order.append(nxt["key"])
+            pending[nxt["key"]] = "answered"
+
+    check("the condition survived into the slot definition",
+          any(s.get("services") for s in slots),
+          "get_slot_definitions dropped it, so nothing downstream can apply it")
+    check("a colour booking is asked the colour question",
+          "colour_history" in asked_for("balayage"))
+    check("a kids cut is not",
+          "colour_history" not in asked_for("kids cut"))
+    check("the unconditional questions are still asked either way",
+          "stylist_preference" in asked_for("kids cut")
+          and "stylist_preference" in asked_for("balayage"),
+          "a condition on one question must not affect its neighbours")
+    check("matching ignores case and spacing",
+          "colour_history" in asked_for("Cut  And  Colour"))
+    # The one that would be a real bug: before the service is known, a
+    # conditional question must be held back rather than asked on the chance
+    # it applies -- but it must not be lost either.
+    check("nothing conditional is asked before the service is known",
+          scheduler._first_missing_slot({}, slots)["key"] == "service")
+    check("a booking with no service never reaches finalize",
+          scheduler._first_missing_slot({"datetime": "x"}, slots) is not None)
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
