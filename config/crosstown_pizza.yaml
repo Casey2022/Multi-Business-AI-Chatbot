@@ -16,6 +16,10 @@
 
 business:
   name: "Crosstown Pizza Co."
+  # The identifier. Stated, not derived from the name above:
+  # the name is owner-editable and only accidentally looks
+  # like an identifier. Must match the registered slug.
+  slug: "crosstown_pizza"
   phone: "(585) 555-0177"
   address: "88 Culver Rd, Rochester NY"
   hours: "Tue-Sun, 11am-10pm (closed Mondays)"

@@ -34,8 +34,34 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config import load_config
-from rag import retrieve
+from rag import retrieve, collection_for, get_chroma_client
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
+
+
+def config_for(slug):
+    """Load a business's config the way the running app loads it.
+
+    The app passes a business_id, which stamps the registered collection
+    name onto the config. Loading the YAML alone skips that, and
+    collection_for then falls back to guessing the collection from the
+    business's display name.
+
+    That guess is what made this file report 6% for Crosstown Pizza Co.:
+    the name inferred "crosstown_pizza_co", the business is registered as
+    "crosstown_pizza", and every query went to a collection that had never
+    existed. Retrieval returned nothing, every time, which looks exactly
+    like a knowledge base with nothing relevant in it.
+
+    Measuring a path production never takes is worse than not measuring.
+    """
+    try:
+        from db import get_business_by_slug
+        business = get_business_by_slug(slug)
+    except Exception:
+        business = None
+    if business:
+        return load_config(business["config_path"], business["id"])
+    return load_config(f"config/{slug}.yaml")
 
 
 # (question, expected chunk heading fragment, fact the answer must contain)
@@ -138,6 +164,41 @@ TESTS = {
 }
 
 
+def preflight(slugs):
+    """Refuse to score against collections that aren't there.
+
+    A retrieval percentage is only meaningful if the lookup reached the
+    right place. An empty or missing collection produces a very low number
+    that reads like bad chunking and sends you off tuning the wrong layer
+    for an afternoon. Checked before any question runs, for the same reason
+    validate_tests is: a wrong answer about why is worse than no answer.
+    """
+    problems = []
+    try:
+        client = get_chroma_client()
+        existing = {c.name if hasattr(c, "name") else str(c)
+                    for c in client.list_collections()}
+    except Exception as e:
+        return [f"couldn't open the vector store: {e}"]
+
+    for slug in slugs:
+        wanted = collection_for(config_for(slug))
+        if wanted not in existing:
+            problems.append(
+                f"{slug}: looks for collection {wanted!r}, which doesn't exist. "
+                f"Present: {sorted(existing)}")
+            continue
+        # A collection that exists but holds nothing fails the same way and
+        # is just as invisible: every query returns [].
+        try:
+            if client.get_collection(wanted).count() == 0:
+                problems.append(f"{slug}: collection {wanted!r} is empty — "
+                                f"run the ingest before scoring it")
+        except Exception as e:
+            problems.append(f"{slug}: couldn't count {wanted!r}: {e}")
+    return problems
+
+
 def validate_tests():
     """Check every expected heading and fact against the actual documents.
 
@@ -195,7 +256,7 @@ def heading_matches(headings, expected):
 
 def evaluate(slug, ask_llm=True, verbose=True):
     """Score one business. Returns (retrieval_hits, retrieval_n, answer_hits, answer_n)."""
-    config = load_config(f"config/{slug}.yaml")
+    config = config_for(slug)
     tests  = TESTS[slug]
 
     r_hits = r_total = a_hits = a_total = 0
@@ -272,14 +333,13 @@ def main():
         print("Businesses:", ", ".join(TESTS))
         return 1
 
-    problems = validate_tests()
+    problems = preflight(slugs) + validate_tests()
     if problems:
-        print(f"The evaluation set no longer matches the documents "
-              f"({len(problems)} problem(s)):\n")
+        print(f"Not scoring — {len(problems)} problem(s) would make the "
+              f"numbers meaningless:\n")
         for problem in problems:
             print("  ·", problem)
-        print("\nFix the questions or the documents before reading any score "
-              "from this run.")
+        print("\nFix these before reading any score from this run.")
         return 1
 
     if ask_llm:

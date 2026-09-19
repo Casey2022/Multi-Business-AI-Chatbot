@@ -2,6 +2,10 @@
 
 business:
   name: "Sunrise Bakery & Café"
+  # The identifier. Stated, not derived from the name above:
+  # the name is owner-editable and only accidentally looks
+  # like an identifier. Must match the registered slug.
+  slug: "sunrise_bakery_and_cafe"
   phone: "(585) 555-0188"
   address: "47 Park Ave, Rochester NY"
   hours: "Tue-Sun, 7am-3pm (closed Mondays)"

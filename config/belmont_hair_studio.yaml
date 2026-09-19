@@ -7,6 +7,10 @@
 
 business:
   name: "Belmont Hair Studio"
+  # The identifier. Stated, not derived from the name above:
+  # the name is owner-editable and only accidentally looks
+  # like an identifier. Must match the registered slug.
+  slug: "belmont_hair_studio"
   phone: "(585) 555-0142"
   address: "212 Monroe Ave, Rochester NY"
   hours: "Tue-Sat, 9am-6pm (closed Sun & Mon)"

@@ -86,14 +86,29 @@ def _slugify(name):
 
     "Bob's Plumbing"        -> "bobs_plumbing"
     "Sunrise Bakery & Café" -> "sunrise_bakery_and_cafe"
+    "Crosstown Pizza Co."   -> "crosstown_pizza_co"
+
+    Note the last one: this is a GUESS at an identifier, derived from a name
+    a human wrote for other humans. It used to leave the trailing period on
+    ("crosstown_pizza_co."), which is not a valid anything — and because the
+    business is actually registered as "crosstown_pizza", the guess named a
+    collection that had never existed. Retrieval came back empty for every
+    question, which reads exactly like a knowledge base with nothing
+    relevant in it rather than a lookup in the wrong place.
+
+    Stripping the punctuation makes the guess tidier. It does not make it
+    right: a name and a slug are different things, and the slug is the one
+    that should be stated rather than inferred. See collection_for.
     """
-    return (
+    import re
+    slug = (
         name.lower()
         .replace("'", "")
         .replace("&", "and")
         .replace("é", "e")
         .replace(" ", "_")
     )
+    return re.sub(r"[^a-z0-9_]", "", slug).strip("_")
 
 
 # ---------------------------------------------------------------------------

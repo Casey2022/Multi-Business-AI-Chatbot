@@ -10,6 +10,10 @@
 
 business:
   name: "Ridgeline Contracting"
+  # The identifier. Stated, not derived from the name above:
+  # the name is owner-editable and only accidentally looks
+  # like an identifier. Must match the registered slug.
+  slug: "ridgeline_contracting"
   phone: "(585) 555-0166"
   address: "1840 Lyell Ave, Rochester NY"
   hours: "Mon-Fri, 7am-4pm"

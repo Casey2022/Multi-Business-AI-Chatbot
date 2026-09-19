@@ -212,6 +212,30 @@ def main():
               "the template would treat a missing value as false and "
               "quietly tell every owner their address checking is off")
 
+    heading("A business's identity is stated, not guessed")
+    # The collection a business retrieves from used to be inferred from its
+    # display NAME when no business_id was passed. "Crosstown Pizza Co."
+    # inferred "crosstown_pizza_co", the business is registered as
+    # "crosstown_pizza", and every offline query went to a collection that
+    # had never existed — returning [] with no error, which reads as an
+    # empty knowledge base rather than a lookup in the wrong place.
+    import yaml as _yaml
+    seed_src = (ROOT / "seed_businesses.py").read_text(encoding="utf-8")
+    for path in sorted((ROOT / "config").glob("*.yaml")):
+        if path.name == "personas.yaml":
+            continue
+        cfg = _yaml.safe_load(path.read_text(encoding="utf-8"))
+        stated = (cfg.get("business") or {}).get("slug")
+        check(f"{path.name}: states its slug", bool(stated),
+              "without it the collection name is guessed from the "
+              "owner-editable business name")
+        if stated:
+            check(f"{path.name}: the slug matches the file it lives in",
+                  stated == path.stem, f"{stated!r} vs {path.stem!r}")
+            check(f"{path.name}: the slug is the one seed_businesses registers",
+                  f'"{stated}"' in seed_src,
+                  "config and registry disagreeing is the whole bug")
+
     heading("Endpoints nothing links to")
     # Not a failure: /sms and /webchat are called by Twilio and by fetch(),
     # never by url_for. Printed because an unreferenced admin page is
