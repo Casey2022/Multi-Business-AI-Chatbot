@@ -14,8 +14,8 @@
 
 import calendar_sync
 from logging_setup import scrub
-from config import (substitute, question_labels, humanize,
-                    RESERVED_SLOT_KEYS)
+from config import (substitute, question_labels, question_prompts,
+                    question_only, humanize, RESERVED_SLOT_KEYS)
 from db import get_state, set_state, save_appointment, get_recent_messages
 from llm import parse_datetime
 from llm import parse_datetime, extract_booking_slots
@@ -799,6 +799,24 @@ def _is_affirmative(message):
 # that as an option. See _confirmation_question.
 SKIPPABLE_ANSWERS = {"none", "n/a", "na", "no", "nope", "nothing", "-", "n"}
 
+# Answers that carry no meaning without their question. "First visit: no"
+# needs the reader to reconstruct what was asked, and a label written in the
+# opposite direction from the question makes it say the reverse of the truth
+# -- which is exactly what "Have you been to us before?" answered "no" did,
+# read back under the label "First visit".
+#
+# Deliberately much smaller than AFFIRMATIVE, which exists to recognise
+# agreement with a confirmation ("sounds good", "perfect") and would drag
+# real answers in here with it: "perfect" is a fine answer to a question
+# about how the colour turned out.
+YES_NO_ANSWERS = {"yes", "y", "yeah", "yep", "yup",
+                  "no", "n", "nope", "nah"}
+
+
+def _is_bare_yes_no(answer):
+    """True when an answer is nothing but yes or no."""
+    return str(answer or "").strip().strip(".!,").lower() in YES_NO_ANSWERS
+
 # Cues in an owner's prompt that invite a non-answer. Matched loosely and on
 # purpose: an owner writes "(or reply 'none')" or "if any" or "optional" in
 # whatever words they like, and the cost of missing one is a read-back line
@@ -819,7 +837,7 @@ def _slots_that_invite_skipping(config):
     return keys
 
 
-def _confirmation_question(pending, config):
+def _confirmation_question(pending, config, lead=None):
     """Read the booking back to the customer — every slot, not just two.
 
     Confirming a subset means the customer approves details they can't see.
@@ -857,6 +875,7 @@ def _confirmation_question(pending, config):
     skip_keys = {"service", "datetime", "datetime_parsed",
                  *INTERNAL_PENDING_KEYS}
     labels    = question_labels(config)
+    prompts   = question_prompts(config)
     optional  = _slots_that_invite_skipping(config)
 
     for key, value in pending.items():
@@ -866,10 +885,19 @@ def _confirmation_question(pending, config):
             continue
         if key in optional and str(value).strip().lower() in SKIPPABLE_ANSWERS:
             continue
-        label = labels.get(key) or humanize(key)
-        lines.append(f"{label}: {value}.")
+        # A substantive answer reads best under its label -- "Problem:
+        # kitchen sink dripping". A bare yes or no reads correctly only
+        # next to the question that produced it, whatever the label says.
+        asked = question_only(prompts.get(key, ""))
+        if asked and _is_bare_yes_no(value):
+            lines.append(f"{asked} — {str(value).strip().strip('.!,').lower()}.")
+        else:
+            label = labels.get(key) or humanize(key)
+            lines.append(f"{label}: {value}.")
 
     lines.append("Is that right?")
+    if lead:
+        lines.insert(0, lead.strip())
     return substitute(" ".join(lines), config)
 
 def _unavailable_message(desired_iso, alternatives, config, reason=None):
@@ -1182,6 +1210,19 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             message, slots, config, already_filled=pending
         )
         if extracted:
+            # A customer who restates an answer we already hold is usually
+            # checking we heard them, not changing anything -- and until now
+            # they got the confirmation back word for word, which reads as a
+            # machine that didn't listen. It's also what prompts a second
+            # restatement, and a third. Nothing changed, so say so and
+            # re-confirm rather than rebuilding the whole booking.
+            changed = {k: v for k, v in extracted.items()
+                       if str(v).strip().lower()
+                       != str(pending.get(k, "")).strip().lower()}
+            if not changed:
+                return _confirmation_question(
+                    pending, config, lead="Thanks — I have that already.")
+
             pending.update(extracted)
             pending.pop("datetime_parsed", None)   # force a re-parse
             _save_state(phone, business_id, "collecting", pending=pending)
@@ -1193,8 +1234,11 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             _save_state(phone, business_id, "collecting", pending=pending)
             return "No problem — what date and time would work better?"
 
-        # Unclear response — ask again rather than guessing.
-        return _confirmation_question(pending, config)
+        # Unclear response — ask again rather than guessing, but say that's
+        # what happened. Repeating the question unchanged makes the customer
+        # wonder whether their message arrived at all.
+        return _confirmation_question(
+            pending, config, lead="Sorry — I didn't quite catch that.")
 
     # --- Unknown state: reset gracefully ---
     log.warning(f"Unknown state '{state}' for {phone} — resetting.")

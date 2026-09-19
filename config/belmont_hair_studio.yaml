@@ -127,8 +127,11 @@ booking:
   extra_questions:
     - key: "stylist_preference"
       prompt: "Anyone you'd like to see in particular? (or reply 'no preference')"
+    # Asked in the same direction the label reads. "Have you been to us
+    # before?" answered "no" was read back as "First visit: no", which says
+    # the opposite of what the customer told us.
     - key: "first_visit"
-      prompt: "Have you been to us before? (yes/no — it helps us allow the right time)"
+      prompt: "Is this your first visit with us? (yes/no — it helps us allow the right time)"
     # Colour history matters for colour. Asking it of someone booking a
     # kids cut is the kind of question that makes an assistant feel like a
     # form rather than a receptionist.

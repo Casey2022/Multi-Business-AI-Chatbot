@@ -192,6 +192,59 @@ def main():
     check("a booking with no service never reaches finalize",
           scheduler._first_missing_slot({"datetime": "x"}, slots) is not None)
 
+    heading("A yes or no is read back with the question that produced it")
+    # The bug: "Have you been to us before?" answered "no" was read back as
+    # "First visit: no" — which states the opposite of what the customer
+    # said. The label and the question pointed in opposite directions, and
+    # nothing could notice, because the label is just the key with the
+    # underscore taken out.
+    booked = {"service": "kids cut", "datetime_parsed": "2026-09-19 17:30",
+              "stylist_preference": "no preference", "first_visit": "no"}
+    said = scheduler._confirmation_question(booked, config)
+    check("the question appears in the read-back",
+          "Is this your first visit" in said, said)
+    check("the bare label form is gone",
+          "First visit: no" not in said,
+          "label and answer alone can't say which way the question ran")
+    check("a substantive answer still uses its short label",
+          "Stylist preference: no preference" in said,
+          "replaying a whole prompt for a real answer is just noise")
+
+    check("yes and no are recognised whatever the punctuation",
+          all(scheduler._is_bare_yes_no(a)
+              for a in ("no", "No.", "YES", "nope", " y ")))
+    # AFFIRMATIVE exists to spot agreement with a confirmation, and contains
+    # words that are perfectly good answers to a question. Borrowing it here
+    # would have swallowed them.
+    check("a real answer is not mistaken for a bare yes/no",
+          not any(scheduler._is_bare_yes_no(a)
+                  for a in ("no preference", "kitchen sink dripping",
+                            "perfect", "sounds good")))
+
+    heading("Every question can be read back as a question")
+    import glob
+    for path in sorted(glob.glob("config/*.yaml")):
+        if "personas" in path:
+            continue
+        cfg = yaml.safe_load(Path(path).read_text())
+        for q in ((cfg.get("booking") or {}).get("extra_questions") or []):
+            # Without a prompt the read-back silently falls back to the
+            # ambiguous label form for yes/no answers.
+            from config import question_only
+            check(f"{Path(path).name}: {q['key']} keeps words once the aside is stripped",
+                  bool(question_only(q.get("prompt", ""))),
+                  "nothing left to quote back")
+
+    heading("Restating an answer gets acknowledged, not echoed")
+    plain = scheduler._confirmation_question(booked, config)
+    led   = scheduler._confirmation_question(booked, config,
+                                             lead="Thanks — I have that already.")
+    check("the lead goes in front", led.startswith("Thanks — I have that already."))
+    check("the confirmation itself is unchanged", plain in led)
+    check("and the two replies differ", plain != led,
+          "a customer who restates an answer must not get their own words "
+          "back verbatim — that is what makes them restate it again")
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

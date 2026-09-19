@@ -131,6 +131,28 @@ def question_labels(config):
     return {q["key"]: question_label(q) for q in questions}
 
 
+def question_prompts(config):
+    """Map each configured question key to the words the customer was asked.
+
+    The companion to question_labels. A label names an answer; a prompt is
+    the question that produced it, and for a bare yes or no the question is
+    the only thing that makes the answer mean anything.
+    """
+    questions = (config.get("booking") or {}).get("extra_questions") or []
+    return {q["key"]: (q.get("prompt") or "").strip() for q in questions}
+
+
+def question_only(prompt):
+    """A prompt with its trailing aside removed, for reading back mid-sentence.
+
+    Owners write the how-to-answer part in brackets -- "(yes/no - it helps us
+    allow the right time)" -- which is useful when asking and clutter when
+    quoting the question back inside a confirmation.
+    """
+    import re
+    return re.sub(r"\s*\([^()]*\)\s*$", "", (prompt or "").strip()).strip()
+
+
 def extra_question_rows(config):
     """Build the settings editor's rows: every saved question, padded to the cap.
 
