@@ -70,9 +70,16 @@ def config_for(slug):
 # inventing a service the business doesn't offer.
 DECLINE = "<<declines>>"
 
-DECLINING = ("don't", "do not", "dont", "we don’t", "not something",
-             "not sure", "i'm not sure", "we specialize", "we specialise",
-             "no, ", "we only", "just hair", "our menu is")
+DECLINING = ("don't", "do not", "dont", "not something", "not sure",
+             "we specialize", "we specialise", "we focus on", "no, ",
+             "we only", "just hair", "our menu is", "can't guarantee",
+             "cannot guarantee")
+
+# Known ceiling: this is a list of ways to say no, and a business can
+# always invent a new one. Each addition makes the check weaker, so it
+# stops here — the answer to "the assistant phrased its refusal
+# differently" is not a longer list, it's a judge that reads the reply.
+# Until then, a miss on DECLINE means go and read what it actually said.
 
 
 # (question, expected chunk heading fragment, fact the answer must contain)
@@ -210,6 +217,100 @@ def preflight(slugs):
     return problems
 
 
+# ---------------------------------------------------------------------------
+# The hard set
+# ---------------------------------------------------------------------------
+#
+# The core set above reached 100% retrieval and 99% answers, and the single
+# miss was the test's phrasing rather than the assistant's. A set where
+# every failure is a test bug has stopped measuring the thing it was built
+# to measure: it proves the plumbing works, which is worth knowing once and
+# worth very little afterwards.
+#
+# These are written to fail. Four kinds, all of them things a real customer
+# does and a keyword search doesn't survive:
+#
+#   vocabulary  the customer's words share nothing with the heading —
+#               "backing up and gurgling" is the Drain Cleaning section
+#   two-hop     the answer lives in two places, or needs arithmetic on a
+#               price and a per-extra rate
+#   trap        the plausible answer is the wrong one: a time outside the
+#               colour cut-off, an address outside the radius, a notice
+#               period that can't be met
+#   near-miss   adjacent to something the business does offer, so an
+#               invented yes is the tempting failure
+#
+# Scored in its own column. A core-set regression means something broke; a
+# hard-set movement means retrieval actually got better or worse.
+HARD = {
+    "bobs_plumbing": [
+        ("my kitchen sink is backing up and making a gurgling noise",
+                                                  "Drain Cleaning",    "$150"),
+        ("there's water pooling under my hot water tank",
+                          ("Water Heater", "Leak Repair"),             None),
+        ("if the drain takes three hours what do I end up paying",
+                                                  "Drain Cleaning",    ("$300", "$75")),
+        ("do you drill wells",                    "Septic Tanks",      DECLINE),
+        ("I'm out in Canandaigua, will you come that far",
+                                                  "Service Area",      ("$50", "travel fee")),
+        ("is the leak detection charge wasted if I go ahead with the repair",
+                                                  "Leak Repair",       ("$125", "applied")),
+    ],
+    "sunrise_bakery_and_cafe": [
+        ("my kid wants a themed cake for Saturday and it's Friday",
+                                                  "Custom Birthday",   "72 hours"),
+        ("how much for a dozen of the little ones",
+                                                  "Cupcake Orders",    "$2.25"),
+        ("I need a gluten free sponge for tomorrow",
+                                                  "Flavors",           "96 hours"),
+        ("can you do a vegan cake",               "Flavors",           DECLINE),
+        ("cheapest way to feed twenty people at a morning meeting",
+                                                  "Pastry Trays",      "$140"),
+        ("I cancelled three days before, do I get my deposit back",
+                                                  "Deposits",          "forfeited"),
+    ],
+    "belmont_hair_studio": [
+        ("my hair is box dyed and I want to go lighter",
+                                                  "Balayage",          "strand test"),
+        ("I've never had colour done here, can I come in tomorrow",
+                                                  "Patch Tests",       "48 hours"),
+        ("can I get my colour done at 4pm",       "Payment and Hours", "3pm"),
+        ("my hair is very long, does that change the colour price",
+                                                  "Colour",            ("$20", "$60")),
+        ("what's the cheapest thing you do for hair",
+                                                  "Haircuts",          ("$10", "$25", "$38")),
+        ("who should I ask for if I want balayage",
+                                                  "Stylists",          ("Priya", "Dana")),
+    ],
+    "ridgeline_contracting": [
+        ("can you start my roof next week, rain is forecast",
+                                                  "Roofing",           ("won't", "will not", "weather")),
+        ("my basement gets a bit damp, can you still finish it",
+                                                  "Basement",          ("will not", "won't", "water")),
+        ("I want a deck built by June, when should I be calling",
+                                                  "Decks",             "March"),
+        ("will you come out just to fix a squeaky door",
+                                                  "General Repairs",   "$350"),
+        ("what happens if I change my mind about something halfway through",
+                                                  "Payment",           "change order"),
+        ("do I have to pay for the permit separately",
+                                                  "Licensing",         ("itemised", "itemized", "separately")),
+    ],
+    "crosstown_pizza": [
+        ("how much for a large with pepperoni, mushroom and onion",
+                                                  "Pizza Sizes",       ("$22", "$2.75", "$30.25")),
+        ("I'm about eight miles out, can you bring it to me",
+                                                  "Delivery",          ("6 miles", "pickup", "can't", "cannot")),
+        ("it's Friday at five and I need food for twenty people",
+                                                  "Party Trays",       ("4pm", "three hours")),
+        ("my daughter has celiac, is the gluten free crust safe for her",
+                                                  "Allergens",         ("cannot", "shared", "call")),
+        ("what time do you shut on a Sunday",     "Hours",             ("10pm", "9:45")),
+        ("do you do a vegan crust",               "Toppings",          DECLINE),
+    ],
+}
+
+
 def validate_tests():
     """Check every expected heading and fact against the actual documents.
 
@@ -226,7 +327,9 @@ def validate_tests():
     from pathlib import Path
 
     problems = []
-    for slug, rows in TESTS.items():
+    combined = {slug: list(TESTS.get(slug, [])) + list(HARD.get(slug, []))
+                for slug in set(TESTS) | set(HARD)}
+    for slug, rows in sorted(combined.items()):
         path = Path("documents") / slug / "services.md"
         if not path.exists():
             problems.append(f"{slug}: no documents/{slug}/services.md")
@@ -319,11 +422,19 @@ def heading_matches(headings, expected):
 
 
 def evaluate(slug, ask_llm=True, verbose=True):
-    """Score one business. Returns (retrieval_hits, retrieval_n, answer_hits, answer_n)."""
-    config = config_for(slug)
-    tests  = TESTS[slug]
+    """Score one business. Returns a dict of counters plus the failures.
 
-    r_hits = r_total = a_hits = a_total = 0
+    The core set and the hard set are counted apart. A core regression
+    means something broke; movement on the hard set is the only place a
+    retrieval change shows up as a number, because the core set is
+    saturated by design.
+    """
+    config = config_for(slug)
+    tests  = ([(row, False) for row in TESTS.get(slug, [])]
+              + [(row, True) for row in HARD.get(slug, [])])
+
+    score = {"r_hits": 0, "r_total": 0, "a_hits": 0, "a_total": 0,
+             "hr_hits": 0, "hr_total": 0, "ha_hits": 0, "ha_total": 0}
     failures = []
 
     if verbose:
@@ -331,7 +442,7 @@ def evaluate(slug, ask_llm=True, verbose=True):
         print(f"  {config['business']['name']}")
         print(f"{'=' * 72}")
 
-    for i, (question, expected_chunk, expected_fact) in enumerate(tests, 1):
+    for i, ((question, expected_chunk, expected_fact), is_hard) in enumerate(tests, 1):
         chunks   = retrieve(question, config)
         headings = [c.split("\n")[0].strip("# ").strip() for c, _ in chunks]
 
@@ -347,21 +458,24 @@ def evaluate(slug, ask_llm=True, verbose=True):
             retrieved_ok = heading_matches(headings, expected_chunk)
             verdict = "hit" if retrieved_ok else f"got {headings[:2]}"
 
+        prefix = "hr_" if is_hard else "r_"
         if retrieved_ok is not None:
-            r_total += 1
-            r_hits  += 1 if retrieved_ok else 0
+            score[prefix + "total"] += 1
+            score[prefix + "hits"]  += 1 if retrieved_ok else 0
 
         reply = get_llm_reply(question, None, config) if ask_llm else None
 
         answered_ok = None
         if ask_llm and expected_fact is not None:
             answered_ok = contains(reply, expected_fact)
-            a_total += 1
-            a_hits  += 1 if answered_ok else 0
+            key = "ha_" if is_hard else "a_"
+            score[key + "total"] += 1
+            score[key + "hits"]  += 1 if answered_ok else 0
 
         bad = (retrieved_ok is False) or (answered_ok is False)
         if bad:
-            failures.append((question, verdict, expected_fact, reply))
+            failures.append((("hard: " if is_hard else "") + question,
+                             verdict, expected_fact, reply))
 
         if verbose:
             marks = []
@@ -369,14 +483,14 @@ def evaluate(slug, ask_llm=True, verbose=True):
                 marks.append(f"retrieval {'PASS' if retrieved_ok else 'FAIL'} ({verdict})")
             if answered_ok is not None:
                 marks.append(f"answer {'PASS' if answered_ok else 'FAIL'}")
-            print(f"[{i:>2}] {question}")
+            print(f"[{i:>2}] {'* ' if is_hard else ''}{question}")
             print(f"     {' · '.join(marks) if marks else 'not scored'}")
             if bad:
                 print(f"     wanted: {expected_fact!r}")
             if reply:
                 print(f"     reply: {reply}")
 
-    return r_hits, r_total, a_hits, a_total, failures
+    return score, failures
 
 
 def percent(hits, total):
@@ -411,26 +525,40 @@ def main():
 
     rows = []
     for slug in slugs:
-        r_hits, r_total, a_hits, a_total, failures = evaluate(slug, ask_llm=ask_llm)
-        rows.append((slug, r_hits, r_total, a_hits, a_total, failures))
+        score, failures = evaluate(slug, ask_llm=ask_llm)
+        rows.append((slug, score, failures))
 
-    print(f"\n{'=' * 72}")
-    print(f"  {'business':<26} {'retrieval':>12} {'answer':>12}")
-    print(f"  {'-' * 26} {'-' * 12} {'-' * 12}")
-    R = A = RT = AT = 0
-    for slug, r_hits, r_total, a_hits, a_total, _ in rows:
-        print(f"  {slug:<26} {f'{r_hits}/{r_total} ' + percent(r_hits, r_total):>12}"
-              f" {f'{a_hits}/{a_total} ' + percent(a_hits, a_total) if a_total else 'skipped':>12}")
-        R, RT, A, AT = R + r_hits, RT + r_total, A + a_hits, AT + a_total
+    def cell(hits, total):
+        return f"{hits}/{total} {percent(hits, total)}" if total else "—"
+
+    print(f"\n{'=' * 78}")
+    print(f"  {'business':<26} {'retrieval':>11} {'answer':>11}"
+          f" {'hard retr':>11} {'hard ans':>11}")
+    print(f"  {'-' * 26} {'-' * 11} {'-' * 11} {'-' * 11} {'-' * 11}")
+
+    totals = {k: 0 for k in ("r_hits", "r_total", "a_hits", "a_total",
+                             "hr_hits", "hr_total", "ha_hits", "ha_total")}
+    for slug, score, _ in rows:
+        for k in totals:
+            totals[k] += score[k]
+        print(f"  {slug:<26} {cell(score['r_hits'], score['r_total']):>11}"
+              f" {cell(score['a_hits'], score['a_total']):>11}"
+              f" {cell(score['hr_hits'], score['hr_total']):>11}"
+              f" {cell(score['ha_hits'], score['ha_total']):>11}")
     if len(rows) > 1:
-        print(f"  {'-' * 26} {'-' * 12} {'-' * 12}")
-        print(f"  {'all':<26} {f'{R}/{RT} ' + percent(R, RT):>12}"
-              f" {f'{A}/{AT} ' + percent(A, AT) if AT else 'skipped':>12}")
-    print(f"{'=' * 72}")
+        print(f"  {'-' * 26} {'-' * 11} {'-' * 11} {'-' * 11} {'-' * 11}")
+        print(f"  {'all':<26} {cell(totals['r_hits'], totals['r_total']):>11}"
+              f" {cell(totals['a_hits'], totals['a_total']):>11}"
+              f" {cell(totals['hr_hits'], totals['hr_total']):>11}"
+              f" {cell(totals['ha_hits'], totals['ha_total']):>11}")
+    print(f"{'=' * 78}")
+    print("  core = the regression guard, saturated by design.")
+    print("  hard = vocabulary mismatches, two-hop answers, traps. The column")
+    print("         that moves when retrieval actually changes.")
 
     # Everything that failed, gathered in one place. A score tells you
     # whether it got worse; this tells you what to go and look at.
-    every_failure = [f for row in rows for f in row[5]]
+    every_failure = [f for row in rows for f in row[2]]
     if every_failure:
         print(f"\n{len(every_failure)} to look at:\n")
         for question, verdict, expected, reply in every_failure:
