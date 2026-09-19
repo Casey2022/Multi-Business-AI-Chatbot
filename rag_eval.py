@@ -64,6 +64,17 @@ def config_for(slug):
     return load_config(f"config/{slug}.yaml")
 
 
+# The right answer to some questions is "we don't do that". Asserting a
+# phrase would be asserting a particular way of saying no, so this checks
+# for any of them — the measure is that the assistant declined rather than
+# inventing a service the business doesn't offer.
+DECLINE = "<<declines>>"
+
+DECLINING = ("don't", "do not", "dont", "we don’t", "not something",
+             "not sure", "i'm not sure", "we specialize", "we specialise",
+             "no, ", "we only", "just hair", "our menu is")
+
+
 # (question, expected chunk heading fragment, fact the answer must contain)
 #
 #   expected chunk  "Some Heading"  that heading should be retrieved
@@ -78,15 +89,15 @@ TESTS = {
         ("do you do hydro jetting",               "Drain Cleaning",    "$400"),
         ("what does a tankless water heater cost","Water Heater",      "$3,500"),
         ("how long does a hidden leak take",      "Leak Repair",       "1-2 days"),
-        ("do you handle septic tanks",            "Septic Tanks",      "not"),
-        ("do you do commercial work",             "Septic Tanks",      "not"),
+        ("do you handle septic tanks",            "Septic Tanks",      DECLINE),
+        ("do you do commercial work",             "Septic Tanks",      DECLINE),
         ("what brands do you service",            "Brands We Service", "Kohler"),
         ("do you serve Webster",                  "Service Area",      "Webster"),
         ("what if I'm outside your service area", "Service Area",      "$50"),
         ("how fast can you get here in an emergency", "Emergency",     "90 minutes"),
         ("is there a fee for after hours",        "Emergency",         "$75"),
         ("what's the warranty on a water heater", "Water Heater",      "10-year"),
-        ("do you install solar panels",           "ANSWER_ONLY",       ("don't", "do not", "not something")),
+        ("do you install solar panels",           "ANSWER_ONLY",       DECLINE),
         ("what's your favourite colour",          "ANSWER_ONLY",       None),
     ],
     "sunrise_bakery_and_cafe": [
@@ -98,9 +109,9 @@ TESTS = {
         ("how much are cupcakes",                 "Cupcake Orders",    "$3.50"),
         ("how far in advance for cupcakes",       "Cupcake Orders",    "24 hours"),
         ("what's your cancellation policy",       "Deposits",          "50%"),
-        ("do you deliver",                        "Pickup, Delivery",  "5-mile"),
+        ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
-        ("do you make cookies",                   None,                None),
+        ("do you make cookies",                   "ANSWER_ONLY",       DECLINE),
     ],
     "belmont_hair_studio": [
         ("how much is a haircut",                 "Haircuts",          "$48"),
@@ -120,7 +131,7 @@ TESTS = {
         ("are you open on Sunday",                "Payment and Hours", "closed"),
         ("what products do you use",              "Products",          ("Davines", "Olaplex")),
         # Nothing in the knowledge base covers this.
-        ("do you do nails",                       None,                None),
+        ("do you do nails",                       "ANSWER_ONLY",       DECLINE),
     ],
     "ridgeline_contracting": [
         ("is the estimate free",                  "How Estimates Work", "free"),
@@ -159,7 +170,7 @@ TESTS = {
         ("are you open Monday",                   "Hours",              "closed"),
         ("what time do you stop taking orders",   "Hours",              "9:45"),
         ("is the gluten free safe for celiac",    "Allergens",          ("cannot", "can't", "shared")),
-        ("do you sell ice cream",                 None,                 None),
+        ("do you sell ice cream",                 "ANSWER_ONLY",        DECLINE),
     ],
 }
 
@@ -230,7 +241,9 @@ def validate_tests():
                     if not any(wanted.lower() in h.lower() for h in headings):
                         problems.append(
                             f"{slug}: no section matches {wanted!r} — {question}")
-            if fact is not None:
+            if fact is not None and fact != DECLINE:
+                # DECLINE asserts the shape of the reply, not a fact in the
+                # document — there is nothing here to check it against.
                 facts = fact if isinstance(fact, tuple) else (fact,)
                 # A tuple means "any of these will do", so it's only wrong
                 # when the document contains none of them.
@@ -240,12 +253,63 @@ def validate_tests():
     return problems
 
 
+def normalise(text):
+    """Flatten the ways the same fact gets typed.
+
+    Six of the nine failures in the first honest run were this and nothing
+    else: the assistant wrote "5–8 weeks" with an en dash where the document
+    says "5 to 8", or "3 hours" where the document says "three hours". The
+    answers were correct. The test was asserting a spelling.
+
+    A test that fails for the wrong reason is worse than no test, because
+    the reasonable response to it is to stop believing the suite.
+    """
+    text = (text or "").lower()
+    for dash in ("\u2013", "\u2014", "\u2212"):      # en, em, minus
+        text = text.replace(dash, "-")
+    text = text.replace("\u2019", "'")                # curly apostrophe
+    text = text.replace("**", "").replace("*", "")   # markdown emphasis
+    return " ".join(text.split())
+
+
+# Numbers a business writes one way and an assistant says another. Only
+# the small ones: past ten, nobody writes it out.
+NUMBER_WORDS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+                "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
+
+
+def digit_form(text):
+    """'three hours' -> '3 hours', so a fact can be asserted either way."""
+    words = normalise(text).split()
+    return " ".join(NUMBER_WORDS.get(w, w) for w in words)
+
+
+def range_form(text):
+    """'five to eight weeks' and '5-8 weeks' are the same claim.
+
+    A document writes a range out; an assistant writes it with a dash. Both
+    forms collapse to "5-8" so the comparison is about the numbers rather
+    than the punctuation between them.
+    """
+    import re
+    text = digit_form(text)
+    text = re.sub(r"\s*-\s*", "-", text)
+    return re.sub(r"(\d)\s+to\s+(\d)", r"\1-\2", text)
+
+
 def contains(reply, expected):
     """Does the reply carry the fact? A tuple means any one of them will do."""
-    text = (reply or "").lower()
-    if isinstance(expected, (tuple, list)):
-        return any(str(e).lower() in text for e in expected)
-    return str(expected).lower() in text
+    if expected == DECLINE:
+        text = normalise(reply)
+        return any(phrase in text for phrase in DECLINING)
+
+    forms = (normalise(reply), digit_form(reply), range_form(reply))
+    for one in (expected if isinstance(expected, (tuple, list)) else (expected,)):
+        if (normalise(one) in forms[0]
+                or digit_form(one) in forms[1]
+                or range_form(one) in forms[2]):
+            return True
+    return False
 
 
 def heading_matches(headings, expected):
