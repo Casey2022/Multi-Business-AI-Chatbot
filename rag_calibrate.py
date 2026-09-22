@@ -98,7 +98,7 @@ def main():
 
     print(f"\n  threshold   right sections kept   irrelevant admitted")
     print(f"  {'-' * 9}   {'-' * 19}   {'-' * 19}")
-    best = None
+    curve = []
     for threshold in [x / 100 for x in range(40, 76, 1)]:
         kept    = sum(1 for d, _, _ in answerable   if d <= threshold)
         leaked  = sum(1 for d, _, _ in unanswerable if d <= threshold)
@@ -107,25 +107,46 @@ def main():
             print(f"    {threshold:.2f}      {kept:3}/{good['n']} "
                   f"({100*kept/good['n']:3.0f}%)        {leaked:3}/{bad['n']} "
                   f"({100*leaked/bad['n']:3.0f}%){mark}")
-        # Prefer keeping the right section; break ties by admitting less.
-        score = (kept / good["n"]) - (leaked / bad["n"])
-        if best is None or score > best[0] + 1e-9:
-            best = (score, threshold, kept, leaked)
+        curve.append((threshold, kept, leaked))
 
-    _, threshold, kept, leaked = best
-    print(f"\n  Best separation at {threshold:.2f}: keeps {kept}/{good['n']} "
-          f"right sections, admits {leaked}/{bad['n']} irrelevant.")
-    if leaked:
-        print("  Note the leaks are not automatically wrong answers — the")
-        print("  assistant still has to decline, and the DECLINE questions in")
-        print("  rag_eval measure whether it does.")
+    # The honest recommendation is the DOMINANT one: the loosest threshold
+    # that admits no more irrelevant sections than the current setting.
+    #
+    # An earlier version scored keeping and leaking equally and recommended
+    # tightening to 0.44, which would have thrown away three right sections
+    # to prevent leaks that have never produced a wrong answer. Weighting
+    # two different mistakes the same is a choice, and it was the wrong one:
+    # a right section discarded is a question the assistant cannot answer,
+    # while an irrelevant one admitted still has to get past the guardrails
+    # before it hurts anyone.
+    here = next((row for row in curve
+                 if abs(row[0] - rag.DISTANCE_THRESHOLD) < 1e-9), None)
+    if here:
+        dominant = max((row for row in curve if row[2] <= here[2]),
+                       key=lambda row: (row[1], row[0]))
+        threshold, kept, leaked = dominant
+        print(f"\n  Current {rag.DISTANCE_THRESHOLD:.2f}: keeps {here[1]}/{good['n']}"
+              f", admits {here[2]}/{bad['n']}.")
+        if threshold > rag.DISTANCE_THRESHOLD and kept > here[1]:
+            print(f"  {threshold:.2f} keeps {kept}/{good['n']} for the SAME "
+                  f"{leaked}/{bad['n']} admitted — strictly better here.")
+        elif kept == here[1]:
+            print(f"  Nothing looser keeps more without admitting more.")
 
-    print(f"\n  Right sections that would still be thrown away at {threshold:.2f}:")
-    missed = sorted((d, s, q) for d, s, q in answerable if d > threshold)
+    print(f"\n  Right sections thrown away at {rag.DISTANCE_THRESHOLD:.2f}:")
+    missed = sorted((d, s, q) for d, s, q in answerable
+                    if d > rag.DISTANCE_THRESHOLD)
     for distance, slug, question in missed[:10]:
         print(f"    {distance:.3f}  {slug}: {question[:56]}")
     if not missed:
         print("    none")
+
+    if bad["n"] < 15:
+        print(f"\n  CAUTION: only {bad['n']} genuinely out-of-scope questions.")
+        print("  The 'irrelevant admitted' column is an anecdote at this size,")
+        print("  and every argument for loosening rests on it. Add more")
+        print("  questions the knowledge base has no section for before")
+        print("  trusting a threshold set from this half of the data.")
     return 0
 
 

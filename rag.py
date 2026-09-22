@@ -54,11 +54,34 @@ CHROMA_DB_PATH     = Path("chroma_db")
 CHUNK_SIZE         = 500
 CHUNK_OVERLAP      = 50
 TOP_K              = 4
-# Tuned against real queries after switching to Voyage embeddings, which
-# compress the distance range compared to the previous local model — the
-# old 0.85 threshold let everything through. Measured separation on Bob's
-# Plumbing: answerable queries 0.23–0.41, irrelevant 0.48–0.58.
-DISTANCE_THRESHOLD = 0.50
+# How far a chunk may be and still be handed to the model.
+#
+# Measured by rag_calibrate.py over 105 questions across all five
+# businesses, 2026-09-22:
+#
+#   the right section, on questions that have one   n=99  median 0.327
+#                                                         p90 0.414  max 0.547
+#   the closest section, on questions that don't    n= 4  min 0.460  max 0.500
+#
+# 0.55 rather than the old 0.50 because at 0.50 every one of the four
+# out-of-scope questions was already admitted — raising it to 0.55 admits
+# exactly the same four and rescues the one right section that was being
+# thrown away (Ridgeline's change-order question, at 0.547, ranked first
+# with a clear 0.05 gap to the next candidate). On this evidence it is a
+# strictly better number, not a trade.
+#
+# What that argument rests on, stated because it is thin: FOUR samples of
+# genuinely out-of-scope questions. That column is an anecdote, not a
+# distribution, and if a wider set puts an irrelevant section at 0.52 then
+# 0.55 admits it where 0.50 would not. Widening that set is the next thing
+# worth doing before this number is trusted further.
+#
+# Note also that an irrelevant chunk reaching the model is not a wrong
+# answer. The guardrails still have to fail on top of it, and the DECLINE
+# questions in rag_eval measure exactly that. So far they pass at 0.50
+# with all four leaking, which is why keeping a right section is worth more
+# here than blocking a marginal one.
+DISTANCE_THRESHOLD = 0.55
 
 # Created lazily rather than at import: gunicorn forks worker processes, and
 # ChromaDB's Rust-backed client is not fork-safe — a client created before the

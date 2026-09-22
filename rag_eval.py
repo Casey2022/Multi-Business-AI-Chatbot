@@ -105,6 +105,9 @@ TESTS = {
         ("is there a fee for after hours",        "Emergency",         "$75"),
         ("what's the warranty on a water heater", "Water Heater",      "10-year"),
         ("do you install solar panels",           "ANSWER_ONLY",       DECLINE),
+        ("do you do electrical work",               "ANSWER_ONLY",       DECLINE),
+        ("can you clean my gutters",                "ANSWER_ONLY",       DECLINE),
+        ("do you install air conditioning",         "ANSWER_ONLY",       DECLINE),
         ("what's your favourite colour",          "ANSWER_ONLY",       None),
     ],
     "sunrise_bakery_and_cafe": [
@@ -118,6 +121,8 @@ TESTS = {
         ("what's your cancellation policy",       "Deposits",          "50%"),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
+        ("do you sell coffee beans",                "ANSWER_ONLY",       DECLINE),
+        ("can I book a table for breakfast",        "ANSWER_ONLY",       DECLINE),
         ("do you make cookies",                   "ANSWER_ONLY",       DECLINE),
     ],
     "belmont_hair_studio": [
@@ -138,6 +143,9 @@ TESTS = {
         ("are you open on Sunday",                "Payment and Hours", "closed"),
         ("what products do you use",              "Products",          ("Davines", "Olaplex")),
         # Nothing in the knowledge base covers this.
+        ("do you do facials",                       "ANSWER_ONLY",       DECLINE),
+        ("can I get eyelash extensions",            "ANSWER_ONLY",       DECLINE),
+        ("do you do massages",                      "ANSWER_ONLY",       DECLINE),
         ("do you do nails",                       "ANSWER_ONLY",       DECLINE),
     ],
     "ridgeline_contracting": [
@@ -157,6 +165,8 @@ TESTS = {
         ("what's the warranty",                   "Warranty",           "two years"),
         # A contractor who quotes a firm price in chat is the failure mode
         # this business exists to demonstrate, so ask for one directly.
+        ("do you do landscaping",                  "ANSWER_ONLY",       DECLINE),
+        ("do you handle pest control",             "ANSWER_ONLY",       DECLINE),
         ("just give me a price for my kitchen right now", "ANSWER_ONLY", None),
     ],
     "crosstown_pizza": [
@@ -177,6 +187,8 @@ TESTS = {
         ("are you open Monday",                   "Hours",              "closed"),
         ("what time do you stop taking orders",   "Hours",              "9:45"),
         ("is the gluten free safe for celiac",    "Allergens",          ("cannot", "can't", "shared")),
+        ("do you sell beer",                        "ANSWER_ONLY",       DECLINE),
+        ("do you serve breakfast",                  "ANSWER_ONLY",       DECLINE),
         ("do you sell ice cream",                 "ANSWER_ONLY",        DECLINE),
     ],
 }
