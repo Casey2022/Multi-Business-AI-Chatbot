@@ -355,6 +355,20 @@ def validate_tests():
     from pathlib import Path
 
     problems = []
+
+    # Every chunk has to name its own section. A continuation chunk that
+    # lost its heading is a fragment the model reads with no idea what it
+    # describes — and it breaks the measurement too, because a chunk's
+    # section is read from its first line, so a headless one counts as the
+    # wrong section even when the right one was retrieved.
+    import rag
+    for path in sorted(Path("documents").glob("*/services.md")):
+        for chunk in rag.chunk_text(path.read_text(encoding="utf-8")):
+            if not chunk.lstrip().startswith("#"):
+                problems.append(
+                    f"{path.parent.name}: a chunk starts with no heading — "
+                    f"{chunk.splitlines()[0][:40]!r}")
+
     combined = {slug: list(TESTS.get(slug, [])) + list(HARD.get(slug, []))
                 for slug in set(TESTS) | set(HARD)}
     for slug, rows in sorted(combined.items()):

@@ -167,12 +167,52 @@ def chunk_text(text):
 
         if len(raw) <= CHUNK_SIZE:
             chunks.append(raw)
-        else:
-            start = 0
-            while start < len(raw):
-                end = start + CHUNK_SIZE
-                chunks.append(raw[start:end])
-                start += CHUNK_SIZE - CHUNK_OVERLAP
+            continue
+
+        # A section too long for one chunk used to be sliced by character
+        # count, which produced a chunk beginning "change to the" — no
+        # heading, no context, starting mid-sentence. Retrieval could return
+        # it and the model would be reading a fragment with nothing to say
+        # what it was about. It also broke the measurement: rag_eval reads a
+        # chunk's section from its first line, so a headless continuation
+        # counted as the wrong section even when the right one came back.
+        #
+        # So: split on line boundaries, and repeat the heading on every
+        # piece. Each chunk stands on its own, which is the whole point of
+        # chunking on headings in the first place.
+        lines   = raw.split("\n")
+        heading = lines[0] if lines[0].lstrip().startswith("#") else ""
+        body    = "\n".join(lines[1:]) if heading else raw
+        budget  = max(80, CHUNK_SIZE - len(heading) - len(" (continued)") - 1)
+
+        pieces, current = [], []
+        for line in body.split("\n"):
+            # A single line longer than the budget has no boundary to use;
+            # fall back to slicing that line and only that line.
+            if len(line) > budget:
+                if current:
+                    pieces.append("\n".join(current))
+                    current = []
+                for start in range(0, len(line), budget - CHUNK_OVERLAP):
+                    pieces.append(line[start:start + budget])
+                continue
+            if current and len("\n".join(current + [line])) > budget:
+                pieces.append("\n".join(current))
+                current = [current[-1], line]      # one line of overlap
+            else:
+                current.append(line)
+        if current:
+            pieces.append("\n".join(current))
+
+        for index, piece in enumerate(pieces):
+            piece = piece.strip()
+            if not piece:
+                continue
+            if heading:
+                label = heading if index == 0 else f"{heading} (continued)"
+                chunks.append(f"{label}\n{piece}")
+            else:
+                chunks.append(piece)
 
     return chunks
 
