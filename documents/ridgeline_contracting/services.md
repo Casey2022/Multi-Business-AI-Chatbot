@@ -56,7 +56,7 @@ are available on request. We pull permits for any work that needs one
 and the cost is itemised separately in the quote — we never fold it
 into a lump sum.
 
-## Payment and Change Orders (Topics: payment, deposit, schedule, change order)
+## Payment and Change Orders (Topics: payment, deposit, schedule, change order, change my mind, changed my mind, add something, extra work, mid-project, halfway through, scope change, adding to the job)
 Projects are invoiced in stages: a deposit at contract signing,
 progress payments at agreed milestones, and a final payment at
 completion and walk-through. We do not ask for the full amount up

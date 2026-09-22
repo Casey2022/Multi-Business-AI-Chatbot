@@ -64,22 +64,38 @@ def config_for(slug):
     return load_config(f"config/{slug}.yaml")
 
 
-# The right answer to some questions is "we don't do that". Asserting a
-# phrase would be asserting a particular way of saying no, so this checks
-# for any of them — the measure is that the assistant declined rather than
-# inventing a service the business doesn't offer.
+# The right answer to some questions is "we don't do that".
+#
+# This started as a list of approved ways to say no, and that was the wrong
+# shape. Every honest refusal the assistant invented that wasn't on the list
+# counted as a failure — "we focus on custom cakes", "we're primarily a
+# bakery" — and the only remedy was to keep lengthening the list, which
+# makes the check weaker each time. Meanwhile the thing actually worth
+# catching sailed through: asked whether the bakery makes cookies, the
+# assistant answered "We sure do!" about a product that appears nowhere in
+# its documents.
+#
+# So the test is inverted. It no longer asks whether the reply declined in
+# an approved manner; it asks whether the reply CLAIMED THE THING. A
+# customer is harmed by being told yes and turning up for something that
+# doesn't exist. Nobody is harmed by a refusal phrased unusually.
+#
+# Opening words only, because that is where the claim lives and it keeps
+# the check from tripping on a legitimate "we don't do nails — we offer
+# hair services".
 DECLINE = "<<declines>>"
 
-DECLINING = ("don't", "do not", "dont", "not something", "not sure",
-             "we specialize", "we specialise", "we focus on", "no, ",
-             "we only", "just hair", "our menu is", "can't guarantee",
-             "cannot guarantee")
+CLAIMING = ("we sure do", "we do!", "yes", "absolutely", "of course",
+            "we certainly", "sure thing", "we've got those",
+            "we have those", "we make those", "we sell those")
 
-# Known ceiling: this is a list of ways to say no, and a business can
-# always invent a new one. Each addition makes the check weaker, so it
-# stops here — the answer to "the assistant phrased its refusal
-# differently" is not a longer list, it's a judge that reads the reply.
-# Until then, a miss on DECLINE means go and read what it actually said.
+OPENING_WORDS = 48
+
+
+def claims_it(reply):
+    """Does the reply open by saying yes to something?"""
+    opening = normalise(reply)[:OPENING_WORDS]
+    return any(phrase in opening for phrase in CLAIMING)
 
 
 # (question, expected chunk heading fragment, fact the answer must contain)
@@ -415,8 +431,9 @@ def range_form(text):
 def contains(reply, expected):
     """Does the reply carry the fact? A tuple means any one of them will do."""
     if expected == DECLINE:
-        text = normalise(reply)
-        return any(phrase in text for phrase in DECLINING)
+        # Silence isn't a refusal either — an empty reply tells the
+        # customer nothing and must not count as one.
+        return bool((reply or "").strip()) and not claims_it(reply)
 
     forms = (normalise(reply), digit_form(reply), range_form(reply))
     for one in (expected if isinstance(expected, (tuple, list)) else (expected,)):

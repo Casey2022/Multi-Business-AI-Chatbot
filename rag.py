@@ -56,32 +56,36 @@ CHUNK_OVERLAP      = 50
 TOP_K              = 4
 # How far a chunk may be and still be handed to the model.
 #
-# Measured by rag_calibrate.py over 105 questions across all five
+# Measured by rag_calibrate.py over 117 questions across all five
 # businesses, 2026-09-22:
 #
 #   the right section, on questions that have one   n=99  median 0.327
 #                                                         p90 0.414  max 0.547
-#   the closest section, on questions that don't    n= 4  min 0.460  max 0.500
+#   the closest section, on questions that don't    n=16  median 0.477
+#                                                         p90 0.504  max 0.511
 #
-# 0.55 rather than the old 0.50 because at 0.50 every one of the four
-# out-of-scope questions was already admitted — raising it to 0.55 admits
-# exactly the same four and rescues the one right section that was being
-# thrown away (Ridgeline's change-order question, at 0.547, ranked first
-# with a clear 0.05 gap to the next candidate). On this evidence it is a
-# strictly better number, not a trade.
+# Read those two ranges together: they overlap from 0.383 to 0.547. There
+# is no threshold that keeps every right section and blocks every wrong
+# one, and the shape of the curve is worse than that — at 0.50, 88% of
+# out-of-scope questions already get a chunk; at 0.55, all of them do.
 #
-# What that argument rests on, stated because it is thin: FOUR samples of
-# genuinely out-of-scope questions. That column is an anecdote, not a
-# distribution, and if a wider set puts an irrelevant section at 0.52 then
-# 0.55 admits it where 0.50 would not. Widening that set is the next thing
-# worth doing before this number is trusted further.
+# So this number is a weak filter, not a safety mechanism. What actually
+# stops a wrong answer is the assistant declining to invent one, and that
+# is what the DECLINE questions in rag_eval measure.
 #
-# Note also that an irrelevant chunk reaching the model is not a wrong
-# answer. The guardrails still have to fail on top of it, and the DECLINE
-# questions in rag_eval measure exactly that. So far they pass at 0.50
-# with all four leaking, which is why keeping a right section is worth more
-# here than blocking a marginal one.
-DISTANCE_THRESHOLD = 0.55
+# It was briefly 0.55, on a measurement of FOUR out-of-scope questions
+# that made raising it look free. Twelve more showed what it cost: asked
+# "do you make cookies", the assistant went from "I'm not sure about
+# cookies specifically" to "We sure do!" — inventing a product, because
+# the daily-pastries chunk crossed the line and reads like a yes. One
+# customer arriving for cookies that don't exist is worse than one being
+# asked to phone about change orders, so 0.50 it is.
+#
+# The right section that 0.50 throws away is Ridgeline's change-order
+# question at 0.547. That one is fixed where it belongs — in the section's
+# Topics line — rather than by moving a number that governs all five
+# businesses to rescue one query.
+DISTANCE_THRESHOLD = 0.50
 
 # Created lazily rather than at import: gunicorn forks worker processes, and
 # ChromaDB's Rust-backed client is not fork-safe — a client created before the
