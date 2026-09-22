@@ -282,9 +282,18 @@ def ingest_documents(config, business_id=None):
     except Exception:
         pass
 
+    # Stamp what this was built from. Without it ensure_ingested has only
+    # the chunk count to go on, which cannot see an edit that leaves the
+    # count alone. Absent for a DB-sourced collection, which is the right
+    # answer: nothing about the seed files describes it.
+    live_metadata = {"hnsw:space": "cosine"}
+    docs_path = Path("documents") / slug
+    if business_id is None and docs_path.exists():
+        live_metadata["source_digest"] = _source_digest(docs_path)
+
     live = client.get_or_create_collection(
         name=collection_name,
-        metadata={"hnsw:space": "cosine"},
+        metadata=live_metadata,
         embedding_function=_embedding_fn,
     )
     live.add(documents=chunks, ids=ids, metadatas=metas)
@@ -293,8 +302,29 @@ def ingest_documents(config, business_id=None):
     log.info(f"Ingested {len(chunks)} chunks into '{collection_name}'.")
     return live
 
+def _source_digest(docs_path):
+    """A fingerprint of the seed documents, for spotting an edited one.
+
+    Chunk count was the old freshness test, and it only notices changes that
+    add or remove a chunk. Edit a heading, correct a price, widen a Topics
+    line — the count is identical, the collection is declared complete, and
+    the change never reaches retrieval. Nothing errors and nothing looks
+    wrong; the assistant just keeps answering from the previous version.
+
+    (Found exactly that way: a Topics line was widened to fix a retrieval
+    miss, the boot said "complete — skipping", and the measured distance
+    came back to three decimal places unchanged.)
+    """
+    import hashlib
+    digest = hashlib.sha256()
+    for md_file in sorted(docs_path.glob("*.md")):
+        digest.update(md_file.name.encode("utf-8"))
+        digest.update(md_file.read_bytes())
+    return digest.hexdigest()[:16]
+
+
 def ensure_ingested(config):
-    """Ingest this business's documents only if its collection is empty.
+    """Ingest this business's documents if the collection is missing or stale.
 
     Safe to call on every server boot. On a persistent filesystem this is a
     fast no-op; on an ephemeral one (cloud free tiers) it rebuilds the vector
@@ -303,25 +333,29 @@ def ensure_ingested(config):
     slug      = collection_for(config)
     docs_path = Path("documents") / slug
 
-    # Expected chunk count from the source documents. Comparing against this
-    # (rather than just count > 0) catches partially-ingested collections,
-    # which happen when ingestion fails midway — e.g. an embedding API rate limit.
     expected = 0
+    digest   = None
     if docs_path.exists():
         for md_file in docs_path.glob("*.md"):
             expected += len(chunk_text(md_file.read_text(encoding="utf-8")))
+        digest = _source_digest(docs_path)
 
     try:
         collection = get_chroma_client().get_collection(
             slug,
             embedding_function=_embedding_fn,
         )
-        count = collection.count()
-        if count == expected and count > 0:
+        count  = collection.count()
+        stored = (collection.metadata or {}).get("source_digest")
+        if count == expected and count > 0 and stored == digest:
             log.info(f"Collection '{slug}' complete ({count} chunks) — skipping.")
             return
-        log.info(f"Collection '{slug}' has {count} chunks, expected {expected} "
-              f"— rebuilding.")
+        if count == expected and count > 0 and stored != digest:
+            log.info(f"Collection '{slug}' has the right number of chunks but "
+                     f"the documents have changed — rebuilding.")
+        else:
+            log.info(f"Collection '{slug}' has {count} chunks, expected "
+                     f"{expected} — rebuilding.")
     except Exception:
         pass
 
