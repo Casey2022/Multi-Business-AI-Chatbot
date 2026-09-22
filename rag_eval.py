@@ -131,7 +131,7 @@ TESTS = {
         ("how much notice for a custom cake",     "Custom Birthday",   "72 hours"),
         ("what do wedding cakes cost",            "Wedding Cakes",     "$400"),
         ("do you have vegan options",             "Flavors",           None),
-        ("can I get gluten free",                 "Flavors",           "96 hours"),
+        ("how much notice for a gluten free cake", "Flavors",          "96 hours"),
         ("how much are cupcakes",                 "Cupcake Orders",    "$3.50"),
         ("how far in advance for cupcakes",       "Cupcake Orders",    "24 hours"),
         ("what's your cancellation policy",       "Deposits",          "50%"),
@@ -296,6 +296,16 @@ HARD = {
                                                   "Pastry Trays",      "$140"),
         ("I cancelled three days before, do I get my deposit back",
                                                   "Deposits",          "forfeited"),
+        # The assistant answered "a few gluten-free pastries available most
+        # days", which the documents contradict three separate times: the
+        # sponge needs 96 hours, the dedicated batches are Wednesdays and
+        # Saturdays, and gluten-free muffins are explicitly not part of the
+        # daily selection. Inventing availability is the same class of harm
+        # as inventing a product.
+        ("can I pop in today and grab a gluten free muffin",
+                          ("Muffins", "Allergens"),
+                          ("not part of the daily selection", "96 hours",
+                           "wednesdays")),
     ],
     "belmont_hair_studio": [
         ("my hair is box dyed and I want to go lighter",

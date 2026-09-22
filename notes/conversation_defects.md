@@ -100,3 +100,48 @@ rather than exact strings:
 
 Those assertions encode the defects above, which means the fixes become
 verifiable instead of hopeful — and the harness keeps them fixed.
+
+---
+
+## Inventing availability (2026-09-22)
+
+Found by the RAG evaluation set, not by reading a transcript.
+
+Asked "can I get gluten free", Sunrise answered:
+
+> We have a few gluten-free pastries available most days, and we can do
+> gluten-free cakes by special order.
+
+The knowledge base says gluten-free three times, and contradicts "most
+days" each time:
+
+- the sponge is available **with 96 hours' notice** (Flavors)
+- dedicated gluten-free batches are **Wednesdays and Saturdays** (Allergens)
+- gluten-free muffins are **not part of the daily selection** (Muffins)
+
+So the shape of the error is not a wrong price or a missed section — every
+relevant chunk was retrieved. It is an *unsupported availability claim*:
+the assistant smoothed three constrained statements into one relaxed one,
+in the direction a customer wants to hear. That is the same class as "We
+sure do!" about cookies, and the same cost: someone arrives on a Tuesday
+for a gluten-free muffin that was never going to be there.
+
+Worth noticing where it lives. Prices and durations are single facts and
+the assistant repeats them accurately — 16/16 on Bob's, 20/20 on Belmont.
+Availability is a *constraint*, usually spread across sections, and
+constraints are what got softened. A question whose answer is "yes, but
+only under these conditions" is the risky shape, not a question whose
+answer is a number.
+
+Two candidate fixes, neither taken yet:
+
+1. **Prompt.** An explicit instruction that availability, notice periods
+   and lead times are stated exactly as the documents state them, never
+   generalised. Cheap, but it widens a prompt that is already the largest
+   thing we send.
+2. **Documents.** The gluten-free story is split across three sections, so
+   any single retrieved chunk is a partial truth. Consolidating it, or
+   cross-referencing, would mean no chunk can be read as the whole answer.
+
+Measured by: `("can I pop in today and grab a gluten free muffin", ...)`
+in rag_eval's hard set.
