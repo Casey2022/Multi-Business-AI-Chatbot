@@ -26,6 +26,7 @@ Q_WEDDING_SOON = "I'd like to order a wedding cake for next weekend"
 Q_MUFFINS = "it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow"
 Q_GREY = "I'm about half grey, what would it cost to cover it"
 Q_CUT = "it's 11am, can I get a cut and colour this afternoon"
+Q_GF = "it's Wednesday, can I pop in today and grab a gluten free muffin"
 
 CASES = [
     # (label, question, rubric, reply, should_pass)
@@ -101,6 +102,23 @@ CASES = [
      "and the last colour appointment we can fit in starts at 3pm. So it'd be "
      "tight!\n\nYour best bet is to text 'appointment' and see what the booking "
      "system shows.", False),
+    ("gf muffin Wed: batch day, 24 hours for GF (real)", Q_GF,
+     R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
+     "Today's Wednesday, so we do have gluten-free batches! But same-day "
+     "availability depends on what we've baked this morning — I'd recommend "
+     "calling ahead at (585) 555-0188 to confirm we have the flavor you want in "
+     "stock.\n\nIf you want to guarantee a dozen, we can do that with 24 hours' "
+     "notice. 🥐", False),
+    ("gf muffin Wed: not daily, 96 hours (SYNTHETIC)", Q_GF,
+     R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
+     "Wednesday is one of our gluten-free baking days, but gluten-free muffins "
+     "aren't part of the daily selection, so I wouldn't count on one today. "
+     "You can order a dozen with 96 hours' notice, or call us to ask what "
+     "gluten-free items are in this morning.", True),
+    ("gf muffin Wed: 'most days' promise (SYNTHETIC, the original defect)", Q_GF,
+     R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
+     "We have a few gluten-free pastries available most days, and Wednesday is "
+     "a gluten-free day, so pop in! 🧁", False),
     ("cut and colour: same-day caveat stated (SYNTHETIC)", Q_CUT, R.CUT_AND_COLOUR_SAME_DAY,
      "A cut and colour holds a chair for most of a morning, so we usually can't "
      "fit one in on the same day. Text 'appointment' and I can find you the "

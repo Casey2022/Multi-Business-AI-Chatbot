@@ -320,10 +320,15 @@ HARD = {
         # Saturdays, and gluten-free muffins are explicitly not part of the
         # daily selection. Inventing availability is the same class of harm
         # as inventing a product.
-        ("can I pop in today and grab a gluten free muffin",
+        # The day is stated because the answer depends on it and the
+        # prompt carries the real date: this row passed on a Tuesday and
+        # failed just after midnight on a Wednesday, with nothing else
+        # changed. Wednesday is the harder trap: a gluten-free batch day, yet
+        # gluten-free muffins still aren't on the shelf and still need 96
+        # hours. The Wednesday reply claimed 24.
+        ("it's Wednesday, can I pop in today and grab a gluten free muffin",
                           ("Muffins", "Allergens"),
-                          ("not part of the daily selection", "96 hours",
-                           "wednesdays")),
+                          rubrics.GLUTEN_FREE_MUFFIN_WEDNESDAY),
         # --- Added 2026-09-22 ---
         # Trap: "full refund" is the wrong half — 25% of a wedding deposit
         # is non-refundable however early you cancel.
@@ -470,9 +475,11 @@ def validate_tests():
             if isinstance(fact, Rubric):
                 # The rubric's quote is its ground truth; if the document
                 # stops saying it, the rubric is grading against fiction.
-                if judge.flatten(fact.quote) not in judge.flatten(document):
-                    problems.append(
-                        f"{slug}: rubric quote not in document — {question}")
+                for quote in fact.quotes:
+                    if judge.flatten(quote) not in judge.flatten(document):
+                        problems.append(
+                            f"{slug}: rubric quote not in document "
+                            f"({quote[:40]!r}…) — {question}")
                 continue
             if fact is not None and fact != DECLINE:
                 # DECLINE asserts the shape of the reply, not a fact in the

@@ -48,7 +48,9 @@ class Rubric:
     """What a correct answer must do, and the document text that says so."""
 
     def __init__(self, quote, criteria):
-        self.quote = quote
+        # One quote, or a tuple when the rule is split across sections.
+        self.quotes = quote if isinstance(quote, tuple) else (quote,)
+        self.quote = "\n\n".join(self.quotes)
         self.criteria = " ".join(criteria.split())
 
     def __repr__(self):

@@ -61,3 +61,15 @@ CUT_AND_COLOUR_SAME_DAY = Rubric(
     is fine. Fails if it suggests this afternoon is likely possible, or
     calls it merely "tight", without saying same-day usually isn't
     possible.""")
+
+GLUTEN_FREE_MUFFIN_WEDNESDAY = Rubric(
+    quote=("We have dedicated gluten-free batches on Wednesdays and Saturdays.",
+           "Gluten-free muffins are not part of the daily selection but can be "
+           "made to order with 96 hours' notice."),
+    criteria="""Makes clear that gluten-free muffins are not part of the
+    daily selection, so the customer shouldn't count on picking one up by
+    walking in today, even though Wednesday is a gluten-free batch day, and
+    that ordering them takes 96 hours' notice. Suggesting a call to check what
+    gluten-free items are in today is fine. Fails if it implies a gluten-free
+    muffin is likely available today, or gives a notice period shorter than
+    96 hours (such as the regular muffins' 24 hours) for gluten-free muffins.""")
