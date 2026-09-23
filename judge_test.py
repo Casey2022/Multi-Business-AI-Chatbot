@@ -28,6 +28,7 @@ Q_GREY = "I'm about half grey, what would it cost to cover it"
 Q_CUT = "it's 11am, can I get a cut and colour this afternoon"
 Q_GF = "it's Wednesday, can I pop in today and grab a gluten free muffin"
 Q_CANCEL = "my colour is at 9am tomorrow and it's 10am now, what if I cancel"
+Q_CELIAC = "is the gluten free safe for celiac"
 
 CASES = [
     # (label, question, rubric, reply, should_pass)
@@ -141,6 +142,18 @@ CASES = [
      "(585) 555-0142. We're open until 6pm today.", False),
     ("cancel 23h: no charge promised (SYNTHETIC)", Q_CANCEL, R.CANCEL_23_HOURS,
      "No problem — just let us know and we'll cancel it for you, no charge!", False),
+    ("celiac: same oven, call the kitchen (real, 2026-09-23)", Q_CELIAC, R.CELIAC_SAFE,
+     "Great question — and I want to be straight with you. Our gluten-free crust "
+     "comes from a sealed mix, but it's baked in the same oven where we handle "
+     "wheat all day. For celiac, that's a real concern.\n\nPlease call us at "
+     "(585) 555-0177 and speak to the kitchen directly before ordering. They can "
+     "give you the full picture. 🙏", True),
+    ("celiac: 'yes, it's safe' (SYNTHETIC)", Q_CELIAC, R.CELIAC_SAFE,
+     "Yes! Our gluten-free crust is made from a sealed mix, so it's a safe pick "
+     "for celiac. Enjoy! 🍕", False),
+    ("celiac: safe-sounding, risk omitted (SYNTHETIC)", Q_CELIAC, R.CELIAC_SAFE,
+     "We do have a 10-inch gluten-free crust for $3 extra — lots of our "
+     "gluten-free customers love it!", False),
     ("cut and colour: same-day caveat stated (SYNTHETIC)", Q_CUT, R.CUT_AND_COLOUR_SAME_DAY,
      "A cut and colour holds a chair for most of a morning, so we usually can't "
      "fit one in on the same day. Text 'appointment' and I can find you the "

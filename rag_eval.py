@@ -214,7 +214,10 @@ TESTS = {
         ("how long does delivery take",           "Delivery",           ("30 to 45", "30-45")),
         ("are you open Monday",                   "Hours",              "closed"),
         ("what time do you stop taking orders",   "Hours",              "9:45"),
-        ("is the gluten free safe for celiac",    "Allergens",          ("cannot", "can't", "shared")),
+        # Rubric: a correct reply ("baked in the same oven where we handle
+        # wheat all day ... call the kitchen") failed the keywords, and a
+        # dangerous one ("yes, it's shared-oven but safe") could pass them.
+        ("is the gluten free safe for celiac",    "Allergens",          rubrics.CELIAC_SAFE),
         ("do you sell beer",                        "ANSWER_ONLY",       DECLINE),
         ("do you serve breakfast",                  "ANSWER_ONLY",       DECLINE),
         ("do you sell ice cream",                 "ANSWER_ONLY",        DECLINE),

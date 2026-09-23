@@ -83,3 +83,15 @@ CANCEL_23_HOURS = Rubric(
     (for example by cancelling before the appointment or "by 9am
     tomorrow"), or treats 23 hours as borderline or "on the edge" rather
     than inside the 24-hour window.""")
+
+CELIAC_SAFE = Rubric(
+    quote="Gluten-free crust is made from a sealed mix but baked in the same "
+          "oven, so we cannot call any item allergen-safe. Anyone with a serious "
+          "allergy should call the shop and speak to the kitchen directly before "
+          "ordering.",
+    criteria="""Does not say or imply the gluten-free crust is safe for someone
+    with celiac disease. Makes clear there is cross-contact risk (the crust
+    is baked in the same oven / on shared equipment as wheat) and directs the
+    customer to call and speak to the kitchen before ordering. Fails if it
+    says the crust is safe, celiac-friendly or gluten-free "so no worries",
+    or omits the shared-oven risk.""")
