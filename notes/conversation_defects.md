@@ -277,3 +277,39 @@ the cut-and-colour one, so the eval doesn't depend on when it runs.
 Whether the live prompt should carry the time is a separate decision. A
 receptionist reasoning about "today" and "tomorrow" without a clock will
 keep hitting this.
+
+## Gluten-free muffins on a batch day (2026-09-23)  (OPEN)
+
+Just after midnight the prompt's date rolled over to Wednesday, a
+gluten-free batch day. Asked "can I pop in today and grab a gluten free
+muffin", Sunrise answered:
+
+> Today's Wednesday, so we do have gluten-free batches! But same-day
+> availability depends on what we've baked this morning — I'd recommend
+> calling ahead … If you want to guarantee a dozen, we can do that with 24
+> hours' notice.
+
+Gluten-free muffins are "not part of the daily selection but can be made to
+order with 96 hours' notice." The reply applied the regular muffins' 24-hour
+rule to gluten-free ones, and let "batch day" imply the muffin would be
+there. On the Tuesday run the same question got a correct answer, so the
+original gluten-free defect isn't fully fixed: it holds on non-batch days
+and bends on batch days.
+
+The eval row now states the day ("it's Wednesday, …") and is graded by rubric.
+
+## Where this family now stands
+
+Three open defects share one shape: a correct rule applied to a case near
+its edge, bent toward a simpler answer.
+
+- half grey: exactly on a "more than half" threshold → quoted the higher price
+- same-day cut and colour: "usually can't" → "cutting it close"
+- gluten-free on a Wednesday: a batch day → treated as if muffins were in, and
+  given the wrong notice period
+
+Candidate fix: a system-prompt instruction that when the customer's case
+sits at or near a condition's boundary, or two rules could apply, the reply
+gives the rule for each side instead of choosing one, plus one worked
+example. Measured by the three rubric rows; the other three rubric rows
+guard against regressions.
