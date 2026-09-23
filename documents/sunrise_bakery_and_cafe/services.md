@@ -45,8 +45,10 @@ orders over $50 within a 5-mile radius for a $15 fee.
 ## Allergens and Dietary Notes
 Our kitchen handles wheat, eggs, dairy, soy, and tree nuts daily. We
 cannot guarantee any product is free from cross-contamination. We have
-dedicated gluten-free batches on Wednesdays and Saturdays. Customers
-with severe allergies should call to discuss before ordering.
+dedicated gluten-free batches on Wednesdays and Saturdays. Batch days
+don't change the muffin rule: gluten-free muffins are made to order with
+96 hours' notice. Customers with severe allergies should call to discuss
+before ordering.
 
 ## Deposits and Cancellation
 Custom cakes require a 50% deposit at ordering. Wedding cakes require
