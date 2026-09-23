@@ -34,6 +34,13 @@ JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-5")
 JUDGE_PRICE_IN_PER_MTOK  = float(os.environ.get("JUDGE_PRICE_IN",  "3.00"))
 JUDGE_PRICE_OUT_PER_MTOK = float(os.environ.get("JUDGE_PRICE_OUT", "15.00"))
 
+# Sonnet 5 rejects the temperature parameter outright ("deprecated for
+# this model"), so by default the judge sends none and its verdicts are not
+# pinned. Set JUDGE_TEMPERATURE only for a judge model that accepts it.
+# Without a pin, judge_test.py is the guard: run it twice and the verdicts
+# should agree.
+JUDGE_TEMPERATURE = os.environ.get("JUDGE_TEMPERATURE")
+
 usage = {"calls": 0, "in": 0, "out": 0}
 
 
@@ -98,8 +105,16 @@ def parse_verdict(text):
     return data["pass"], str(data.get("reason", "")).strip()
 
 
+def _request(prompt):
+    body = {"model": JUDGE_MODEL, "max_tokens": 200,
+            "messages": [{"role": "user", "content": prompt}]}
+    if JUDGE_TEMPERATURE is not None:
+        body["temperature"] = float(JUDGE_TEMPERATURE)
+    return body
+
+
 def _call(prompt):
-    """One temperature-0 call. Uses the SDK when present, plain HTTP if not."""
+    """One judge call. Uses the SDK when present, plain HTTP if not."""
     key = os.environ.get("ANTHROPIC_API_KEY")
     try:
         from anthropic import Anthropic
@@ -107,18 +122,14 @@ def _call(prompt):
         Anthropic = None
 
     if Anthropic is not None:
-        response = Anthropic(api_key=key).messages.create(
-            model=JUDGE_MODEL, max_tokens=200, temperature=0,
-            messages=[{"role": "user", "content": prompt}])
+        response = Anthropic(api_key=key).messages.create(**_request(prompt))
         text = response.content[0].text
         tokens_in, tokens_out = response.usage.input_tokens, response.usage.output_tokens
     else:
         import urllib.request
         request = urllib.request.Request(
             "https://api.anthropic.com/v1/messages",
-            data=json.dumps({"model": JUDGE_MODEL, "max_tokens": 200,
-                             "temperature": 0,
-                             "messages": [{"role": "user", "content": prompt}]}).encode(),
+            data=json.dumps(_request(prompt)).encode(),
             headers={"x-api-key": key or "", "anthropic-version": "2023-06-01",
                      "content-type": "application/json"})
         with urllib.request.urlopen(request, timeout=60) as r:
