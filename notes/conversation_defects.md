@@ -146,7 +146,7 @@ Two candidate fixes (the prompt one was taken — see Resolved below):
 Measured by: `("can I pop in today and grab a gluten free muffin", ...)`
 in rag_eval's hard set.
 
-## Hedging past a policy it holds (2026-09-23)  (STILL OPEN — `c27e6dd` did not fix it)
+## Hedging past a policy it holds (2026-09-23)  (FIXED — `c27e6dd`)
 
 Asked "I cancelled three days before, do I get my deposit back", Sunrise
 answered:
@@ -176,36 +176,47 @@ Same family as the gluten-free answer above: both are questions whose
 honest answer is conditional, and both got softened — one into a promise,
 one into a shrug.
 
-## `c27e6dd` — gluten-free fixed, deposit NOT fixed (2026-09-22)
+## Resolved — both conditional-answer defects (`c27e6dd`, 2026-09-22)
 
 `c27e6dd` added three system-prompt rules in `llm.py`: state the condition
 rather than the outcome, never widen it, and state a published policy even
-when the customer's own order can't be looked up.
+when the customer's own order can't be looked up. Hard answers went from
+29/30 to 30/30 at temperature 0, and no other column moved.
 
-**Gluten-free: fixed.** The muffin question passes and has not regressed.
-
-**Deposit: still open.** The reply read at temperature 0 on 2026-09-22:
+Both replies were read in full, not just scored:
 
 > I can't look up your specific order or cancellation, so I'd need you to
 > call us at (585) 555-0188 to sort this out.
+>
+> Our policy: cancellations **more than 7 days out** get a full refund
+> (minus any non-refundable portion). **Less than 7days** = deposit is
+> forfeited. Since you cancelled 3 days before, that falls in the "less
+> than 7 days" window, so the deposit wouldn't be refunded — but call and
+> we can review your situation.
 
-That is the original shrug, nearly word for word. The third rule was
-written for exactly this case and the reply ignores it. The 7-day forfeit
-rule is not mentioned.
+> We have dedicated gluten-free batches on **Wednesdays and Saturdays** —
+> today's Tuesday, so we won't have gluten-free muffins in stock. But you
+> can order a dozen gluten-free muffins with **96 hours' notice** …
 
-**The score didn't catch it.** That run printed `answer PASS` for this
-reply, although the reply doesn't contain "forfeited", the fact the test
-expects. Run in isolation, `contains()` on disk returns False for this
-reply, so the PASS is not explained yet. Until it is, the 30/30 hard-answer
-figure isn't trustworthy for this row. Separately, the test is too weak
-even when it works: "forfeited" can appear without the 7-day condition that
-makes it the answer.
+Both state the condition and apply it to the customer's case. The deposit
+reply still opens with the "call us" line before giving the policy. That's
+acceptable, but policy first would read better.
 
-Next:
-1. Find out why this row printed PASS.
-2. Make the test demand the condition (7 days), not just the outcome word.
-3. Fix the reply. The rule is in the prompt and isn't being followed, so the
-   next thing to try is stronger placement or an example, not another rule.
+### The false alarm on the way here
+
+`5ce890c` briefly marked the deposit defect still open. The reply had been
+read with `grep -A3`, which stops at the first blank line, so only the
+"call us" paragraph showed and the policy paragraph was cut off. Re-read
+with `-A12`, the full reply was right, and so was the grader. Lesson: read
+a multi-paragraph reply in full, never through a fixed-line grep window.
+
+### The test now demands the condition
+
+The row used to check for "forfeited" alone, which a reply could say without
+ever saying *when*. A **list** fact in `rag_eval.py` now means all of these
+must appear (a tuple still means any of them), and the deposit row expects
+`["7 days", "forfeited"]`. Checked statically: tonight's reply passes; the old
+shrug and an outcome-only reply ("your deposit is forfeited") both fail.
 
 Consolidating Sunrise's gluten-free information is no longer needed as a
 fallback; it stays in the backlog as optional tidying.

@@ -295,7 +295,7 @@ HARD = {
         ("cheapest way to feed twenty people at a morning meeting",
                                                   "Pastry Trays",      "$140"),
         ("I cancelled three days before, do I get my deposit back",
-                                                  "Deposits",          "forfeited"),
+                                                  "Deposits",          ["7 days", "forfeited"]),
         # The assistant answered "a few gluten-free pastries available most
         # days", which the documents contradict three separate times: the
         # sponge needs 96 hours, the dedicated batches are Wednesdays and
@@ -399,6 +399,14 @@ def validate_tests():
             if fact is not None and fact != DECLINE:
                 # DECLINE asserts the shape of the reply, not a fact in the
                 # document — there is nothing here to check it against.
+                if isinstance(fact, list):
+                    # A list means "all of these": every one must be in the
+                    # document, or the test demands something it never says.
+                    missing = [f for f in fact if f.lower() not in lowered]
+                    if missing:
+                        problems.append(
+                            f"{slug}: document doesn't say {missing!r} — {question}")
+                    continue
                 facts = fact if isinstance(fact, tuple) else (fact,)
                 # A tuple means "any of these will do", so it's only wrong
                 # when the document contains none of them.
@@ -466,7 +474,15 @@ def range_form(text):
 
 
 def contains(reply, expected):
-    """Does the reply carry the fact? A tuple means any one of them will do."""
+    """Does the reply carry the fact?
+
+    A tuple means any one of them will do. A list means ALL of them must be
+    there: a conditional answer is the condition plus the outcome, and
+    checking only the outcome word ("forfeited") passes a reply that never
+    says when it applies ("inside 7 days").
+    """
+    if isinstance(expected, list):
+        return all(contains(reply, one) for one in expected)
     if expected == DECLINE:
         # Silence isn't a refusal either — an empty reply tells the
         # customer nothing and must not count as one.
@@ -474,7 +490,7 @@ def contains(reply, expected):
 
     forms = (normalise(reply), digit_form(reply), range_form(reply),
              money_form(reply))
-    for one in (expected if isinstance(expected, (tuple, list)) else (expected,)):
+    for one in (expected if isinstance(expected, tuple) else (expected,)):
         if (normalise(one) in forms[0]
                 or digit_form(one) in forms[1]
                 or range_form(one) in forms[2]
