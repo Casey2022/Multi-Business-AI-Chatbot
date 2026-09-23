@@ -341,3 +341,23 @@ rubric (`514fa2f`).
 Lesson: a prompt rule about boundaries has to say when it does NOT apply.
 "Near the edge" with no definition invites the model to see an edge
 wherever it looks.
+
+## `93e9a88` result (2026-09-23): 49/50
+
+`rag_eval.py --all`: **69/69 · 84/84 · 51/51 · 49/50**.
+
+- **23-hour cancellation: fixed again.** The narrowed boundary rule
+  ("does NOT apply when the numbers settle it") undid the `daf684b`
+  regression.
+- **Half grey, same-day cut and colour: still fixed.**
+- **Gluten-free muffin on a Wednesday: still failing.** The reply was
+  almost word for word the pre-`93e9a88` one: "we have dedicated gluten-free
+  batches on Wednesdays and Saturdays, so today's a good day … call ahead to
+  confirm we have gluten-free muffins in stock right now."
+
+The document fix did reach retrieval. The app rebuilt the Sunrise
+collection at 14:08, its `source_digest` matches the current markdown, and
+the stored Allergens chunk contains the new sentence. So either the query
+doesn't retrieve that chunk (a retrieval problem), or it does and the model
+ignores a sentence that answers the question directly (a model problem).
+`rag_probe.py` tells the two apart.
