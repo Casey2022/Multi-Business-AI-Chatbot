@@ -483,7 +483,7 @@ def validate_tests():
                     # An item can itself be a tuple of spellings, any of
                     # which will do.
                     missing = [f for f in fact
-                               and not any(one.lower() in lowered for one in
+                               if not any(one.lower() in lowered for one in
                                           (f if isinstance(f, tuple) else (f,)))]
                     if missing:
                         problems.append(
