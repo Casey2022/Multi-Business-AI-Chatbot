@@ -409,3 +409,26 @@ assumed prices ($3/$15 per MTok for Sonnet 5, $1/$5 for Haiku).
 Not yet conclusive: one business, one run, Sonnet 5's replies can't be
 pinned (it rejects temperature), and the judge was Sonnet 5 grading
 itself. The full run, with an independent judge, decides it.
+
+## The judge got a verdict wrong (2026-09-23)
+
+Haiku, full run, Sonnet 5 judge: 69/69 · 84/84 · 51/51 · 48/50. The celiac
+rubric passed. One of the two hard failures was the judge's mistake:
+
+> Grey coverage is priced as a root touch-up ($85) if it's half the head
+> or less — but if it's more than half, it's all-over colour ($110). Since
+> you said "about half," it depends which side you're on.
+
+That is exactly the right answer, and exactly what `daf684b` was written to
+produce. The judge failed it for "moving the boundary". The rubric's example
+of moving the boundary was "half or more", and the judge matched "half the
+head or less" against it. The rubric now lists equivalent correct
+phrasings (`5482291`).
+
+So Haiku's real score is **49/50**, the only true failure being gluten-free
+Wednesday. And "trust the judge's verdicts more than its reasons" was too
+generous: a rubric that names a forbidden phrase invites the judge to match
+the phrase, not the meaning. judge_test now carries this reply as a PASS
+case (28 cases), and every judge change re-runs it.
+
+Opus 5.5 as judge: 27/27 on judge_test before this case was added.
