@@ -313,3 +313,31 @@ sits at or near a condition's boundary, or two rules could apply, the reply
 gives the rule for each side instead of choosing one, plus one worked
 example. Measured by the three rubric rows; the other three rubric rows
 guard against regressions.
+
+## `daf684b` result (2026-09-23): two fixed, one not, one new regression
+
+`rag_eval.py --all`: **69/69 · 84/84 · 51/51 · 48/50** (was 47/50).
+
+- **Half grey: fixed.** Graded PASS by the judge.
+- **Same-day cut and colour: fixed.** Graded PASS by the judge.
+- **Gluten-free muffin on a Wednesday: not fixed.** It no longer quotes 24
+  hours, but says "we have dedicated gluten-free batches on Wednesdays and
+  Saturdays, so today's a good day" and never mentions that gluten-free
+  muffins aren't in the daily selection or need 96 hours. The
+  specific-rule-wins rule didn't take. The two facts live in different
+  sections (Allergens, Muffins), and the batch-day one wins.
+- **New regression, 23-hour cancellation.** Before `daf684b`: "less than 24
+  hours — so a cancellation would be charged at 50%". After: "you'd need to
+  cancel by 9am tomorrow to avoid the 50% cancellation charge … right on the
+  edge of the 24-hour window". That's wrong: 23 hours is inside the window. "On
+  the edge" is the new boundary rule's own vocabulary, so the rule is
+  over-applying. It fires on a case the arithmetic settles, not only on one
+  the customer's description leaves open ("about half").
+
+That regression passed the keyword check's "50%" and failed only on the
+spelling of "24 hours", so it was caught by accident. The row is now a
+rubric (`514fa2f`).
+
+Lesson: a prompt rule about boundaries has to say when it does NOT apply.
+"Near the edge" with no definition invites the model to see an edge
+wherever it looks.
