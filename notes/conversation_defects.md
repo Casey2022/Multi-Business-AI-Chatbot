@@ -391,3 +391,21 @@ conversation, not an eval fix.
 
 The eval row stays as it is, failing. It is the honest measure of this
 limitation, and a model change would show up there first.
+
+## First Sonnet 5 signal (2026-09-23)
+
+With `8c095d6` (current time in the prompt, pinned eval clock, `LLM_MODEL`):
+
+- **Haiku 4.5, full run:** 69/69 · 83/84 · 51/51 · 49/50, $0.284 for 138
+  calls. The core miss was the celiac row failing a correct reply on
+  keywords, now a rubric (`4933044`). Gluten-free Wednesday still fails.
+- **Sonnet 5, Sunrise only:** 10/10 · 12/12 · 11/11 · **11/11**, $0.220 for 24
+  calls. **Gluten-free Wednesday passed**, the one row no prompt or document
+  change moved on Haiku.
+
+Per call that's about $0.0092 against $0.0021, roughly 4.5x, using the
+assumed prices ($3/$15 per MTok for Sonnet 5, $1/$5 for Haiku).
+
+Not yet conclusive: one business, one run, Sonnet 5's replies can't be
+pinned (it rejects temperature), and the judge was Sonnet 5 grading
+itself. The full run, with an independent judge, decides it.
