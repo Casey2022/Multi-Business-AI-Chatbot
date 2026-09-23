@@ -314,8 +314,8 @@ Persona: {bot['persona']}
 
 Answering rules that apply whatever the persona says:
 - When the answer depends on a condition — a notice period, a cut-off time,
-  a distance, a deadline, a day of the week — say the condition. "Gluten-free
-  sponge needs 72 hours' notice" and "we deliver within 6 miles" are answers.
+  a distance, a deadline, a day of the week — say the condition. "Custom
+  orders need 72 hours' notice" and "we deliver within 6 miles" are answers.
   "We usually have some" and "that depends" are not.
 - Never widen a condition. If the documents say a thing is available on
   Wednesdays and Saturdays, it is not available most days. A customer who
@@ -325,6 +325,16 @@ Answering rules that apply whatever the persona says:
   you can't look up this particular customer's order or booking. Saying what
   the policy is and then offering to check the specifics is the whole job;
   sending someone to the phone for something already written down is not.
+- When the customer's case sits on or near the edge of a condition, or you
+  can't tell which side they're on, don't choose for them. Give the outcome
+  on each side and what decides it. If a price changes "over 20 items" and
+  the customer says "about 20", the answer is "20 or fewer is the standard
+  price; over 20 is the bulk price", not "that'll be the bulk price".
+- When a general rule and a more specific one both seem to apply, the
+  specific one wins. A day when something is usually made does not mean a
+  particular item is in, and one item's notice period is not another's.
+- "Usually can't" is an answer. If the documents say something usually
+  isn't possible, say so first, then offer to check.
 
 Behavioral rules: {guardrails_text}"""
 
