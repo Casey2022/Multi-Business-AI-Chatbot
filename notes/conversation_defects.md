@@ -146,7 +146,7 @@ Two candidate fixes (the prompt one was taken — see Resolved below):
 Measured by: `("can I pop in today and grab a gluten free muffin", ...)`
 in rag_eval's hard set.
 
-## Hedging past a policy it holds (2026-09-23)  (FIXED — `c27e6dd`)
+## Hedging past a policy it holds (2026-09-23)  (STILL OPEN — `c27e6dd` did not fix it)
 
 Asked "I cancelled three days before, do I get my deposit back", Sunrise
 answered:
@@ -176,23 +176,36 @@ Same family as the gluten-free answer above: both are questions whose
 honest answer is conditional, and both got softened — one into a promise,
 one into a shrug.
 
-## Resolved — both conditional-answer defects (`c27e6dd`, measured 2026-09-22)
+## `c27e6dd` — gluten-free fixed, deposit NOT fixed (2026-09-22)
 
-Fixed with the prompt route, not the documents route: three system-prompt
-rules in `llm.py` — state the condition rather than the outcome, never
-widen it, and state a published policy even when the customer's own order
-can't be looked up.
+`c27e6dd` added three system-prompt rules in `llm.py`: state the condition
+rather than the outcome, never widen it, and state a published policy even
+when the customer's own order can't be looked up.
 
-Measured with `rag_eval.py --all` at temperature 0: hard answers
-29/30 → 30/30, every other column unchanged (69/69 · 84/84 · 31/31 ·
-30/30), reproduced on a second run. The gluten-free muffin question did
-not regress. Cost: about 90 input tokens per request.
+**Gluten-free: fixed.** The muffin question passes and has not regressed.
 
-Caveat on the deposit question: the grader checks that the reply contains
-"forfeited", which proves the fact is present, not that the 7-day rule is
-stated as the condition. Read the reply itself before treating this as
-closed at the wording level:
-`python3 rag_eval.py sunrise_bakery_and_cafe | grep -A3 "deposit back"`.
+**Deposit: still open.** The reply read at temperature 0 on 2026-09-22:
 
-Consolidating Sunrise's gluten-free information (candidate fix 2) is no
-longer needed as a fallback; it stays in the backlog as optional tidying.
+> I can't look up your specific order or cancellation, so I'd need you to
+> call us at (585) 555-0188 to sort this out.
+
+That is the original shrug, nearly word for word. The third rule was
+written for exactly this case and the reply ignores it. The 7-day forfeit
+rule is not mentioned.
+
+**The score didn't catch it.** That run printed `answer PASS` for this
+reply, although the reply doesn't contain "forfeited", the fact the test
+expects. Run in isolation, `contains()` on disk returns False for this
+reply, so the PASS is not explained yet. Until it is, the 30/30 hard-answer
+figure isn't trustworthy for this row. Separately, the test is too weak
+even when it works: "forfeited" can appear without the 7-day condition that
+makes it the answer.
+
+Next:
+1. Find out why this row printed PASS.
+2. Make the test demand the condition (7 days), not just the outcome word.
+3. Fix the reply. The rule is in the prompt and isn't being followed, so the
+   next thing to try is stronger placement or an example, not another rule.
+
+Consolidating Sunrise's gluten-free information is no longer needed as a
+fallback; it stays in the backlog as optional tidying.
