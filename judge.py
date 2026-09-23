@@ -107,8 +107,25 @@ def parse_verdict(text):
     return data["pass"], str(data.get("reason", "")).strip()
 
 
+def text_of(blocks):
+    """The answer text from a response's content blocks.
+
+    Sonnet 5 can put a thinking block before the text, so the first block
+    isn't always the answer. That crashed a full rag_eval run on 2026-09-23.
+    Works for SDK objects and plain-JSON dicts alike.
+    """
+    parts = []
+    for block in blocks or []:
+        kind = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
+        if kind == "text":
+            parts.append(block["text"] if isinstance(block, dict) else block.text)
+    return "\n".join(parts)
+
+
 def _request(prompt):
-    body = {"model": JUDGE_MODEL, "max_tokens": 200,
+    # Room for a thinking block AND the verdict. At 200, a long thinking
+    # block could use the whole budget and leave no answer.
+    body = {"model": JUDGE_MODEL, "max_tokens": 1024,
             "messages": [{"role": "user", "content": prompt}]}
     if JUDGE_TEMPERATURE is not None:
         body["temperature"] = float(JUDGE_TEMPERATURE)
@@ -125,7 +142,7 @@ def _call(prompt):
 
     if Anthropic is not None:
         response = Anthropic(api_key=key).messages.create(**_request(prompt))
-        text = response.content[0].text
+        text = text_of(response.content)
         tokens_in, tokens_out = response.usage.input_tokens, response.usage.output_tokens
     else:
         import urllib.request
@@ -136,7 +153,7 @@ def _call(prompt):
                      "content-type": "application/json"})
         with urllib.request.urlopen(request, timeout=60) as r:
             body = json.load(r)
-        text = body["content"][0]["text"]
+        text = text_of(body["content"])
         tokens_in, tokens_out = body["usage"]["input_tokens"], body["usage"]["output_tokens"]
 
     usage["calls"] += 1
@@ -149,7 +166,14 @@ def judge(question, reply, rubric):
     """(passed, reason) for one reply against its rubric."""
     if not (reply or "").strip():
         return False, "empty reply"
-    return parse_verdict(_call(prompt_for(question, reply, rubric)))
+    try:
+        text = _call(prompt_for(question, reply, rubric))
+    except Exception as e:
+        # One failed judge call must not throw away a whole paid run. It
+        # counts as a FAIL, and the reason says it was the judge, not the
+        # receptionist, so nobody chases a defect that isn't there.
+        return False, f"JUDGE ERROR (not a verdict): {type(e).__name__}: {e}"
+    return parse_verdict(text)
 
 
 def cost_summary():
