@@ -822,6 +822,12 @@ def main():
         judge_summary = judge.cost_summary()
         if judge_summary:
             print(judge_summary)
+        if judge.errors:
+            # Scored as FAIL so a paid run isn't lost, but a failure with no
+            # judge behind it isn't a finding about the receptionist.
+            print(f"\n  WARNING: {len(judge.errors)} judge call(s) failed and "
+                  f"were scored FAIL. The rubric rows in this table are not "
+                  f"valid. First error:\n    {judge.errors[0]}")
 
     return 0
 

@@ -43,6 +43,15 @@ JUDGE_TEMPERATURE = os.environ.get("JUDGE_TEMPERATURE")
 
 usage = {"calls": 0, "in": 0, "out": 0}
 
+# Every judge failure's reason starts with this, so callers can tell "the
+# judge said FAIL" from "there was no judge".
+ERROR_PREFIX = "JUDGE ERROR (not a verdict)"
+errors = []
+
+
+def is_error(reason):
+    return str(reason).startswith(ERROR_PREFIX)
+
 
 class Rubric:
     """What a correct answer must do, and the document text that says so."""
@@ -172,7 +181,9 @@ def judge(question, reply, rubric):
         # One failed judge call must not throw away a whole paid run. It
         # counts as a FAIL, and the reason says it was the judge, not the
         # receptionist, so nobody chases a defect that isn't there.
-        return False, f"JUDGE ERROR (not a verdict): {type(e).__name__}: {e}"
+        reason = f"{ERROR_PREFIX}: {type(e).__name__}: {e}"
+        errors.append(reason)
+        return False, reason
     return parse_verdict(text)
 
 

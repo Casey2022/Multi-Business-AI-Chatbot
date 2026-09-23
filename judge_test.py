@@ -168,6 +168,16 @@ def main():
     wrong = 0
     for label, question, rubric, reply, should_pass in CASES:
         passed, reason = judge.judge(question, reply, rubric)
+        if judge.is_error(reason):
+            # A failed call is not a FAIL verdict. Counting it as one let a
+            # run with zero successful calls report 17/27: every case whose
+            # known answer is FAIL "agreed". Stop at the first error. The
+            # usual causes (usage limit, bad model name, no network) fail
+            # every call, and the rest would cost time and prove nothing.
+            print(f"ERROR · {label}\n      {reason}")
+            print(f"\nStopped: the judge didn't return a verdict, so this run "
+                  f"says nothing about it. Fix the error and re-run.")
+            return 2
         ok = passed == should_pass
         wrong += not ok
         print(f"{'ok  ' if ok else 'WRONG'} expected {'PASS' if should_pass else 'FAIL'}, "
@@ -175,7 +185,7 @@ def main():
         if not ok:
             print(f"      judge said: {reason}")
     print(f"\n{len(CASES) - wrong}/{len(CASES)} verdicts agree with the known answer.")
-    print(judge.cost_summary())
+    print(judge.cost_summary() or "Judge: no successful calls.")
     return 1 if wrong else 0
 
 
