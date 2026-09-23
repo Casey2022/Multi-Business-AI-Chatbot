@@ -145,3 +145,33 @@ Two candidate fixes, neither taken yet:
 
 Measured by: `("can I pop in today and grab a gluten free muffin", ...)`
 in rag_eval's hard set.
+
+## Hedging past a policy it holds (2026-09-23)
+
+Asked "I cancelled three days before, do I get my deposit back", Sunrise
+answered:
+
+> I can't look up your specific order, so I'm not sure which service you
+> ordered or what deposit terms apply. Please call us.
+
+The Deposits section was retrieved and says it plainly: cancellation less
+than 7 days out means the deposit is forfeited; less than 48 hours means
+the full order price is charged. Three days is inside seven. The policy
+was answerable without knowing anything about the order.
+
+The first half of that reply is true and worth keeping — it genuinely
+can't look up an order. The failure is stopping there instead of saying
+what the policy is and then offering to check the specifics. A caller who
+rings the bakery to be told a published policy is a caller the assistant
+existed to save.
+
+Not always. The same question answered correctly on the previous run,
+which is the other half of the finding: replies vary between runs, and a
+one-question swing is not evidence of anything. rag_eval now pins
+temperature to 0 so a difference between two scores is a difference in the
+system rather than the weather. This defect is therefore recorded as
+intermittent-and-real, not as a regression from any particular change.
+
+Same family as the gluten-free answer above: both are questions whose
+honest answer is conditional, and both got softened — one into a promise,
+one into a shrug.

@@ -413,7 +413,7 @@ examples, however it is phrased.
 # ---------------------------------------------------------------------------
 
 def get_llm_reply(message, history=None, config=None, channel="sms",
-                  mid_booking=False):
+                  mid_booking=False, temperature=None):
     """Send the customer's message to Claude with full context and return reply.
 
     Context assembled per-request:
@@ -424,6 +424,15 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
 
     `config` is required — passing None will raise a clear error rather than
     silently serving the wrong business.
+
+    `temperature` is for measurement, not for customers. Left alone, replies
+    vary a little run to run, which is what you want from a receptionist and
+    ruinous when you are comparing two scores: a question that answered
+    "cancelling inside 7 days means the deposit is forfeited" on Tuesday
+    declined to answer at all on Wednesday, with nothing changed in between.
+    A one-question swing then reads as a regression when it is the weather.
+    rag_eval pins it to 0 so a difference between runs is a difference in
+    the system.
     """
     if config is None:
         raise ValueError("get_llm_reply requires a config dict — "
@@ -468,12 +477,11 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     messages.append({"role": "user", "content": message})
 
     try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=200,
-            system=effective_system,
-            messages=messages,
-        )
+        call = dict(model=MODEL, max_tokens=200,
+                    system=effective_system, messages=messages)
+        if temperature is not None:
+            call["temperature"] = temperature
+        response = client.messages.create(**call)
         _note_usage(response, "Q&A reply")
         reply = response.content[0].text.strip()
         log.debug(f"Claude replied: {reply!r}")

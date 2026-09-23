@@ -433,6 +433,19 @@ NUMBER_WORDS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
                 "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
 
 
+def money_form(text):
+    """'$12k' and '$12,000' are the same number.
+
+    An assistant writes a price the way a person would say it out loud. The
+    documents write it the way a quote does. Both are correct and only one
+    of them was passing.
+    """
+    import re
+    def expand(match):
+        return f"${int(float(match.group(1)) * 1000):,}"
+    return re.sub(r"\$\s*([\d.]+)\s*k\b", expand, normalise(text))
+
+
 def digit_form(text):
     """'three hours' -> '3 hours', so a fact can be asserted either way."""
     words = normalise(text).split()
@@ -459,11 +472,13 @@ def contains(reply, expected):
         # customer nothing and must not count as one.
         return bool((reply or "").strip()) and not claims_it(reply)
 
-    forms = (normalise(reply), digit_form(reply), range_form(reply))
+    forms = (normalise(reply), digit_form(reply), range_form(reply),
+             money_form(reply))
     for one in (expected if isinstance(expected, (tuple, list)) else (expected,)):
         if (normalise(one) in forms[0]
                 or digit_form(one) in forms[1]
-                or range_form(one) in forms[2]):
+                or range_form(one) in forms[2]
+                or money_form(one) in forms[3]):
             return True
     return False
 
@@ -516,7 +531,9 @@ def evaluate(slug, ask_llm=True, verbose=True):
             score[prefix + "total"] += 1
             score[prefix + "hits"]  += 1 if retrieved_ok else 0
 
-        reply = get_llm_reply(question, None, config) if ask_llm else None
+        # Temperature 0: a score has to be comparable to the last one.
+        reply = (get_llm_reply(question, None, config, temperature=0)
+                 if ask_llm else None)
 
         answered_ok = None
         if ask_llm and expected_fact is not None:
