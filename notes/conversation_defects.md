@@ -361,3 +361,33 @@ the stored Allergens chunk contains the new sentence. So either the query
 doesn't retrieve that chunk (a retrieval problem), or it does and the model
 ignores a sentence that answers the question directly (a model problem).
 `rag_probe.py` tells the two apart.
+
+### Retrieval ruled out: it's the model (2026-09-23)
+
+`rag_probe.py sunrise_bakery_and_cafe "it's Wednesday, can I pop in today
+and grab a gluten free muffin"`:
+
+```
+  0.227  in  Muffins and Daily Pastries
+  0.244  in  Allergens and Dietary Notes        <- holds the new sentence
+  0.322  in  Muffins and Daily Pastries (continued)
+  0.390  in  Pickup, Delivery, and Hours
+  0.422  in  Pastry Trays for Events
+  0.444  in  Flavors and Fillings Available
+```
+
+Every relevant section was in the context, near the top. The model had
+"gluten-free muffins are made to order with 96 hours' notice" and "not part
+of the daily selection" in front of it, and still answered "call ahead to
+confirm we have gluten-free muffins in stock right now". It keys on
+"Wednesday" + "gluten-free batches" and reads that as yes.
+
+**Status: known limitation of the receptionist model (Haiku 4.5), not a
+retrieval or document gap.** Recorded as such, deliberately NOT chased with
+more prompt rules. Each rule costs input tokens on every request, and the
+last one (`daf684b`) fixed two cases and broke a third. What would plausibly
+fix it is a stronger receptionist model, which is a cost decision for every
+conversation, not an eval fix.
+
+The eval row stays as it is, failing. It is the honest measure of this
+limitation, and a model change would show up there first.
