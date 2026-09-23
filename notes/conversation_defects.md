@@ -103,7 +103,7 @@ verifiable instead of hopeful — and the harness keeps them fixed.
 
 ---
 
-## Inventing availability (2026-09-22)
+## Inventing availability (2026-09-22)  (FIXED — `c27e6dd`)
 
 Found by the RAG evaluation set, not by reading a transcript.
 
@@ -133,7 +133,7 @@ constraints are what got softened. A question whose answer is "yes, but
 only under these conditions" is the risky shape, not a question whose
 answer is a number.
 
-Two candidate fixes, neither taken yet:
+Two candidate fixes (the prompt one was taken — see Resolved below):
 
 1. **Prompt.** An explicit instruction that availability, notice periods
    and lead times are stated exactly as the documents state them, never
@@ -146,7 +146,7 @@ Two candidate fixes, neither taken yet:
 Measured by: `("can I pop in today and grab a gluten free muffin", ...)`
 in rag_eval's hard set.
 
-## Hedging past a policy it holds (2026-09-23)
+## Hedging past a policy it holds (2026-09-23)  (FIXED — `c27e6dd`)
 
 Asked "I cancelled three days before, do I get my deposit back", Sunrise
 answered:
@@ -175,3 +175,24 @@ intermittent-and-real, not as a regression from any particular change.
 Same family as the gluten-free answer above: both are questions whose
 honest answer is conditional, and both got softened — one into a promise,
 one into a shrug.
+
+## Resolved — both conditional-answer defects (`c27e6dd`, measured 2026-09-22)
+
+Fixed with the prompt route, not the documents route: three system-prompt
+rules in `llm.py` — state the condition rather than the outcome, never
+widen it, and state a published policy even when the customer's own order
+can't be looked up.
+
+Measured with `rag_eval.py --all` at temperature 0: hard answers
+29/30 → 30/30, every other column unchanged (69/69 · 84/84 · 31/31 ·
+30/30), reproduced on a second run. The gluten-free muffin question did
+not regress. Cost: about 90 input tokens per request.
+
+Caveat on the deposit question: the grader checks that the reply contains
+"forfeited", which proves the fact is present, not that the 7-day rule is
+stated as the condition. Read the reply itself before treating this as
+closed at the wording level:
+`python3 rag_eval.py sunrise_bakery_and_cafe | grep -A3 "deposit back"`.
+
+Consolidating Sunrise's gluten-free information (candidate fix 2) is no
+longer needed as a fallback; it stays in the backlog as optional tidying.
