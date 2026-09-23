@@ -105,6 +105,10 @@ def claims_it(reply):
 #                   "ANSWER_ONLY"   retrieval isn't the measure here
 #   expected fact   "text"          the reply must contain this
 #                   ("a", "b")      the reply must contain at least one
+#                   ["a", "b"]      the reply must contain every one — for a
+#                                   conditional answer, the condition AND the
+#                                   outcome. An item may be a tuple of
+#                                   spellings: ["a", ("b", "b2")]
 #                   None            not scored — printed for reading only
 TESTS = {
     "bobs_plumbing": [
@@ -283,6 +287,13 @@ HARD = {
                                                   "Service Area",      ("$50", "travel fee")),
         ("is the leak detection charge wasted if I go ahead with the repair",
                                                   "Leak Repair",       ("$125", "applied")),
+        # --- Added 2026-09-22: conditional answers, traps, two-part facts ---
+        ("there's a damp patch spreading on my wall, can you fix it today",
+                                                  "Leak Repair",       ["1-2 days", "$125"]),
+        ("it's 2am and my basement is flooding, what will it cost to get someone out",
+                                                  "Emergency Service", ["$75", "labor"]),
+        ("how much to swap my 50 gallon tank for a tankless one",
+                                                  "Water Heater",      ["$3,500", "$5,500"]),
     ],
     "sunrise_bakery_and_cafe": [
         ("my kid wants a themed cake for Saturday and it's Friday",
@@ -306,6 +317,17 @@ HARD = {
                           ("Muffins", "Allergens"),
                           ("not part of the daily selection", "96 hours",
                            "wednesdays")),
+        # --- Added 2026-09-22 ---
+        # Trap: "full refund" is the wrong half — 25% of a wedding deposit
+        # is non-refundable however early you cancel.
+        ("if I cancel my wedding cake a month out do I get my deposit back",
+                                                  "Deposits",          ["25%", "non-refundable"]),
+        ("I'd like to order a wedding cake for next weekend",
+                                                  "Wedding Cakes",     ["2 weeks", "tasting"]),
+        ("I need two dozen blueberry muffins tomorrow morning, guaranteed",
+                                                  "Muffins",           ["24 hours", "$35"]),
+        ("do you have anything that's nut free",  "Allergens",
+                          ["tree nuts", ("cannot guarantee", "can't guarantee")]),
     ],
     "belmont_hair_studio": [
         ("my hair is box dyed and I want to go lighter",
@@ -319,6 +341,15 @@ HARD = {
                                                   "Haircuts",          ("$10", "$25", "$38")),
         ("who should I ask for if I want balayage",
                                                   "Stylists",          ("Priya", "Dana")),
+        # --- Added 2026-09-22 ---
+        # Trap: half grey is NOT more than half, so it's a root touch-up.
+        ("I'm about half grey, what would it cost to cover it",
+                                                  "Colour",            ["$85", "more than half"]),
+        ("my colour is at 9am tomorrow and it's 10am now, what if I cancel",
+                                                  "Cancellation",      ["24 hours", "50%"]),
+        ("can I get a cut and colour this afternoon",
+                                                  "Cut and Colour",    [("same day", "same-day")]),
+        ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
     ],
     "ridgeline_contracting": [
         ("can you start my roof next week, rain is forecast",
@@ -333,6 +364,16 @@ HARD = {
                                                   "Payment",           "change order"),
         ("do I have to pay for the permit separately",
                                                   "Licensing",         ("itemised", "itemized", "separately")),
+        # --- Added 2026-09-22 ---
+        ("can you replace a rotten step at my cottage about 50 miles away",
+                                                  "Service Area",      [("35 miles", "close to home")]),
+        ("roughly what would a 300 square foot composite deck cost",
+                                                  "Decks",             ["$55", "$80"]),
+        # Trap: agreeing is the harm. They never take the full amount up front.
+        ("you'll want the whole amount up front, right?",
+                                                  "Payment",           [("stages", "milestone", "progress payment")]),
+        ("my bathroom in a 1920s house needs redoing, can you give me a firm price now",
+                                                  "Bathroom",          ["subfloor", ("visit", "estimat")]),
     ],
     "crosstown_pizza": [
         ("how much for a large with pepperoni, mushroom and onion",
@@ -345,6 +386,17 @@ HARD = {
                                                   "Allergens",         ("cannot", "shared", "call")),
         ("what time do you shut on a Sunday",     "Hours",             ("10pm", "9:45")),
         ("do you do a vegan crust",               "Toppings",          DECLINE),
+        # --- Added 2026-09-22 ---
+        # Trap: gluten-free only comes as a 10-inch.
+        ("can I get the gluten free crust on a large",
+                                                  "Pizza Sizes",       [("10-inch", "10 inch")]),
+        ("can you deliver just a 10 piece wings, that's $12",
+                                                  "Delivery",          ["$15", "minimum"]),
+        ("can I place a pickup order here",       "Pickup",            ["555-0177"]),
+        ("it's Saturday at 7pm, how long will delivery take",
+                                                  "Delivery",          ["45 to 70"]),
+        ("can I split the bill across three cards",
+                                                  "Payment",           [("two cards", "2 cards")]),
     ],
 }
 
@@ -402,7 +454,11 @@ def validate_tests():
                 if isinstance(fact, list):
                     # A list means "all of these": every one must be in the
                     # document, or the test demands something it never says.
-                    missing = [f for f in fact if f.lower() not in lowered]
+                    # An item can itself be a tuple of spellings, any of
+                    # which will do.
+                    missing = [f for f in fact
+                               if not any(one.lower() in lowered for one in
+                                          (f if isinstance(f, tuple) else (f,)))]
                     if missing:
                         problems.append(
                             f"{slug}: document doesn't say {missing!r} — {question}")
