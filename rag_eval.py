@@ -36,6 +36,9 @@ load_dotenv()
 from config import load_config
 from rag import retrieve, collection_for, get_chroma_client
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
+import judge
+import rubrics
+from judge import Rubric
 
 
 def config_for(slug):
@@ -109,6 +112,10 @@ def claims_it(reply):
 #                                   conditional answer, the condition AND the
 #                                   outcome. An item may be a tuple of
 #                                   spellings: ["a", ("b", "b2")]
+#                   Rubric(...)     a second model grades the reply against
+#                                   written criteria (see judge.py) — for
+#                                   answers where applying a condition is the
+#                                   point, which no keyword can check
 #                   None            not scored — printed for reading only
 TESTS = {
     "bobs_plumbing": [
@@ -306,7 +313,7 @@ HARD = {
         ("cheapest way to feed twenty people at a morning meeting",
                                                   "Pastry Trays",      "$140"),
         ("I cancelled three days before, do I get my deposit back",
-                                                  "Deposits",          ["7 days", "forfeited"]),
+                                                  "Deposits",          rubrics.DEPOSIT_THREE_DAYS),
         # The assistant answered "a few gluten-free pastries available most
         # days", which the documents contradict three separate times: the
         # sponge needs 96 hours, the dedicated batches are Wednesdays and
@@ -321,9 +328,9 @@ HARD = {
         # Trap: "full refund" is the wrong half — 25% of a wedding deposit
         # is non-refundable however early you cancel.
         ("if I cancel my wedding cake a month out do I get my deposit back",
-                                                  "Deposits",          ["25%", "non-refundable"]),
+                                                  "Deposits",          rubrics.WEDDING_CANCEL_MONTH_OUT),
         ("I'd like to order a wedding cake for next weekend",
-                                                  "Wedding Cakes",     ["2 weeks"]),
+                                                  "Wedding Cakes",     rubrics.WEDDING_NEXT_WEEKEND),
         # The clock is in the question because the prompt carries the date
         # but not the time: "tomorrow morning" alone can't be checked
         # against a 24-hour rule, and the answer would change with when the
@@ -334,7 +341,7 @@ HARD = {
                           # A list of refusal phrasings was tried first and
                           # failed an honest reply ("the guarantee needs that
                           # 24-hour window") — the same trap DECLINE fell into.
-                          ["24 hours", "14 hours"]),
+                          rubrics.MUFFINS_6PM_FOR_8AM),
         ("do you have anything that's nut free",  "Allergens",
                           ["tree nuts", ("cannot guarantee", "can't guarantee")]),
     ],
@@ -353,14 +360,14 @@ HARD = {
         # --- Added 2026-09-22 ---
         # Trap: half grey is NOT more than half, so it's a root touch-up.
         ("I'm about half grey, what would it cost to cover it",
-                                                  "Colour",            ["$85", "more than half"]),
+                                                  "Colour",            rubrics.HALF_GREY),
         ("my colour is at 9am tomorrow and it's 10am now, what if I cancel",
                                                   "Cancellation",      ["24 hours", "50%"]),
         # Clock stated for the same reason as the muffins. 11am + 2.5 hours
         # clears the 3pm colour cut-off, so arithmetic says yes; the
         # document says a same-day cut and colour usually can't be fitted.
         ("it's 11am, can I get a cut and colour this afternoon",
-                                                  "Cut and Colour",    [("same day", "same-day")]),
+                                                  "Cut and Colour",    rubrics.CUT_AND_COLOUR_SAME_DAY),
         ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
     ],
     "ridgeline_contracting": [
@@ -413,14 +420,6 @@ HARD = {
 }
 
 
-# Facts a correct answer has to WORK OUT rather than quote, so they can't
-# appear in the document. Each one carries the working, so the exemption is
-# checked by a reader instead of being a hole in validate_tests.
-DERIVED = {
-    "14 hours": "6pm to 8am — the gap the 24-hour muffin rule is measured against",
-}
-
-
 def validate_tests():
     """Check every expected heading and fact against the actual documents.
 
@@ -468,6 +467,13 @@ def validate_tests():
                     if not any(wanted.lower() in h.lower() for h in headings):
                         problems.append(
                             f"{slug}: no section matches {wanted!r} — {question}")
+            if isinstance(fact, Rubric):
+                # The rubric's quote is its ground truth; if the document
+                # stops saying it, the rubric is grading against fiction.
+                if judge.flatten(fact.quote) not in judge.flatten(document):
+                    problems.append(
+                        f"{slug}: rubric quote not in document — {question}")
+                continue
             if fact is not None and fact != DECLINE:
                 # DECLINE asserts the shape of the reply, not a fact in the
                 # document — there is nothing here to check it against.
@@ -477,7 +483,6 @@ def validate_tests():
                     # An item can itself be a tuple of spellings, any of
                     # which will do.
                     missing = [f for f in fact
-                               if f not in DERIVED
                                and not any(one.lower() in lowered for one in
                                           (f if isinstance(f, tuple) else (f,)))]
                     if missing:
@@ -629,7 +634,13 @@ def evaluate(slug, ask_llm=True, verbose=True):
                  if ask_llm else None)
 
         answered_ok = None
-        if ask_llm and expected_fact is not None:
+        judged = None
+        if ask_llm and isinstance(expected_fact, Rubric):
+            answered_ok, judged = judge.judge(question, reply, expected_fact)
+            key = "ha_" if is_hard else "a_"
+            score[key + "total"] += 1
+            score[key + "hits"]  += 1 if answered_ok else 0
+        elif ask_llm and expected_fact is not None:
             answered_ok = contains(reply, expected_fact)
             key = "ha_" if is_hard else "a_"
             score[key + "total"] += 1
@@ -637,8 +648,10 @@ def evaluate(slug, ask_llm=True, verbose=True):
 
         bad = (retrieved_ok is False) or (answered_ok is False)
         if bad:
+            wanted = (f"{expected_fact.criteria}\n    judge:     {judged}"
+                      if judged is not None else expected_fact)
             failures.append((("hard: " if is_hard else "") + question,
-                             verdict, expected_fact, reply))
+                             verdict, wanted, reply))
 
         if verbose:
             marks = []
@@ -650,6 +663,8 @@ def evaluate(slug, ask_llm=True, verbose=True):
             print(f"     {' · '.join(marks) if marks else 'not scored'}")
             if bad:
                 print(f"     wanted: {expected_fact!r}")
+            if judged is not None:
+                print(f"     judge:  {judged}")
             if reply:
                 print(f"     reply: {reply}")
 
@@ -727,7 +742,9 @@ def main():
         for question, verdict, expected, reply in every_failure:
             print(f"  · {question}")
             print(f"    retrieval: {verdict}")
-            if expected is not None:
+            if isinstance(expected, str) and "\n    judge:" in expected:
+                print(f"    rubric:    {expected}")
+            elif expected is not None:
                 print(f"    wanted:    {expected!r}")
             if reply:
                 # The whole reply, indented. A cut-off reply is how a correct
@@ -741,6 +758,9 @@ def main():
         summary = turn_cost_summary()
         if summary:
             print(f"Run cost: {summary}")
+        judge_summary = judge.cost_summary()
+        if judge_summary:
+            print(judge_summary)
 
     return 0
 
