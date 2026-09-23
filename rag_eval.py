@@ -324,8 +324,16 @@ HARD = {
                                                   "Deposits",          ["25%", "non-refundable"]),
         ("I'd like to order a wedding cake for next weekend",
                                                   "Wedding Cakes",     ["2 weeks", "tasting"]),
-        ("I need two dozen blueberry muffins tomorrow morning, guaranteed",
-                                                  "Muffins",           ["24 hours", "$35"]),
+        # The clock is in the question because the prompt carries the date
+        # but not the time: "tomorrow morning" alone can't be checked
+        # against a 24-hour rule, and the answer would change with when the
+        # eval happens to run. Trap: 6pm to 8am is 14 hours, not 24.
+        ("it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow",
+                                                  "Muffins",
+                          ["24 hours", ("can't guarantee", "cannot guarantee",
+                                        "can't be guaranteed", "won't be guaranteed",
+                                        "not guaranteed", "call ahead",
+                                        "not enough notice", "less than 24")]),
         ("do you have anything that's nut free",  "Allergens",
                           ["tree nuts", ("cannot guarantee", "can't guarantee")]),
     ],
@@ -347,7 +355,10 @@ HARD = {
                                                   "Colour",            ["$85", "more than half"]),
         ("my colour is at 9am tomorrow and it's 10am now, what if I cancel",
                                                   "Cancellation",      ["24 hours", "50%"]),
-        ("can I get a cut and colour this afternoon",
+        # Clock stated for the same reason as the muffins. 11am + 2.5 hours
+        # clears the 3pm colour cut-off, so arithmetic says yes; the
+        # document says a same-day cut and colour usually can't be fitted.
+        ("it's 11am, can I get a cut and colour this afternoon",
                                                   "Cut and Colour",    [("same day", "same-day")]),
         ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
     ],
@@ -709,7 +720,11 @@ def main():
             if expected is not None:
                 print(f"    wanted:    {expected!r}")
             if reply:
-                print(f"    said:      {reply[:160]}")
+                # The whole reply, indented. A cut-off reply is how a correct
+                # answer got read as a failure: the part that mattered was in
+                # the second paragraph.
+                said = reply.replace("\n", "\n               ")
+                print(f"    said:      {said}")
             print()
 
     if ask_llm:

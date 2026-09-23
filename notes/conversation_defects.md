@@ -220,3 +220,47 @@ shrug and an outcome-only reply ("your deposit is forfeited") both fail.
 
 Consolidating Sunrise's gluten-free information is no longer needed as a
 fallback; it stays in the backlog as optional tidying.
+
+## Widening a threshold (2026-09-22)  (OPEN)
+
+Found by the harder eval set (`c366bd0`). Asked "I'm about half grey, what
+would it cost to cover it", Belmont answered:
+
+> Grey coverage is priced as a root touch-up if it's under half your head,
+> or all-over if it's half or more. Since you're about half grey, that'd be
+> all-over colour — **$110 and about 2 hours**.
+
+The document says grey coverage is a root touch-up "unless the grey is
+more than half the head". Half is not more than half, so the answer is $85.
+The assistant restated the rule with the boundary moved ("half or more"),
+then applied its own version and quoted $25 too much.
+
+This breaks `c27e6dd`'s "never widen a condition" rule directly. The rule
+is in the prompt and wasn't followed. Note the direction, too: every
+earlier softening moved toward what the customer wanted to hear. This one
+moved toward the more expensive service. So the pattern isn't "tell
+people what they want to hear". It's "paraphrase the condition, then
+reason from the paraphrase". A boundary survives being quoted; it doesn't
+reliably survive being reworded.
+
+## Softening "usually can't" into "tight" (2026-09-22)  (OPEN)
+
+Asked "can I get a cut and colour this afternoon", Belmont reasoned from
+the 3pm colour cut-off and said "it'd be tight! Your best bet is to text
+'appointment' and see". The document says a cut and colour "holds a chair
+for most of a morning, so we can't usually fit one in on the same day".
+"Usually can't" was softened to "tight, try it". Milder than the others,
+same family.
+
+## The prompt knows the date, not the time
+
+`llm.py` gives the model `Today is <weekday, date>`, with no clock. So
+"tomorrow morning, guaranteed" can't be checked against a 24-hour notice
+rule. Asked for muffins for tomorrow morning, the assistant said "you're
+right at that window", a claim it had no way to make. That question is
+now phrased with the clock in it ("it's 6pm … for 8am tomorrow"), and so is
+the cut-and-colour one, so the eval doesn't depend on when it runs.
+
+Whether the live prompt should carry the time is a separate decision. A
+receptionist reasoning about "today" and "tomorrow" without a clock will
+keep hitting this.
