@@ -36,6 +36,7 @@ load_dotenv()
 from config import load_config
 from rag import retrieve, collection_for, get_chroma_client
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
+import llm
 import judge
 import rubrics
 from judge import Rubric
@@ -428,6 +429,37 @@ HARD = {
 }
 
 
+# The clock the prompt is given. It carries the time now, and the real clock
+# would make a score depend on when it was run: a question that says "it's
+# 6pm", asked at 2pm, contradicts its own prompt. Every question gets
+# DEFAULT_CLOCK unless it states a day or time, in which case it gets
+# that one here, so the prompt and the customer agree.
+from datetime import datetime as _dt
+DEFAULT_CLOCK = _dt(2026, 9, 22, 10, 0)          # a Tuesday, 10am: all five open
+CLOCKS = {
+    "it's 2am and my basement is flooding, what will it cost to get someone out":
+        _dt(2026, 9, 22, 2, 0),
+    "my kid wants a themed cake for Saturday and it's Friday":
+        _dt(2026, 9, 25, 10, 0),
+    "it's Wednesday, can I pop in today and grab a gluten free muffin":
+        _dt(2026, 9, 23, 10, 0),
+    "it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow":
+        _dt(2026, 9, 22, 18, 0),
+    "it's 11am, can I get a cut and colour this afternoon":
+        _dt(2026, 9, 22, 11, 0),
+    "my colour is at 9am tomorrow and it's 10am now, what if I cancel":
+        _dt(2026, 9, 22, 10, 0),
+    "it's Friday at five and I need food for twenty people":
+        _dt(2026, 9, 25, 17, 0),
+    "it's Saturday at 7pm, how long will delivery take":
+        _dt(2026, 9, 26, 19, 0),
+}
+
+
+def clock_for(question):
+    return CLOCKS.get(question, DEFAULT_CLOCK)
+
+
 def validate_tests():
     """Check every expected heading and fact against the actual documents.
 
@@ -460,6 +492,12 @@ def validate_tests():
 
     combined = {slug: list(TESTS.get(slug, [])) + list(HARD.get(slug, []))
                 for slug in set(TESTS) | set(HARD)}
+    # A clock keyed by a question that no longer exists pins nothing, and
+    # the reworded question silently runs on the default clock.
+    asked = {row[0] for rows in combined.values() for row in rows}
+    for question in CLOCKS:
+        if question not in asked:
+            problems.append(f"CLOCKS names a question that isn't asked: {question!r}")
     for slug, rows in sorted(combined.items()):
         path = Path("documents") / slug / "services.md"
         if not path.exists():
@@ -640,7 +678,8 @@ def evaluate(slug, ask_llm=True, verbose=True):
             score[prefix + "hits"]  += 1 if retrieved_ok else 0
 
         # Temperature 0: a score has to be comparable to the last one.
-        reply = (get_llm_reply(question, None, config, temperature=0)
+        reply = (get_llm_reply(question, None, config, temperature=0,
+                               now=clock_for(question))
                  if ask_llm else None)
 
         answered_ok = None
@@ -710,6 +749,12 @@ def main():
 
     if ask_llm:
         start_turn_accounting()
+        # Which receptionist is being scored belongs next to the score. A
+        # table pasted without it can't be compared to anything.
+        print(f"Receptionist model: {llm.MODEL}   Judge: {judge.JUDGE_MODEL}")
+        if llm.MODEL == judge.JUDGE_MODEL:
+            print("  Note: the judge is grading its own model. Consider "
+                  "JUDGE_MODEL=<a different model> (then re-run judge_test.py).")
 
     rows = []
     for slug in slugs:
@@ -767,7 +812,10 @@ def main():
     if ask_llm:
         summary = turn_cost_summary()
         if summary:
-            print(f"Run cost: {summary}")
+            print(f"Run cost: {summary}  [{llm.MODEL}]")
+        if llm.temperature_dropped:
+            print(f"  {llm.MODEL} rejects temperature, so these replies weren't "
+                  f"pinned. Expect more run-to-run variation than with Haiku.")
         judge_summary = judge.cost_summary()
         if judge_summary:
             print(judge_summary)
