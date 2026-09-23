@@ -366,8 +366,11 @@ HARD = {
         # Trap: half grey is NOT more than half, so it's a root touch-up.
         ("I'm about half grey, what would it cost to cover it",
                                                   "Colour",            rubrics.HALF_GREY),
+        # Rubric, not keywords: after daf684b the reply kept "50%" and said
+        # "cancel by 9am tomorrow to avoid the charge", which is wrong, and
+        # failed only because it wrote "24-hour window" instead of "24 hours".
         ("my colour is at 9am tomorrow and it's 10am now, what if I cancel",
-                                                  "Cancellation",      ["24 hours", "50%"]),
+                                                  "Cancellation",      rubrics.CANCEL_23_HOURS),
         # Clock stated for the same reason as the muffins. 11am + 2.5 hours
         # clears the 3pm colour cut-off, so arithmetic says yes; the
         # document says a same-day cut and colour usually can't be fitted.

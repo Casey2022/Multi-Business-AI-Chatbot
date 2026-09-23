@@ -73,3 +73,13 @@ GLUTEN_FREE_MUFFIN_WEDNESDAY = Rubric(
     gluten-free items are in today is fine. Fails if it implies a gluten-free
     muffin is likely available today, or gives a notice period shorter than
     96 hours (such as the regular muffins' 24 hours) for gluten-free muffins.""")
+
+CANCEL_23_HOURS = Rubric(
+    quote="Please give 24 hours' notice to cancel or move an appointment. Under "
+          "24 hours, or a no-show, is charged at 50% of the service.",
+    criteria="""Works out that 10am today to 9am tomorrow is 23 hours, which
+    is under the 24 hours' notice required, so cancelling now is charged at
+    50% of the service. Fails if it says the charge can still be avoided
+    (for example by cancelling before the appointment or "by 9am
+    tomorrow"), or treats 23 hours as borderline or "on the edge" rather
+    than inside the 24-hour window.""")

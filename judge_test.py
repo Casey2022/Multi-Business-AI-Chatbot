@@ -27,6 +27,7 @@ Q_MUFFINS = "it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am 
 Q_GREY = "I'm about half grey, what would it cost to cover it"
 Q_CUT = "it's 11am, can I get a cut and colour this afternoon"
 Q_GF = "it's Wednesday, can I pop in today and grab a gluten free muffin"
+Q_CANCEL = "my colour is at 9am tomorrow and it's 10am now, what if I cancel"
 
 CASES = [
     # (label, question, rubric, reply, should_pass)
@@ -109,6 +110,13 @@ CASES = [
      "calling ahead at (585) 555-0188 to confirm we have the flavor you want in "
      "stock.\n\nIf you want to guarantee a dozen, we can do that with 24 hours' "
      "notice. 🥐", False),
+    ("gf muffin Wed: 'today's a good day' (real, after daf684b)", Q_GF,
+     R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
+     "Great question! We have dedicated gluten-free batches on Wednesdays and "
+     "Saturdays, so today's a good day. That said, same-day availability "
+     "depends on what we've baked this morning — I'd recommend calling ahead "
+     "at (585) 555-0188 to confirmwe have the flavor you want in stock. We're "
+     "open until 3pm today!", False),
     ("gf muffin Wed: not daily, 96 hours (SYNTHETIC)", Q_GF,
      R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
      "Wednesday is one of our gluten-free baking days, but gluten-free muffins "
@@ -119,6 +127,20 @@ CASES = [
      R.GLUTEN_FREE_MUFFIN_WEDNESDAY,
      "We have a few gluten-free pastries available most days, and Wednesday is "
      "a gluten-free day, so pop in! 🧁", False),
+    ("cancel 23h: under 24, 50% applies (real, 2026-09-22)", Q_CANCEL, R.CANCEL_23_HOURS,
+     "You need to give 24 hours' notice to cancel without a charge. Since your "
+     "appointment is tomorrow at 9am and it's 10am now, that's less than 24 "
+     "hours — so a cancellation would be charged at 50% of the service.\n\nIf "
+     "you need to cancel or move it, call us at (585) 555-0142 and we can chat "
+     "through your options.", True),
+    ("cancel 23h: 'cancel by 9am tomorrow to avoid it' (real, after daf684b)",
+     Q_CANCEL, R.CANCEL_23_HOURS,
+     "You're cutting it close — you'd need to cancel by 9am tomorrow to avoid "
+     "the 50% cancellation charge. That's less than 23 hours from now, so "
+     "you're right on the edge of the 24-hour window.\n\nTo cancel, call us at "
+     "(585) 555-0142. We're open until 6pm today.", False),
+    ("cancel 23h: no charge promised (SYNTHETIC)", Q_CANCEL, R.CANCEL_23_HOURS,
+     "No problem — just let us know and we'll cancel it for you, no charge!", False),
     ("cut and colour: same-day caveat stated (SYNTHETIC)", Q_CUT, R.CUT_AND_COLOUR_SAME_DAY,
      "A cut and colour holds a chair for most of a morning, so we usually can't "
      "fit one in on the same day. Text 'appointment' and I can find you the "
