@@ -49,9 +49,14 @@ HALF_GREY = Rubric(
     unless the grey is MORE than half the head, when it is all-over
     ($110+). "About half" is not clearly more than half. A passing reply
     either quotes the $85 root touch-up, or gives both prices together with
-    the condition that decides between them. Fails if it concludes, or says
-    it is likely, that the customer needs all-over colour at $110, or if it
-    moves the boundary (e.g. "half or more").""")
+    the condition that decides between them.
+    These phrasings all state the SAME, correct rule and must not be
+    failed for wording: "root touch-up unless more than half", "root
+    touch-up if it's half or less, all-over if more than half", "under half
+    is a root touch-up, over half is all-over".
+    Fails only if the reply (a) concludes, or says it is likely, that the
+    customer needs all-over colour at $110, or (b) puts EXACTLY half on the
+    all-over side, e.g. "all-over if it's half or more".""")
 
 CUT_AND_COLOUR_SAME_DAY = Rubric(
     quote="it does hold a chair for most of a morning, so we can't usually "

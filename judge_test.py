@@ -85,6 +85,13 @@ CASES = [
      "Grey coverage is priced as a root touch-up if it's less than half your "
      "head, or all-over if it's more than half. Since you're about half grey, "
      "that'll likely be all-over colour — **$110 and about 2 hours**.", False),
+    ("grey: 'half or less' + both prices, it depends (real, 2026-09-23)",
+     Q_GREY, R.HALF_GREY,
+     "Grey coverage is priced as a root touch-up ($85) if it's half the head or "
+     "less — but if it's more than half, it's all-over colour ($110). Since you "
+     "said \"about half,\" it depends which side you're on. Either way, it's "
+     "about 2 hours.\n\nWant to book? Text 'appointment' and we'll get you "
+     "sorted. 💇", True),
     ("grey: both branches (SYNTHETIC)", Q_GREY, R.HALF_GREY,
      "Grey coverage is a root touch-up ($85) unless the grey is more than half "
      "your head, in which case it's all-over from $110. At about half you're "
