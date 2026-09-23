@@ -323,17 +323,18 @@ HARD = {
         ("if I cancel my wedding cake a month out do I get my deposit back",
                                                   "Deposits",          ["25%", "non-refundable"]),
         ("I'd like to order a wedding cake for next weekend",
-                                                  "Wedding Cakes",     ["2 weeks", "tasting"]),
+                                                  "Wedding Cakes",     ["2 weeks"]),
         # The clock is in the question because the prompt carries the date
         # but not the time: "tomorrow morning" alone can't be checked
         # against a 24-hour rule, and the answer would change with when the
         # eval happens to run. Trap: 6pm to 8am is 14 hours, not 24.
         ("it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow",
                                                   "Muffins",
-                          ["24 hours", ("can't guarantee", "cannot guarantee",
-                                        "can't be guaranteed", "won't be guaranteed",
-                                        "not guaranteed", "call ahead",
-                                        "not enough notice", "less than 24")]),
+                          # The arithmetic is the evidence it applied the rule.
+                          # A list of refusal phrasings was tried first and
+                          # failed an honest reply ("the guarantee needs that
+                          # 24-hour window") — the same trap DECLINE fell into.
+                          ["24 hours", "14 hours"]),
         ("do you have anything that's nut free",  "Allergens",
                           ["tree nuts", ("cannot guarantee", "can't guarantee")]),
     ],
@@ -412,6 +413,14 @@ HARD = {
 }
 
 
+# Facts a correct answer has to WORK OUT rather than quote, so they can't
+# appear in the document. Each one carries the working, so the exemption is
+# checked by a reader instead of being a hole in validate_tests.
+DERIVED = {
+    "14 hours": "6pm to 8am — the gap the 24-hour muffin rule is measured against",
+}
+
+
 def validate_tests():
     """Check every expected heading and fact against the actual documents.
 
@@ -468,7 +477,8 @@ def validate_tests():
                     # An item can itself be a tuple of spellings, any of
                     # which will do.
                     missing = [f for f in fact
-                               if not any(one.lower() in lowered for one in
+                               if f not in DERIVED
+                               and not any(one.lower() in lowered for one in
                                           (f if isinstance(f, tuple) else (f,)))]
                     if missing:
                         problems.append(

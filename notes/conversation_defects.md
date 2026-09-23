@@ -243,6 +243,19 @@ people what they want to hear". It's "paraphrase the condition, then
 reason from the paraphrase". A boundary survives being quoted; it doesn't
 reliably survive being reworded.
 
+**Revised after the second run.** That explanation doesn't hold. On the
+next run the assistant quoted the boundary correctly ("all-over if it's
+more than half") and still concluded "about half grey … that'll likely be
+all-over colour — $110". So the error isn't in the paraphrase. It's in
+*applying* a correctly quoted threshold to a case that sits on it. Having
+the assistant quote conditions verbatim would not have fixed this.
+
+What a correct answer does with a case near the boundary is give both
+branches: "if it's half or less it's a root touch-up at $85; if it's more
+than half it's all-over at $110; the stylist confirms at the chair." That's
+the existing "state the condition, not the outcome" rule, applied to a
+case the assistant felt it could decide on its own.
+
 ## Softening "usually can't" into "tight" (2026-09-22)  (OPEN)
 
 Asked "can I get a cut and colour this afternoon", Belmont reasoned from
