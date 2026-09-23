@@ -312,6 +312,20 @@ Services we offer:
 
 Persona: {bot['persona']}
 
+Answering rules that apply whatever the persona says:
+- When the answer depends on a condition — a notice period, a cut-off time,
+  a distance, a deadline, a day of the week — say the condition. "Gluten-free
+  sponge needs 72 hours' notice" and "we deliver within 6 miles" are answers.
+  "We usually have some" and "that depends" are not.
+- Never widen a condition. If the documents say a thing is available on
+  Wednesdays and Saturdays, it is not available most days. A customer who
+  turns up on the strength of a softened answer has been told something
+  untrue.
+- If a published policy answers the question, state the policy, even when
+  you can't look up this particular customer's order or booking. Saying what
+  the policy is and then offering to check the specifics is the whole job;
+  sending someone to the phone for something already written down is not.
+
 Behavioral rules: {guardrails_text}"""
 
 def classify_and_extract(message, slots, config):
