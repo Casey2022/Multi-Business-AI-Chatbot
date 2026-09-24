@@ -81,7 +81,13 @@ def main():
         heading("parse_datetime reads the date where the business is")
         # Tuesday 22 Sep 2026, 9:30pm Eastern = Wednesday 1:30am UTC.
         clock.utc_now = lambda: datetime(2026, 9, 23, 1, 30, tzinfo=timezone.utc)
-        llm.parse_datetime("tomorrow at 9am", config)
+        result = llm.parse_datetime("tomorrow at 9am", config)
+        # The RETURN value, not just the prompt. The first version of this
+        # test only read the prompt, and passed while parse_datetime returned
+        # None for every input (a NameError swallowed by its except), which
+        # broke every booking on the live demo.
+        check("parse_datetime returns the model's timestamp",
+              result == "2026-09-23 09:00", repr(result))
         prompt = sent[-1]["messages"][0]["content"]
         check("at 9:30pm Eastern the model is told it's Tuesday",
               "Tuesday, September 22, 2026" in prompt,
@@ -89,6 +95,22 @@ def main():
         check("... and its 'tomorrow' example is Wednesday the 23rd",
               '"tomorrow morning" -> 2026-09-23' in prompt,
               [l for l in prompt.splitlines() if "tomorrow morning" in l])
+
+        # And an answer that isn't a date comes back as None, not a crash.
+        real_create = llm.client.messages.create
+        llm.client.messages.create = lambda **c: types.SimpleNamespace(
+            content=[types.SimpleNamespace(type="text", text="NONE")],
+            stop_reason="end_turn",
+            usage=types.SimpleNamespace(input_tokens=0, output_tokens=0))
+        check("a model answer of NONE gives None",
+              llm.parse_datetime("whenever", config) is None)
+        llm.client.messages.create = lambda **c: types.SimpleNamespace(
+            content=[types.SimpleNamespace(type="text", text="2026-02-31 09:00")],
+            stop_reason="end_turn",
+            usage=types.SimpleNamespace(input_tokens=0, output_tokens=0))
+        check("an impossible date (Feb 31) gives None",
+              llm.parse_datetime("feb 31", config) is None)
+        llm.client.messages.create = real_create
 
         heading("the system prompt agrees with parse_datetime")
         system = llm.build_system_prompt({**config, "business": {
