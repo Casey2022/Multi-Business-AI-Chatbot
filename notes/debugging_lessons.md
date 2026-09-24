@@ -1277,3 +1277,39 @@ and about the date. Run under `TZ=UTC`, the old code fails them.
 **The general rule:** a naive datetime is only meaningful next to the
 answer to "local to what?". If two naive values come from different places,
 one of them is wrong somewhere.
+
+## The fix that broke every booking, and the test that watched the wrong end (2026-09-23)
+
+**Symptom:** on the live demo, every date a customer typed ("Tomorrow at
+12", "Friday at 2") got "Sorry, I couldn't read that as a date and time."
+It was found within an hour of deploying, by booking on the live site by hand.
+
+**Cause:** the time-zone fix (`50755a5`) trimmed an import in
+`parse_datetime` from `datetime, timedelta` to `timedelta`, because the line
+it replaced no longer needed `datetime`. Thirty lines further down,
+`datetime.strptime` validated the model's answer. Every call raised
+`NameError`, and a catch-all `except Exception` logged it at *info* as
+"Date parse error", the same line a customer's gibberish produces. So:
+no crash, no error in the log, and 100% of bookings refused.
+
+**Why the new test missed it:** `clock_test.py` checked the *prompt*
+`parse_datetime` sent to the model, which was the thing the fix changed,
+and never the *value it returned*. Its fake client answered correctly. The
+function then threw that answer away. The test watched the input end of the
+pipe while the output end was broken.
+
+**Fixes:**
+- the import, with a comment on why it's needed
+- the `except` split: `ValueError` is a customer miss (info); anything else
+  is our bug (`log.exception`, with a traceback)
+- the test asserts the return value, and was run against the broken import
+  to prove it fails
+
+**Lessons:**
+1. A test for a function checks what it *returns*, not only what it does
+   along the way.
+2. A catch-all `except` that logs at info turns a programming error into a
+   silent product failure. Catch the error you expect; let anything else be
+   loud.
+3. The "real conversation after every change" habit caught this in minutes.
+   All 309 green checks didn't.
