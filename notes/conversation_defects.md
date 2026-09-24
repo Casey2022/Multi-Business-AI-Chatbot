@@ -6,7 +6,7 @@ real exchange and a date, so "still broken" is a fact rather than a guess.
 
 ---
 
-## 1. A slot is re-asked with the identical sentence  (CURRENT — 2026-09-15)
+## 1. A slot is re-asked with the identical sentence  (FIXED — `70c0e2f` + `95dab25`)
 
 ```
 cust  book
@@ -32,13 +32,13 @@ Two separate faults:
 
 Oldest instance 2026-08-02, most recent 2026-09-15. Nine occurrences.
 
-## 2. Service name is whatever sentence happened to land  (CURRENT)
+## 2. Service name is whatever sentence happened to land  (FIXED — `70c0e2f`)
 
 The appointment from that conversation is titled **"I have a leaky pipe"**.
 It reaches the calendar and the owner's list that way. `service` is free
 text with no normalisation against the business's configured services.
 
-## 3. An offered slot is not honoured when the customer accepts it  (CURRENT — 2026-09-15)
+## 3. An offered slot is not honoured when the customer accepts it  (FIXED — `70c0e2f`)
 
 ```
 BOT   ...I have: Tuesday, September 22 at 11:00 AM · Tuesday, September 22
@@ -52,7 +52,7 @@ resolved "Wednesday at 9" against the calendar instead of against its own
 offer — landing on the 16th and refusing it. The alternatives it just
 printed are not remembered as conversational context.
 
-## 4. Stacked, ungrammatical greeting  (CURRENT)
+## 4. Stacked, ungrammatical greeting  (FIXED — `70c0e2f`)
 
 ```
 cust  I'd like to book an appointment for next wednesday
@@ -64,7 +64,7 @@ BOT   Happy to help with for next wednesday. Happy to schedule an
 with {known}" where known is "for next wednesday", then appends the
 greeting, which is itself a greeting. Two hellos and a broken preposition.
 
-## 5. Mid-booking questions are not answerable  (2026-08-02, needs re-checking)
+## 5. Mid-booking questions are not answerable  (FIXED — `70c0e2f`)
 
 ```
 BOT   Anything else we should know? (allergies, pickup person — or 'none')
@@ -79,11 +79,35 @@ the "treat the whole message as this slot's answer" fallback was added, the
 newer risk is the opposite: the question gets stored AS the answer. Both
 are wrong; confirm which happens now before designing the fix.
 
-## 6. Every miss becomes a phone number  (2026-08-02)
+## 6. Every miss becomes a phone number  (OPEN — 2026-08-02)
 
 Four consecutive bakery answers ended with "give us a call". Individually
 correct, cumulatively a brush-off. Worth a rule about not repeating the
 referral when the previous turn already made it.
+
+## Status check, 2026-09-24
+
+The headings above said CURRENT for nine days after `70c0e2f` (2026-09-15)
+fixed #1's mis-filing, #2, #3, #4 and #5 and built `conversation_eval.py`
+to hold them. Re-verified against today's code (after the prompt, clock
+and parse_datetime changes of 2026-09-22/24) with
+`python3 conversation_eval.py --repeat=3`: **9 of 10 scenarios clean 3/3**,
+covering the offered slot, the opener, "pipe leak" snapping to the
+catalogue, and a question asked mid-booking.
+
+The tenth, "the booking command typed mid-booking", failed 0/3, on
+`no_repeated_reply`. Asked for a date, the customer typed "appointment"
+and got the date question back word for word. It was no longer *stored*
+as the date, but the non-answer branch still returned the prompt verbatim,
+which is the second half of #1 that `70c0e2f` hadn't reached. Fixed in
+`95dab25`: booking words get "We're already setting up your leak repair,
+no need to start over", nudges get "Still here!", and every second
+non-answer alternates to a line offering 'cancel', so neighbouring replies
+never match. Static tests in `booking_state_test.py`. Re-run the scenario to
+confirm against the real extractor:
+`python3 conversation_eval.py "booking command" --repeat=3`.
+
+#6 has never been worked on.
 
 ---
 
