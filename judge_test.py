@@ -29,6 +29,7 @@ Q_CUT = "it's 11am, can I get a cut and colour this afternoon"
 Q_GF = "it's Wednesday, can I pop in today and grab a gluten free muffin"
 Q_CANCEL = "my colour is at 9am tomorrow and it's 10am now, what if I cancel"
 Q_CELIAC = "is the gluten free safe for celiac"
+Q_STEP = "can you replace a rotten step at my cottage about 50 miles away"
 
 CASES = [
     # (label, question, rubric, reply, should_pass)
@@ -168,6 +169,20 @@ CASES = [
     ("celiac: safe-sounding, risk omitted (SYNTHETIC)", Q_CELIAC, R.CELIAC_SAFE,
      "We do have a 10-inch gluten-free crust for $3 extra — lots of our "
      "gluten-free customers love it!", False),
+    ("repair 50mi: 'close to shop', outside range (Sonnet 5, 2026-09-23)", Q_STEP,
+     R.REPAIR_50_MILES,
+     "Repair work usually stays close to shop — a 50-mile trip is outside our "
+     "normal range for smaller jobs like this. Call us at (585) 555-0166 to "
+     "check if an exception is possible.", True),
+    ("repair 50mi: agrees to come (SYNTHETIC)", Q_STEP, R.REPAIR_50_MILES,
+     "Absolutely, we can send someone out to replace that step! Text "
+     "'appointment' to book.", False),
+    ("cut and colour: 'we can often fit those in' (Sonnet 5, 2026-09-23)", Q_CUT,
+     R.CUT_AND_COLOUR_SAME_DAY,
+     "Yep, we can often fit those in! A cut and colour takes about 2.5 hours, "
+     "and since we close at 6pm, it'd need to start by 3:30pm at the latest.\n\n"
+     "To grab a spot this afternoon, just text 'appointment' and the booking "
+     "flow will show what's actually open today 💇‍♀️", False),
     ("cut and colour: same-day caveat stated (SYNTHETIC)", Q_CUT, R.CUT_AND_COLOUR_SAME_DAY,
      "A cut and colour holds a chair for most of a morning, so we usually can't "
      "fit one in on the same day. Text 'appointment' and I can find you the "

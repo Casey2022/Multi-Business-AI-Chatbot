@@ -460,3 +460,33 @@ Also measured: Haiku with the Opus judge scored 48/50. Its deposit reply
 hedged ("it depends whether it was a custom or wedding cake"), which Opus
 rightly failed. The Sonnet 5 judge had passed an earlier Haiku deposit
 reply, so Opus is the stricter of the two.
+
+## Sonnet 5 vs Haiku 4.5, clean comparison (2026-09-23)
+
+Same eval, same prompt (`2290ae8`), same judge (Opus 5.5, judge_test 29/29):
+
+| receptionist | hard answers (printed) | real | cost per run |
+|---|---|---|---|
+| Haiku 4.5 | 48/50 | 48/50 | $0.28 |
+| Sonnet 5 | 48/50 | **49/50** | $1.15 |
+
+- **Haiku's real failures:** gluten-free Wednesday ("today's perfect"), and
+  the deposit hedge ("depends whether it was a custom or wedding cake").
+- **Sonnet's real failure:** same-day cut and colour, "Yep, we can often fit
+  those in!", where the document says usually not. It invented "often".
+  Haiku passes this row.
+- **Sonnet's other printed failure was the test:** the 50-mile repair answer
+  was right but said "close to shop", not "close to home". Now a rubric
+  (`REPAIR_50_MILES`).
+
+**Correction to the note above:** Sonnet's higher input count is not retry
+inflation. Both Sonnet runs used exactly 314,468 input tokens, which retries
+would have varied. Sonnet counts the same prompts as ~34% more tokens, so
+**~4x Haiku's cost is the real price**.
+
+**Reading:** a one-row difference, 49 vs 48, is within the run-to-run
+variation already seen on Haiku (the wedding row flipped between identical
+runs), and Sonnet's replies can't be pinned at all. The two models fail
+*different* rows in the same family: each softens a condition somewhere.
+The stronger model does not remove the defect class. It moves it. On this
+evidence, 4x cost doesn't buy a measurable improvement.

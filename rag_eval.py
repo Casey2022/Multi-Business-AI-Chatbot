@@ -397,7 +397,7 @@ HARD = {
                                                   "Licensing",         ("itemised", "itemized", "separately")),
         # --- Added 2026-09-22 ---
         ("can you replace a rotten step at my cottage about 50 miles away",
-                                                  "Service Area",      [("35 miles", "close to home")]),
+                                                  "Service Area",      rubrics.REPAIR_50_MILES),
         ("roughly what would a 300 square foot composite deck cost",
                                                   "Decks",             ["$55", "$80"]),
         # Trap: agreeing is the harm. They never take the full amount up front.

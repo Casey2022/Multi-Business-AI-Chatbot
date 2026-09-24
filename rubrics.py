@@ -102,3 +102,16 @@ CELIAC_SAFE = Rubric(
     customer to call and speak to the kitchen before ordering. Fails if it
     says the crust is safe, celiac-friendly or gluten-free "so no worries",
     or omits the shared-oven risk.""")
+
+REPAIR_50_MILES = Rubric(
+    quote="We work across Monroe County and the surrounding towns, within about "
+          "35 miles of the Lyell Ave shop. For larger projects we'll travel "
+          "further — call and ask. Smaller repair work we keep close to home, "
+          "because a two-hour round trip for a door is not fair to the customer.",
+    criteria="""Makes clear that a small repair 50 miles away is outside the
+    range Ridgeline normally travels for small jobs (repairs are kept local,
+    within about 35 miles), so it probably isn't something they'd take on.
+    Suggesting the customer call to ask is fine. Wording doesn't matter
+    ("close to home", "close to the shop", "outside our normal range" all
+    pass). Fails if it agrees to do the job, or implies 50 miles is within
+    range.""")
