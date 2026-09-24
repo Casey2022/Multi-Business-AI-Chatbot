@@ -245,6 +245,60 @@ def main():
           "a customer who restates an answer must not get their own words "
           "back verbatim — that is what makes them restate it again")
 
+    heading("A non-answer is asked again, never repeated word for word")
+    # conversation_eval caught this on 2026-09-24: asked for a date, the
+    # customer typed "appointment", and got "When works for you?" back
+    # verbatim. It wasn't stored as the date (the Sept 15 fix held), but
+    # repeating a question tells the customer nothing landed.
+    bobs = yaml.safe_load(Path("config/bobs_plumbing.yaml").read_text())
+    real_extract = scheduler.extract_booking_slots
+    scheduler.extract_booking_slots = lambda *a, **k: {}   # a non-answer extracts nothing
+    try:
+        phone = "reask_test"
+        set_state(phone, BIZ, "collecting", pending={
+            "service": "leak repair",
+            "service_address": "1738 William St, Rochester NY"})
+        question = scheduler.substitute(
+            scheduler._first_missing_slot(get_state(phone, BIZ)["pending"],
+                                          scheduler.get_slot_definitions(bobs))["prompt"],
+            bobs)
+        said = [question]
+        for msg in ["appointment", "appointment", "hello", "hello", "book", "you there"]:
+            said.append(scheduler.handle_booking(phone, msg, bobs, BIZ))
+        pending = get_state(phone, BIZ)["pending"]
+    finally:
+        scheduler.extract_booking_slots = real_extract
+
+    repeats = [a for a, b in zip(said, said[1:]) if a.strip() == b.strip()]
+    check("no reply repeats the one before it, across six non-answers",
+          not repeats, repeats[:1])
+    check("each re-ask still asks the question", all(question in r for r in said[1:]))
+    check("a booking word is told the booking is already under way, by service",
+          "already setting up your leak repair" in said[1], said[1])
+    check("a nudge gets a nudge back", said[3].startswith("Still here!"), said[3])
+    check("from the second non-answer on, it says how to stop",
+          "'cancel'" in said[2], said[2])
+    check("none of it was stored as the date", "datetime" not in pending,
+          str(pending))
+
+    heading("Internal bookkeeping never reaches the customer or the calendar")
+    # The re-ask counter lives in pending as "_reasked". The read-back and
+    # the saved appointment skip INTERNAL_PENDING_KEYS, an explicit list,
+    # so a new "_" key left off it would be read back to the customer and
+    # saved into the appointment's details.
+    import re
+    written = set(re.findall(r'"(_[a-z][a-z_]*)"',
+                             Path("scheduler.py").read_text()))
+    missing_keys = written - set(scheduler.INTERNAL_PENDING_KEYS)
+    check("every _key the scheduler writes is on INTERNAL_PENDING_KEYS",
+          not missing_keys, sorted(missing_keys))
+    readback = scheduler._confirmation_question(
+        {**pending, "datetime": "Monday at 11", "datetime_parsed": "2026-09-28 11:00",
+         "_reasked": {"datetime": 3}}, bobs)
+    check("the read-back doesn't mention the re-ask counter",
+          "reasked" not in readback.lower() and "{'datetime'" not in readback,
+          readback)
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

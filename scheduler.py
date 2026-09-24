@@ -30,7 +30,7 @@ log_cal = logging.getLogger("calendar")
 # Bookkeeping the booking flow keeps in `pending` that is not a customer
 # answer. Prefixed so it can never collide with a slot key an owner invents.
 INTERNAL_PENDING_KEYS = ("_checks", "_address_confirm", "_address_attempts",
-                         "_offered")
+                         "_offered", "_reasked")
 
 # How many times we'll ask a customer to clarify an address before giving up
 # and booking it as typed. Two is a compromise: enough to recover a typo or a
@@ -383,18 +383,61 @@ QUESTION_OPENERS = ("what", "when", "where", "why", "how", "who", "can you",
 # starts a booking (they're already in one), and the noises people make at a
 # bot that has gone quiet. Filing one of these as a slot value is how
 # "appointment" became someone's requested date and time.
-NON_ANSWERS = {
+#
+# Two kinds, because they mean different things and deserve different
+# replies. A booking word says "I think I have to start over". A nudge says
+# "are you still there?".
+BOOKING_WORDS = {
     "book", "booking", "appointment", "appointments", "order", "schedule",
-    "reschedule", "hi", "hello", "hey", "yo", "hello there", "you there",
+    "reschedule",
+}
+NUDGES = {
+    "hi", "hello", "hey", "yo", "hello there", "you there",
     "are you there", "anyone there", "anybody there", "still there",
     "help", "ping", "test",
 }
+NON_ANSWERS = BOOKING_WORDS | NUDGES
 
 
 def _is_not_an_answer(message):
     """True if this message can't sensibly be the answer to any question."""
     text = _normalise(message)
     return bool(text) and text in NON_ANSWERS
+
+
+def _reask_after_non_answer(message, missing, pending, config):
+    """Ask again for the slot we're waiting on, WITHOUT repeating ourselves.
+
+    Returning the question word for word (what this did until 2026-09-24)
+    tells the customer nothing landed, which is defect 1 in
+    notes/conversation_defects.md, and conversation_eval's no_repeated_reply
+    caught it. So the re-ask acknowledges where the booking stands, and a
+    second non-answer in a row gets different wording again.
+
+    Returns (reply, pending); the caller saves pending, which carries the
+    count of re-asks for this slot.
+    """
+    prompt  = substitute(missing["prompt"], config)
+    service = pending.get("service")
+    key     = missing["key"]
+
+    counts = dict(pending.get("_reasked") or {})
+    n = counts.get(key, 0)
+    counts[key] = n + 1
+    pending = {**pending, "_reasked": counts}
+
+    if n % 2 == 1:
+        # The second non-answer in a row (and every other one after it).
+        # Alternating with the acknowledging lead-in below means two
+        # neighbouring replies can never be the same sentence, however many
+        # non-answers arrive. From the second one on, say how to get out.
+        return (f"I just need an answer to this one to finish the booking "
+                f"(or reply 'cancel' to stop): {prompt}"), pending
+    if _normalise(message) in BOOKING_WORDS:
+        lead = (f"We're already setting up your {service}"
+                if service else "We're already in the middle of booking")
+        return f"{lead}, no need to start over. {prompt}", pending
+    return f"Still here! {prompt}", pending
 
 
 def _looks_like_a_question(message):
@@ -1181,11 +1224,15 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             if missing and _is_not_an_answer(message):
                 # A nudge or the booking command itself. Storing it would
                 # fill a slot with a word the customer never meant as an
-                # answer; the polite thing is to repeat what we asked.
+                # answer. Ask again, acknowledging where things stand; never
+                # the same sentence twice in a row.
                 log.info("Non-answer mid-booking — re-asking '%s'",
                          missing["key"])
                 log.debug("The non-answer was: %r", message.strip()[:80])
-                return substitute(missing["prompt"], config)
+                reply, pending = _reask_after_non_answer(
+                    message, missing, pending, config)
+                _save_state(phone, business_id, "collecting", pending=pending)
+                return reply
             if missing:
                 extracted = {missing["key"]: message.strip()[:200]}
                 log.info(f"No slots extracted — "
