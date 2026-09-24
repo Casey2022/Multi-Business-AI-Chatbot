@@ -565,6 +565,10 @@ def normalise(text):
         text = text.replace(dash, "-")
     text = text.replace("\u2019", "'")                # curly apostrophe
     text = text.replace("**", "").replace("*", "")   # markdown emphasis
+    # "48 hrs" is "48 hours". Sonnet 5 wrote the short form and failed a
+    # correct answer on it.
+    import re
+    text = re.sub(r"\b(\d+)\s*hrs?\b", lambda m: f"{m.group(1)} hours", text)
     return " ".join(text.split())
 
 

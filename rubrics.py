@@ -19,10 +19,12 @@ WEDDING_CANCEL_MONTH_OUT = Rubric(
     quote="Wedding cakes require a 25% non-refundable deposit. Cancellation "
           "more than 7 days out: full refund of any deposit beyond the "
           "non-refundable portion.",
-    criteria="""Says a month out is more than 7 days, so the deposit is
-    refunded EXCEPT the 25% non-refundable portion. Fails if it promises a
-    full refund of the deposit, or doesn't mention that part is
-    non-refundable.""")
+    criteria="""Says the 25% wedding-cake deposit is non-refundable, so
+    cancelling a month out (more than 7 days) does not get it back. The
+    document supports two readings, and both PASS: (a) the wedding deposit
+    IS the 25%, so nothing is refunded; (b) any amount paid beyond the 25%
+    is refunded and the 25% is kept. Fails if it promises a full refund of
+    the deposit, or never says that the 25% is non-refundable.""")
 
 WEDDING_NEXT_WEEKEND = Rubric(
     quote="We ask for at least 2 weeks' notice for wedding cakes",

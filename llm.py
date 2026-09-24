@@ -32,6 +32,14 @@ MODEL = os.environ.get("LLM_MODEL", "claude-haiku-4-5-20251001")
 # unpinned replies make two scores less comparable.
 temperature_dropped = False
 
+# Set the first time a reply comes back with a thinking block. From then on
+# every call gets THINKING_ROOM extra max_tokens up front, so the reasoning
+# doesn't eat the SMS-sized reply budget. Retrying after the fact cost a
+# full re-send of the input each time, and on the first Sonnet 5 run it left
+# replies like "C" and "perfect for your".
+model_thinks = False
+THINKING_ROOM = 2048
+
 DEFAULT_TIMEZONE = "America/New_York"
 
 # ---------------------------------------------------------------------------
@@ -106,19 +114,27 @@ def text_of(response):
                      if getattr(b, "type", None) == "text").strip()
 
 
+def _thought(response):
+    return any(getattr(b, "type", None) == "thinking" for b in response.content)
+
+
 def _create(**call):
-    """messages.create with the model and two model-specific fallbacks.
+    """messages.create with the model and its model-specific fallbacks.
 
     1. A model that rejects `temperature` gets the call again without it,
        and every later call skips it.
-    2. If a thinking block uses up max_tokens and leaves no text, the call
-       is retried once with room for both. Without this, every SMS-sized
-       budget (20 tokens for date parsing) could return nothing.
+    2. A model that thinks gets THINKING_ROOM extra max_tokens on every call
+       once it has been seen thinking.
+    3. If a reply was cut off at max_tokens after thinking (empty or partial
+       text, e.g. "C"), the call is retried once with the extra room. A reply
+       cut off WITHOUT thinking is left alone: that's just a long reply.
     """
-    global temperature_dropped
+    global temperature_dropped, model_thinks
     call.setdefault("model", MODEL)
     if temperature_dropped:
         call.pop("temperature", None)
+    if model_thinks:
+        call["max_tokens"] = call.get("max_tokens", 0) + THINKING_ROOM
     try:
         response = client.messages.create(**call)
     except Exception as e:
@@ -130,12 +146,19 @@ def _create(**call):
             response = client.messages.create(**call)
         else:
             raise
-    if not text_of(response) and getattr(response, "stop_reason", None) == "max_tokens":
-        log.warning("%s used its whole max_tokens (%s) before replying; "
-                    "retrying with room for thinking.", call["model"],
-                    call.get("max_tokens"))
-        call["max_tokens"] = call.get("max_tokens", 0) + 2048
-        response = client.messages.create(**call)
+    if _thought(response) and not model_thinks:
+        log.warning("%s thinks before replying; adding %d max_tokens to every "
+                    "call from now on.", call["model"], THINKING_ROOM)
+        model_thinks = True
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            call["max_tokens"] = call.get("max_tokens", 0) + THINKING_ROOM
+            response = client.messages.create(**call)
+    elif (_thought(response)
+          and getattr(response, "stop_reason", None) == "max_tokens"):
+        # Even the extra room ran out. Say so rather than hand back half a
+        # reply as if it were whole.
+        log.warning("%s ran out of max_tokens (%s) after thinking; the reply "
+                    "is cut off.", call["model"], call.get("max_tokens"))
     return response
 
 

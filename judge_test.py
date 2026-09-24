@@ -49,6 +49,13 @@ CASES = [
     ("wedding cancel: 25% kept (SYNTHETIC)", Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
      "A month out is more than 7 days, so you'd get your deposit back apart "
      "from the 25% non-refundable portion that every wedding deposit carries.", True),
+    ("wedding cancel: the deposit IS the 25%, nothing back (Sonnet 5, 2026-09-23, completed)",
+     Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
+     "Wedding cake deposits are 25% non-refundable, so that portion stays with us "
+     "either way. Since you're canceling more than 7 days out, any deposit beyond "
+     "that non-refundable 25% would be refunded — but for wedding cakes, the "
+     "deposit is just the 25%. Call us at (585) 555-0188 if you'd like to talk "
+     "it through.", True),
     ("wedding cancel: full refund promised (SYNTHETIC)", Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
      "Yes! Cancelling more than 7 days out gets a full refund of your deposit. 🎂", False),
 
