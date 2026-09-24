@@ -15,6 +15,8 @@
 import logging
 from datetime import datetime, timedelta
 
+import clock
+
 log = logging.getLogger("scheduling")
 
 
@@ -167,7 +169,7 @@ def is_slot_available(config, start_iso, busy, service=None):
     # Past times are the parser's most likely mistake ("Thursday" said on a
     # Thursday). find_alternatives already skips past candidates; this makes
     # the same guarantee for a directly requested time.
-    if start < datetime.now():
+    if start < clock.business_now(config):
         return False
 
     if not within_business_hours(start, duration, sched):
@@ -201,13 +203,14 @@ def find_alternatives(config, desired_iso, busy, service=None):
     step    = timedelta(minutes=sched["granularity"])
     wanted  = sched["max_alternatives"]
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
+    now     = clock.business_now(config)   # once, not 672 times
 
     def search(direction, limit):
         """Walk one direction, collecting available slots."""
         out = []
         for i in range(1, 337):          # 336 half-hour steps ≈ 7 days
             candidate = desired + (step * i * direction)
-            if candidate < datetime.now():
+            if candidate < now:
                 continue
             iso = candidate.strftime("%Y-%m-%d %H:%M")
             if is_slot_available(config, iso, busy, service):
@@ -249,7 +252,7 @@ def slot_rejection_reason(config, start_iso, busy, service=None):
     start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
     end   = start + timedelta(minutes=duration)
 
-    if start < datetime.now():
+    if start < clock.business_now(config):
         return "past"
 
     hours = sched["business_hours"]

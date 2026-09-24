@@ -191,6 +191,54 @@ def main():
     check("blank matches nothing real",
           not scheduling.same_service("", "colour"))
 
+    heading("The business's clock, not the server's")
+    # Render runs on UTC. A UTC server's datetime.now() at 2pm Eastern says
+    # 6pm, so every same-day slot in the next four hours was refused as
+    # "past". clock.utc_now is replaced to fix the moment; the business's
+    # zone comes from its config.
+    import clock
+    from datetime import date, timezone
+    belmont = yaml.safe_load(Path("config/belmont_hair_studio.yaml").read_text())
+    real_utc_now = clock.utc_now
+    try:
+        # Tuesday 22 Sep 2026, 2pm Eastern (EDT) = 6pm UTC.
+        clock.utc_now = lambda: datetime(2026, 9, 22, 18, 0, tzinfo=timezone.utc)
+        check("at 6pm UTC it is 2pm for an Eastern business",
+              clock.business_now(belmont) == datetime(2026, 9, 22, 14, 0),
+              str(clock.business_now(belmont)))
+        check("a 4pm slot at 2pm Eastern is not refused as 'past'",
+              scheduling.slot_rejection_reason(belmont, "2026-09-22 16:00", []) is None,
+              str(scheduling.slot_rejection_reason(belmont, "2026-09-22 16:00", [])))
+        check("... and is bookable",
+              scheduling.is_slot_available(belmont, "2026-09-22 16:00", []))
+        check("a 1pm slot at 2pm Eastern IS past",
+              scheduling.slot_rejection_reason(belmont, "2026-09-22 13:00", []) == "past")
+        alts = scheduling.find_alternatives(belmont, "2026-09-22 13:00", [])
+        check("no alternative offered before 2pm Eastern",
+              alts and all(a >= "2026-09-22 14:00" for a in alts), str(alts))
+        check("the 2:30pm slot is offered, which a UTC clock would have hidden",
+              "2026-09-22 14:30" in alts, str(alts))
+
+        # 9:30pm Eastern Tuesday = 1:30am UTC Wednesday.
+        clock.utc_now = lambda: datetime(2026, 9, 23, 1, 30, tzinfo=timezone.utc)
+        check("at 1:30am UTC Wednesday it is still Tuesday in Rochester",
+              clock.business_today(belmont) == date(2026, 9, 22),
+              str(clock.business_today(belmont)))
+        check("Wednesday 9am is bookable the evening before",
+              scheduling.is_slot_available(belmont, "2026-09-23 09:00", []))
+
+        # Winter: EST is UTC-5, and the zone database, not a fixed offset,
+        # decides that.
+        clock.utc_now = lambda: datetime(2026, 12, 15, 19, 0, tzinfo=timezone.utc)
+        check("in December 7pm UTC is 2pm Eastern (EST, UTC-5)",
+              clock.business_now(belmont) == datetime(2026, 12, 15, 14, 0),
+              str(clock.business_now(belmont)))
+
+        check("a config with no timezone falls back to America/New_York",
+              clock.timezone_for({}) == "America/New_York")
+    finally:
+        clock.utc_now = real_utc_now
+
     heading("Every configured condition names a service that exists")
     for path in sorted(Path("config").glob("*.yaml")):
         if path.name == "personas.yaml":

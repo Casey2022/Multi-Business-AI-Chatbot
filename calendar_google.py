@@ -285,7 +285,11 @@ def fetch_changes(config, sync_token=None):
         params["syncToken"] = sync_token
     else:
         # Initial sync: only care about events from now forward.
-        params["timeMin"] = datetime.now().replace(tzinfo=tz).isoformat()
+        # datetime.now(tz), not datetime.now().replace(tzinfo=tz): the
+        # latter labels the SERVER's clock with the business's zone. On
+        # Render (UTC) that claimed 1am tomorrow at 9pm Eastern, and the
+        # first sync skipped the next four hours of real events.
+        params["timeMin"] = datetime.now(tz).isoformat()
 
     try:
         result = _get_service().events().list(**params).execute()

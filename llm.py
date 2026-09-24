@@ -40,7 +40,6 @@ temperature_dropped = False
 model_thinks = False
 THINKING_ROOM = 2048
 
-DEFAULT_TIMEZONE = "America/New_York"
 
 # ---------------------------------------------------------------------------
 # What a conversation costs
@@ -163,19 +162,9 @@ def _create(**call):
 
 
 def business_now(config=None, now=None):
-    """The current time where the business is, not where the server is.
-
-    Render runs on UTC, so datetime.now() there turns Eastern evening into
-    tomorrow morning. The business's own timezone lives in its calendar
-    config. `now` lets the eval pin the clock, so a score doesn't depend on
-    when it was run.
-    """
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    if now is not None:
-        return now
-    tz = ((config or {}).get("calendar") or {}).get("timezone") or DEFAULT_TIMEZONE
-    return datetime.now(ZoneInfo(tz)).replace(tzinfo=None)
+    """The business's local time (see clock.py). Kept here for callers."""
+    import clock
+    return clock.business_now(config, now)
 
 
 def as_data(text, tag="customer_message"):
@@ -629,9 +618,11 @@ def parse_datetime(user_input, config=None):
     genuinely answered differently on identical input, producing a booking
     that was silently rejected as outside hours.
     """
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
-    now       = datetime.now()
+    # The business's date, not the server's: on Render (UTC) the server
+    # clock turned "tomorrow" at 9pm Eastern into the day after tomorrow.
+    now       = business_now(config)
     today_str = now.strftime("%A, %B %d, %Y")
 
     tomorrow  = (now + timedelta(days=1)).strftime("%Y-%m-%d")

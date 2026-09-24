@@ -125,7 +125,12 @@ def appointments(business_id):
     # the "Scheduled for" cell can link straight to the right calendar week
     # rather than always landing on today's.
     from datetime import datetime, timedelta
-    today       = datetime.now().date()
+    import clock
+    from config import load_config
+    # The business's today, not the server's: on Render (UTC) this jumped a
+    # day early every evening, putting Sunday-night bookings a week off.
+    today       = clock.business_today(
+        load_config(business["config_path"], business_id))
     this_monday = today - timedelta(days=today.weekday())
 
     for appt in appointment_list:
@@ -559,7 +564,8 @@ def calendar_view(business_id):
     except ValueError:
         highlight = None
 
-    today       = datetime.now().date()
+    import clock
+    today       = clock.business_today(config)
     week_start  = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
     days        = [week_start + timedelta(days=i) for i in range(7)]
 

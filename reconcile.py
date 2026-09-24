@@ -51,7 +51,7 @@ def reconcile_business(business):
         if event.get("status") == "cancelled":
             if appt["status"] != "cancelled":
                 cancel_appointment(appt["id"])
-                note = f"Cancelled in calendar on {datetime.now():%b %d at %-I:%M %p}"
+                note = f"Cancelled in calendar on {datetime.now(tz):%b %d at %-I:%M %p}"
                 mark_calendar_change(appt["id"], note)
                 changes.append(f"#{appt['id']} {appt['service']} — cancelled")
             continue
@@ -67,7 +67,7 @@ def reconcile_business(business):
         if new_start != appt["datetime"]:
             reschedule_appointment(appt["id"], new_start)
             note = (f"Moved in calendar from {appt['datetime']} "
-                    f"on {datetime.now():%b %d at %-I:%M %p}")
+                    f"on {datetime.now(tz):%b %d at %-I:%M %p}")
             mark_calendar_change(appt["id"], note)
             changes.append(
                 f"#{appt['id']} {appt['service']} — moved to {new_start}"
