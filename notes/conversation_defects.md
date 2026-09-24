@@ -432,3 +432,31 @@ the phrase, not the meaning. judge_test now carries this reply as a PASS
 case (28 cases), and every judge change re-runs it.
 
 Opus 5.5 as judge: 27/27 on judge_test before this case was added.
+
+## First full Sonnet 5 run (2026-09-23), and what it actually measured
+
+`JUDGE_MODEL=claude-opus-5-5 LLM_MODEL=claude-sonnet-5`: 69/69 · 84/84 ·
+51/51 · 46/50, **$1.15** (Haiku, same judge: 48/50, $0.28).
+
+Sonnet 5 **passed** every row Haiku can't or couldn't: gluten-free
+Wednesday, half grey, same-day cut and colour, the 23-hour cancellation.
+None of its four failures was about answer quality:
+
+1. Deposit: the whole reply was **"C"**. Thinking used up the 200-token budget.
+2. Friday party trays: cut off at "perfect for your". Same cause.
+3. Wedding cancellation: cut off, and *right where the rubric was wrong*.
+   Sonnet read "Wedding cakes require a 25% non-refundable deposit" as
+   "the deposit IS the 25%, so nothing comes back", which is the more natural
+   reading. The rubric assumed a bigger deposit.
+4. "Never had colour done": a correct answer that wrote "48 hrs".
+
+All four were fixed in the harness (`model_thinks` up-front room, both
+wedding readings pass, "hrs" normalised), and the run has to be repeated
+before it says anything about Sonnet's answers or its true cost. The
+inflated input (314k vs 235k tokens) was mostly retries re-sending the
+prompt.
+
+Also measured: Haiku with the Opus judge scored 48/50. Its deposit reply
+hedged ("it depends whether it was a custom or wedding cake"), which Opus
+rightly failed. The Sonnet 5 judge had passed an earlier Haiku deposit
+reply, so Opus is the stricter of the two.
