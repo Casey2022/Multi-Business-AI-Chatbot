@@ -8,7 +8,8 @@ that text, not which words it must use.
 from judge import Rubric
 
 DEPOSIT_THREE_DAYS = Rubric(
-    quote="Less than 7 days: deposit forfeited.",
+    quote="For any cake order, cancelling less than 7 days out forfeits the "
+          "deposit",
     criteria="""States the policy that cancelling less than 7 days before
     means the deposit is forfeited, and applies it: three days is inside that
     window, so the deposit is not refunded. Saying it can't look up the
@@ -16,15 +17,15 @@ DEPOSIT_THREE_DAYS = Rubric(
     stating the policy, or states the outcome without the 7-day rule.""")
 
 WEDDING_CANCEL_MONTH_OUT = Rubric(
-    quote="Wedding cakes require a 25% non-refundable deposit. Cancellation "
-          "more than 7 days out: full refund of any deposit beyond the "
-          "non-refundable portion.",
-    criteria="""Says the 25% wedding-cake deposit is non-refundable, so
-    cancelling a month out (more than 7 days) does not get it back. The
-    document supports two readings, and both PASS: (a) the wedding deposit
-    IS the 25%, so nothing is refunded; (b) any amount paid beyond the 25%
-    is refunded and the 25% is kept. Fails if it promises a full refund of
-    the deposit, or never says that the 25% is non-refundable.""")
+    quote="Wedding cakes require a deposit of at least 25% of the order price, "
+          "and that 25% is non-refundable. Cancel more than 7 days out and "
+          "anything paid above the 25% is refunded; the 25% is kept.",
+    criteria="""Says a month out is more than 7 days, so anything the customer
+    paid above 25% of the order price is refunded and the 25% is kept. Adding
+    "if you only paid the 25% minimum, there's nothing to refund" is fine.
+    Fails if it promises a full refund of the deposit, never says the 25% is
+    kept, or says nothing comes back whatever was paid (for example, claiming
+    the wedding deposit is always exactly 25%).""")
 
 WEDDING_NEXT_WEEKEND = Rubric(
     quote="We ask for at least 2 weeks' notice for wedding cakes",

@@ -51,10 +51,14 @@ don't change the muffin rule: gluten-free muffins are made to order with
 before ordering.
 
 ## Deposits and Cancellation
-Custom cakes require a 50% deposit at ordering. Wedding cakes require
-a 25% non-refundable deposit. Cancellation more than 7 days out: full
-refund of any deposit beyond the non-refundable portion. Less than 7
-days: deposit forfeited. Less than 48 hours: full order price charged.
+Custom cakes require a 50% deposit at ordering. Cancel more than 7
+days before the order date and the full deposit is refunded.
+Wedding cakes require a deposit of at least 25% of the order price,
+and that 25% is non-refundable. Cancel more than 7 days out and
+anything paid above the 25% is refunded; the 25% is kept.
+For any cake order, cancelling less than 7 days out forfeits the
+deposit, and cancelling less than 48 hours out is charged the full
+order price.
 
 ## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
 We bake a rotating daily selection of muffins, scones, croissants, and

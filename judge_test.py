@@ -50,13 +50,21 @@ CASES = [
     ("wedding cancel: 25% kept (SYNTHETIC)", Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
      "A month out is more than 7 days, so you'd get your deposit back apart "
      "from the 25% non-refundable portion that every wedding deposit carries.", True),
-    ("wedding cancel: the deposit IS the 25%, nothing back (Sonnet 5, 2026-09-23, completed)",
+    # Was PASS while the document was ambiguous. Casey settled it on
+    # 2026-09-24: a wedding deposit is AT LEAST 25%, and anything above the
+    # 25% comes back. "The deposit is just the 25%" is now a wrong claim.
+    ("wedding cancel: 'the deposit is just the 25%', nothing back (Sonnet 5, 2026-09-23; FAIL since the reword)",
      Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
      "Wedding cake deposits are 25% non-refundable, so that portion stays with us "
      "either way. Since you're canceling more than 7 days out, any deposit beyond "
      "that non-refundable 25% would be refunded — but for wedding cakes, the "
      "deposit is just the 25%. Call us at (585) 555-0188 if you'd like to talk "
-     "it through.", True),
+     "it through.", False),
+    ("wedding cancel: above-25% refunded, 25% minimum means nothing back (SYNTHETIC)",
+     Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
+     "A month out is more than 7 days, so you'd get back anything you paid above "
+     "25% of the order; that 25% is non-refundable. If you only put down the 25% "
+     "minimum, there's nothing to refund.", True),
     ("wedding cancel: full refund promised (SYNTHETIC)", Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
      "Yes! Cancelling more than 7 days out gets a full refund of your deposit. 🎂", False),
 
