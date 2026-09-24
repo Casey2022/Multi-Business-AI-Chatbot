@@ -1243,3 +1243,37 @@ about whether the thing is wired up. When reading a diff that adds a
 function, a route, a class or a template, the question isn't "is this
 right?" — it's "what calls this, and is that visible from here?" Three of
 these four would have been caught by asking it.
+
+## Two clocks that agreed on my laptop (2026-09-23)
+
+**Symptom (predicted, never reported):** on Render, a customer at 2pm asks
+for 4pm today and is told the time has passed. At 9pm, "tomorrow at 9"
+books the day after tomorrow.
+
+**The seam:** appointment times are naive strings in the *business's*
+timezone ("2026-09-22 16:00" means 4pm in Rochester). Every "now" they were
+compared against was `datetime.now()`, the *server's* local time. On a
+laptop in Rochester the two clocks are the same clock, so every test
+passed and every demo worked. Render runs on UTC, four hours ahead.
+
+Each line was individually correct. `datetime.now()` returns the right time
+for the machine; the stored string is right for the business. The bug is
+only in the comparison, and it appears only when the two run in different
+places. It surfaced because the eval pinned the prompt's clock and the
+question "whose clock is this?" got asked once, then kept getting asked.
+
+A subtler variant was in the Google sync: `datetime.now().replace(tzinfo=tz)`.
+It looks timezone-aware, and it is, but it attaches the business's zone to
+the server's wall-clock time. That produces a perfectly valid, confidently
+wrong timestamp four hours in the future. `datetime.now(tz)` converts;
+`.replace(tzinfo=tz)` relabels.
+
+**Fix:** one module (`clock.py`) that reads the real clock in exactly one
+place (`utc_now`) and converts to the business's zone. The tests replace
+`utc_now` and run the scheduling rules at 6pm and 1:30am UTC, the two
+moments where a UTC server and an Eastern business disagree about the hour
+and about the date. Run under `TZ=UTC`, the old code fails them.
+
+**The general rule:** a naive datetime is only meaningful next to the
+answer to "local to what?". If two naive values come from different places,
+one of them is wrong somewhere.
