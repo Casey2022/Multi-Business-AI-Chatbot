@@ -487,8 +487,11 @@ class Transcript:
 
 def _dates():
     """Concrete near-future dates, so scripts don't drift with the calendar."""
-    from datetime import datetime, timedelta
-    now = datetime.now()
+    from datetime import timedelta
+    import clock
+    # The business's clock, which is what the scheduler judges "past" by. The
+    # machine's clock only agrees when the machine is in Eastern time.
+    now = clock.business_now()
     plus2 = now + timedelta(days=2)
     out = {
         "plus2": plus2.strftime("%Y-%m-%d"),
