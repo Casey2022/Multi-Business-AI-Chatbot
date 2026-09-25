@@ -41,6 +41,8 @@ import geocode
 from config import load_config
 from db import init_db, set_state
 import scheduler
+import progress
+from progress import say
 
 
 # ---------------------------------------------------------------------------
@@ -590,31 +592,35 @@ def main():
         print("no scenarios matched"); return 1
 
     failed = 0
-    for scenario in chosen:
-        # Run it `repeat` times and keep the worst result. The extractor is a
-        # language model: the same script produced a clean booking on one run
-        # and filed the customer's "yes" as the service on the next. A
-        # scenario that passes four times out of five is not passing.
-        runs = [run(scenario, config) for _ in range(repeat)]
-        clean = sum(1 for _, f in runs if not f)
-        t, failures = next(((t, f) for t, f in runs if f), runs[0])
+    with progress.bar(len(chosen) * repeat, unit="conversation") as bar:
+        for scenario in chosen:
+            # Run it `repeat` times and keep the worst result. The extractor is a
+            # language model: the same script produced a clean booking on one run
+            # and filed the customer's "yes" as the service on the next. A
+            # scenario that passes four times out of five is not passing.
+            runs = []
+            for _ in range(repeat):
+                runs.append(run(scenario, config))
+                bar.update()
+            clean = sum(1 for _, f in runs if not f)
+            t, failures = next(((t, f) for t, f in runs if f), runs[0])
 
-        mark = "FAIL" if failures else "pass"
-        if repeat > 1:
-            mark += f"  [{clean}/{repeat} clean]"
-        print(f"\n{'─'*72}\n{mark}  {scenario['name']}")
-        if failures or verbose:
-            print(f"      {scenario['why']}\n")
-            import textwrap
-            for who, text in t.exchange:
-                label = "cust" if who == "cust" else "BOT "
-                body = " ".join(text.split())
-                for i, line in enumerate(textwrap.wrap(body, 92) or [""]):
-                    print(f"      {label if i == 0 else '    '}  {line}")
-            print()
-        for name, problem in failures:
-            print(f"      ✗ {name}: {problem}")
-        failed += bool(failures)
+            mark = "FAIL" if failures else "pass"
+            if repeat > 1:
+                mark += f"  [{clean}/{repeat} clean]"
+            say(f"\n{'─'*72}\n{mark}  {scenario['name']}")
+            if failures or verbose:
+                say(f"      {scenario['why']}\n")
+                import textwrap
+                for who, text in t.exchange:
+                    label = "cust" if who == "cust" else "BOT "
+                    body = " ".join(text.split())
+                    for i, line in enumerate(textwrap.wrap(body, 92) or [""]):
+                        say(f"      {label if i == 0 else '    '}  {line}")
+                say()
+            for name, problem in failures:
+                say(f"      ✗ {name}: {problem}")
+            failed += bool(failures)
 
     print(f"\n{'─'*72}")
     print(f"{len(chosen) - failed}/{len(chosen)} scenarios clean")

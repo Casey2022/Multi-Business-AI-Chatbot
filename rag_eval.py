@@ -38,7 +38,9 @@ from rag import retrieve, collection_for, get_chroma_client
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
 import llm
 import judge
+import progress
 import rubrics
+from progress import say
 from judge import Rubric
 
 
@@ -645,7 +647,7 @@ def heading_matches(headings, expected):
     return any(str(w).lower() in h.lower() for w in wanted for h in headings)
 
 
-def evaluate(slug, ask_llm=True, verbose=True):
+def evaluate(slug, ask_llm=True, verbose=True, bar=None):
     """Score one business. Returns a dict of counters plus the failures.
 
     The core set and the hard set are counted apart. A core regression
@@ -662,9 +664,12 @@ def evaluate(slug, ask_llm=True, verbose=True):
     failures = []
 
     if verbose:
-        print(f"\n{'=' * 72}")
-        print(f"  {config['business']['name']}")
-        print(f"{'=' * 72}")
+        say(f"\n{'=' * 72}")
+        say(f"  {config['business']['name']}")
+        say(f"{'=' * 72}")
+
+    if bar is not None:
+        bar.set_description(config["business"]["name"])
 
     for i, ((question, expected_chunk, expected_fact), is_hard) in enumerate(tests, 1):
         chunks   = retrieve(question, config)
@@ -718,14 +723,16 @@ def evaluate(slug, ask_llm=True, verbose=True):
                 marks.append(f"retrieval {'PASS' if retrieved_ok else 'FAIL'} ({verdict})")
             if answered_ok is not None:
                 marks.append(f"answer {'PASS' if answered_ok else 'FAIL'}")
-            print(f"[{i:>2}] {'* ' if is_hard else ''}{question}")
-            print(f"     {' · '.join(marks) if marks else 'not scored'}")
+            say(f"[{i:>2}] {'* ' if is_hard else ''}{question}")
+            say(f"     {' · '.join(marks) if marks else 'not scored'}")
             if bad:
-                print(f"     wanted: {expected_fact!r}")
+                say(f"     wanted: {expected_fact!r}")
             if judged is not None:
-                print(f"     judge:  {judged}")
+                say(f"     judge:  {judged}")
             if reply:
-                print(f"     reply: {reply}")
+                say(f"     reply: {reply}")
+        if bar is not None:
+            bar.update()
 
     return score, failures
 
@@ -767,9 +774,11 @@ def main():
                   "JUDGE_MODEL=<a different model> (then re-run judge_test.py).")
 
     rows = []
-    for slug in slugs:
-        score, failures = evaluate(slug, ask_llm=ask_llm)
-        rows.append((slug, score, failures))
+    total = sum(len(TESTS.get(s, [])) + len(HARD.get(s, [])) for s in slugs)
+    with progress.bar(total, unit="question") as bar:
+        for slug in slugs:
+            score, failures = evaluate(slug, ask_llm=ask_llm, bar=bar)
+            rows.append((slug, score, failures))
 
     def cell(hits, total):
         return f"{hits}/{total} {percent(hits, total)}" if total else "—"
