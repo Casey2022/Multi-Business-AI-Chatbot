@@ -8,18 +8,20 @@ that text, not which words it must use.
 from judge import Rubric
 
 DEPOSIT_THREE_DAYS = Rubric(
-    quote="For any cake order, cancelling less than 7 days out forfeits the "
-          "deposit",
+    quote="Less than 7 days before: the deposit is forfeited, for any cake.",
     criteria="""States the policy that cancelling less than 7 days before
     means the deposit is forfeited, and applies it: three days is inside that
-    window, so the deposit is not refunded. Saying it can't look up the
-    specific order is fine, but the reply fails if it stops there without
-    stating the policy, or states the outcome without the 7-day rule.""")
+    window, so the deposit is not refunded. This holds for ANY cake, wedding
+    cakes included. Saying it can't look up the specific order is fine, and
+    so is asking which kind of cake it was. Fails if it stops at "call us"
+    without stating the policy, states the outcome without the 7-day rule, or
+    says any part of a deposit (for example, a wedding deposit above 25%)
+    comes back when cancelling inside 7 days.""")
 
 WEDDING_CANCEL_MONTH_OUT = Rubric(
-    quote="Wedding cakes require a deposit of at least 25% of the order price, "
-          "and that 25% is non-refundable. Cancel more than 7 days out and "
-          "anything paid above the 25% is refunded; the 25% is kept.",
+    quote="More than 7 days before the order date: a custom cake deposit is "
+          "refunded in full; for a wedding cake, anything paid above 25% of the "
+          "order price is refunded and the 25% is kept.",
     criteria="""Says a month out is more than 7 days, so anything the customer
     paid above 25% of the order price is refunded and the 25% is kept. Adding
     "if you only paid the 25% minimum, there's nothing to refund" is fine.

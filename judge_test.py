@@ -40,6 +40,13 @@ CASES = [
      "**Less than 7days** = deposit is forfeited. Since you cancelled 3 days "
      "before, that falls in the \"less than 7 days\" window, so the deposit "
      "wouldn't be refunded — but call and we can review your situation.", True),
+    ("deposit: wedding refund inside 7 days (real, after 6f80447)", Q_DEPOSIT,
+     R.DEPOSIT_THREE_DAYS,
+     "For a custom cake order cancelled 3 days before: that's less than 7 days "
+     "out, so unfortunately the deposit is forfeited.\n\nFor a wedding cake: "
+     "same timing means the 25% non-refundable deposit is kept, and anything "
+     "you paid above that is refunded.\n\nWhich type of order was it? If you "
+     "need to discuss specifics, call us at (585) 555-0188.", False),
     ("deposit: the shrug (real, earlier run)", Q_DEPOSIT, R.DEPOSIT_THREE_DAYS,
      "I can't look up your order or process refunds myself. Please call us at "
      "(585) 555-0188 and we'll sort it out right away. Our team has your "
@@ -48,8 +55,12 @@ CASES = [
      "Sorry, your deposit is forfeited. Call us if you have questions!", False),
 
     ("wedding cancel: 25% kept (SYNTHETIC)", Q_WEDDING_CANCEL, R.WEDDING_CANCEL_MONTH_OUT,
-     "A month out is more than 7 days, so you'd get your deposit back apart "
-     "from the 25% non-refundable portion that every wedding deposit carries.", True),
+     # Reworded 2026-09-24. The old text ("apart from the 25% non-refundable
+     # portion that every wedding deposit carries") was written for the old,
+     # ambiguous policy and could mean 25% of the DEPOSIT. Opus read it that
+     # way and failed it, fairly.
+     "A month out is more than 7 days, so you'd get back your deposit apart "
+     "from 25% of the order price, which is non-refundable.", True),
     # Was PASS while the document was ambiguous. Casey settled it on
     # 2026-09-24: a wedding deposit is AT LEAST 25%, and anything above the
     # 25% comes back. "The deposit is just the 25%" is now a wrong claim.
