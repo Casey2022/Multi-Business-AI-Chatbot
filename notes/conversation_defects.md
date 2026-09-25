@@ -514,3 +514,22 @@ runs), and Sonnet's replies can't be pinned at all. The two models fail
 *different* rows in the same family: each softens a condition somewhere.
 The stronger model does not remove the defect class. It moves it. On this
 evidence, 4x cost doesn't buy a measurable improvement.
+
+## Rewording a policy can create a new wrong answer (2026-09-24)
+
+Sunrise's deposit sentence was ambiguous, and Casey settled what it means.
+The first rewrite (`6f80447`) grouped the rules by cake type. Haiku then
+answered the three-day cancellation question with the wedding cake's
+more-than-7-days refund rule ("anything you paid above that is refunded"),
+though inside 7 days every deposit is forfeited. The row had passed before
+the rewrite.
+
+Retrieval hands the model one chunk, and the model takes the sentence
+nearest the words in the question. Customers ask by *timing* ("I cancelled
+three days before"), so a policy chunk grouped by cake type puts a refund
+sentence next to "wedding" and away from "less than 7 days". Rewritten by
+timing (`343828e`): each window states its outcome for both kinds
+of cake.
+
+Lesson: write policy text in the shape of the questions it answers, and
+re-run the eval after ANY document edit, even one that only "clarifies".
