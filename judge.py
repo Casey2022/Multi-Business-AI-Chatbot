@@ -41,7 +41,25 @@ JUDGE_PRICE_OUT_PER_MTOK = float(os.environ.get("JUDGE_PRICE_OUT", "15.00"))
 # should agree.
 JUDGE_TEMPERATURE = os.environ.get("JUDGE_TEMPERATURE")
 
-usage = {"calls": 0, "in": 0, "out": 0}
+usage = {"calls": 0, "in": 0, "out": 0, "gateway_cost": 0.0}
+
+# An experiment, 2026-09-24: evaluation models (TypeSafe's Jev, through
+# Vercel AI Gateway) don't write text. They take a "state" and typed
+# questions and return a probability. Set JUDGE_MODEL=typesafe-ai/jev and
+# AI_GATEWAY_API_KEY to try one; everything else stays on Claude.
+EVALUATION_MODELS = ("typesafe-ai/",)
+GATEWAY_EVALUATE_URL = "https://ai-gateway.vercel.sh/v1/evaluate"
+# Probability at or above this counts as PASS.
+EVALUATION_THRESHOLD = float(os.environ.get("JUDGE_THRESHOLD", "0.5"))
+
+
+def is_evaluation_model(model=None):
+    return (model or JUDGE_MODEL).startswith(EVALUATION_MODELS)
+
+
+def key_name():
+    """The environment variable the current judge needs."""
+    return "AI_GATEWAY_API_KEY" if is_evaluation_model() else "ANTHROPIC_API_KEY"
 
 # Every judge failure's reason starts with this, so callers can tell "the
 # judge said FAIL" from "there was no judge".
@@ -171,10 +189,78 @@ def _call(prompt):
     return text
 
 
+def evaluation_request(question, reply, rubric):
+    """The same grading job as prompt_for, as one yes/no question.
+
+    The rubric goes in as the question's "true" criterion, and the document,
+    question and reply go in as structured state, so the model sees which
+    text is the policy and which is the reply being graded.
+    """
+    return {
+        "model": JUDGE_MODEL,
+        "state": {
+            "business_document": rubric.quote,
+            "customer_question": question,
+            "receptionist_reply": reply,
+        },
+        "questions": {
+            "meets_rubric": {
+                "type": "boolean",
+                "instructions": (
+                    "Does receptionist_reply meet the rubric below, judged "
+                    "against business_document? Grade only against the rubric: "
+                    "tone, length, greetings and extra friendly suggestions "
+                    "don't matter. Rubric: " + rubric.criteria),
+                "criteria": {
+                    "true": "The reply does everything the rubric requires "
+                            "and nothing the rubric forbids.",
+                    "false": "The reply misses something the rubric requires, "
+                             "or states something the rubric or document "
+                             "contradicts.",
+                },
+            },
+        },
+    }
+
+
+def _evaluate(question, reply, rubric):
+    """One call to an evaluation model. Returns the probability of PASS."""
+    import urllib.request
+    request = urllib.request.Request(
+        GATEWAY_EVALUATE_URL,
+        data=json.dumps(evaluation_request(question, reply, rubric)).encode(),
+        headers={"Authorization": f"Bearer {os.environ.get('AI_GATEWAY_API_KEY', '')}",
+                 "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as r:
+            body = json.load(r)
+    except urllib.error.HTTPError as e:
+        # The gateway explains itself in the body; the status alone doesn't.
+        raise RuntimeError(f"HTTP {e.code}: {e.read().decode(errors='replace')[:300]}")
+    answer = body["answers"]["meets_rubric"]
+    tokens = body.get("usage") or {}
+    usage["calls"] += 1
+    usage["in"] += tokens.get("inputTokens", 0)
+    usage["out"] += tokens.get("outputTokens", 0)
+    cost = ((body.get("providerMetadata") or {}).get("gateway") or {}).get("cost")
+    usage["gateway_cost"] += float(cost or 0)
+    return float(answer["probability"])
+
+
 def judge(question, reply, rubric):
     """(passed, reason) for one reply against its rubric."""
     if not (reply or "").strip():
         return False, "empty reply"
+    if is_evaluation_model():
+        try:
+            probability = _evaluate(question, reply, rubric)
+        except Exception as e:
+            reason = f"{ERROR_PREFIX}: {type(e).__name__}: {e}"
+            errors.append(reason)
+            return False, reason
+        # No sentence of reasoning: an evaluation model returns only a number.
+        return (probability >= EVALUATION_THRESHOLD,
+                f"P(meets rubric) = {probability:.2f}")
     try:
         text = _call(prompt_for(question, reply, rubric))
     except Exception as e:
@@ -190,6 +276,10 @@ def judge(question, reply, rubric):
 def cost_summary():
     if not usage["calls"]:
         return None
+    if is_evaluation_model():
+        return (f"Judge ({JUDGE_MODEL}): {usage['calls']} call(s), "
+                f"{usage['in']:,} in / {usage['out']:,} out, "
+                f"gateway cost ${usage['gateway_cost']:.5f}")
     dollars = (usage["in"] / 1e6 * JUDGE_PRICE_IN_PER_MTOK
                + usage["out"] / 1e6 * JUDGE_PRICE_OUT_PER_MTOK)
     return (f"Judge ({JUDGE_MODEL}): {usage['calls']} call(s), "

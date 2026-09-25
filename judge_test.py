@@ -210,9 +210,10 @@ CASES = [
 
 
 def main():
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY is not set.")
+    if not os.environ.get(judge.key_name()):
+        print(f"{judge.key_name()} is not set (needed for JUDGE_MODEL={judge.JUDGE_MODEL}).")
         return 1
+    print(f"Judge: {judge.JUDGE_MODEL}\n")
     wrong = 0
     for label, question, rubric, reply, should_pass in CASES:
         passed, reason = judge.judge(question, reply, rubric)
@@ -229,7 +230,10 @@ def main():
         ok = passed == should_pass
         wrong += not ok
         print(f"{'ok  ' if ok else 'WRONG'} expected {'PASS' if should_pass else 'FAIL'}, "
-              f"judged {'PASS' if passed else 'FAIL'} · {label}")
+              f"judged {'PASS' if passed else 'FAIL'} · {label}"
+              # An evaluation model's only "reason" is its probability, and
+              # how close a right answer came to the line matters too.
+              + (f"  [{reason}]" if judge.is_evaluation_model() else ""))
         if not ok:
             print(f"      judge said: {reason}")
     print(f"\n{len(CASES) - wrong}/{len(CASES)} verdicts agree with the known answer.")
