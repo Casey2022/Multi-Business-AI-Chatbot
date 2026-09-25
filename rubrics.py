@@ -8,7 +8,8 @@ that text, not which words it must use.
 from judge import Rubric
 
 DEPOSIT_THREE_DAYS = Rubric(
-    quote="Less than 7 days before: the deposit is forfeited, for any cake.",
+    quote="Less than 7 days before: the whole deposit is forfeited, for any "
+          "cake; for a wedding cake that includes anything paid above 25%.",
     criteria="""States the policy that cancelling less than 7 days before
     means the deposit is forfeited, and applies it: three days is inside that
     window, so the deposit is not refunded. This holds for ANY cake, wedding

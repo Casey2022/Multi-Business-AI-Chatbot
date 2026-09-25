@@ -146,7 +146,10 @@ TESTS = {
         ("how much notice for a gluten free cake", "Flavors",          "96 hours"),
         ("how much are cupcakes",                 "Cupcake Orders",    "$3.50"),
         ("how far in advance for cupcakes",       "Cupcake Orders",    "24 hours"),
-        ("what's your cancellation policy",       "Deposits",          "50%"),
+        # "50%" is the deposit SIZE, not the cancellation policy. A complete,
+        # correct policy summary failed on it (2026-09-24) once the section
+        # stopped opening with "Custom cakes require a 50% deposit".
+        ("what's your cancellation policy",       "Deposits",          ["7 days", "forfeit"]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
         ("do you sell coffee beans",                "ANSWER_ONLY",       DECLINE),

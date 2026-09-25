@@ -56,7 +56,8 @@ the order price.
 More than 7 days before the order date: a custom cake deposit is
 refunded in full; for a wedding cake, anything paid above 25% of the
 order price is refunded and the 25% is kept.
-Less than 7 days before: the deposit is forfeited, for any cake.
+Less than 7 days before: the whole deposit is forfeited, for any cake;
+for a wedding cake that includes anything paid above 25%.
 Less than 48 hours before: the full order price is charged, for any
 cake.
 
