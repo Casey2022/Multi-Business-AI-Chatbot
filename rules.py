@@ -22,9 +22,33 @@ BOOK_INTENT = "__BOOK__"
 BOOKING_RULE = {
     "name": "book",
     "keywords": ["book", "schedule", "appointment", "make an appointment", "order"],
-    "match": "any",
+    # "command": the WHOLE message must be a booking command, optionally
+    # with polite framing ("I'd like to book", "order please"). It used to
+    # be "any", which fired on the word anywhere: "I cancelled my cake
+    # order, do I get my deposit back?" started a booking on the live demo
+    # (2026-09-25), and Sunrise's own "cancel my order" rule could never
+    # win. A longer message goes to llm.classify_and_extract, which reads
+    # what the sentence is about instead of which words it contains.
+    "match": "command",
     "reply": BOOK_INTENT,
 }
+
+_POLITE_START = r"(?:(?:hi|hello|hey)[,!.]?\s+)?(?:(?:i(?:'d| would)? (?:like|want|need) to|can i|could i|i'?d like to|let me|i want an?|i need an?|i'?d like an?)\s+)?"
+_POLITE_END = r"(?:\s+(?:please|pls|now|today))?\s*[.!?]*"
+_ARTICLE = r"(?:(?:a|an|my)\s+)?"
+
+
+def is_booking_command(text, keywords=BOOKING_RULE["keywords"]):
+    """True if the message is just a request to start a booking.
+
+    "book", "order please", "I'd like to book an appointment" -> True.
+    "I cancelled my order, refund?", "where's my order" -> False.
+    """
+    words = "|".join(re.escape(k) for k in sorted(keywords, key=len, reverse=True))
+    # "book an appointment", "place an order", "make an order"
+    core = rf"(?:(?:place|make)\s+)?{_ARTICLE}(?:{words})(?:\s+{_ARTICLE}(?:{words}))?"
+    pattern = rf"^{_POLITE_START}{core}{_POLITE_END}$"
+    return re.match(pattern, text.strip().lower()) is not None
 
 
 def get_reply(message, config):
@@ -37,15 +61,19 @@ def get_reply(message, config):
     """
     text = message.strip().lower()
 
-    # BOOKING_RULE first so it always wins over any business-defined rule
-    # that might have overlapping keywords.
+    # BOOKING_RULE first so a bare "book" or "order" always starts a
+    # booking, even if a business rule shares the word. It only matches
+    # whole-message commands now, so it no longer steals sentences that
+    # merely mention an order ("cancel my order" reaches its own rule).
     rules = [BOOKING_RULE] + config.get("rules", [])
 
     for rule in rules:
         matched = False
         keywords = rule.get("keywords", [])
 
-        if rule.get("match") == "exact":
+        if rule.get("match") == "command":
+            matched = is_booking_command(text, keywords)
+        elif rule.get("match") == "exact":
             # Entire normalized message must equal one of the keywords.
             if text in keywords:
                 matched = True

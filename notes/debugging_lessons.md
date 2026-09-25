@@ -1313,3 +1313,53 @@ pipe while the output end was broken.
    loud.
 3. The "real conversation after every change" habit caught this in minutes.
    All 309 green checks didn't.
+
+## "Couldn't reach the assistant", and a question that became an order (2026-09-25)
+
+**Symptom:** on the live demo, asking Sunrise "I cancelled 3 days before, do
+I get my deposit back?" got *"Sorry — I couldn't reach the assistant just
+then."* Rephrased with "…my cake order…", it replied *"Happy to help you place
+an order!"* Minutes earlier a 3pm booking on Bob's had worked perfectly.
+
+**Two bugs, one conversation.**
+
+1. **The message was the widget's, not the server's.** `demo.html` shows
+   "couldn't reach" whenever the response isn't readable JSON. The server
+   was reachable: it crashed. `get_llm_reply` wrapped the Claude call in a
+   `try`, but the step before it, the knowledge-base search, wasn't. That
+   search embeds the question with a network call to Voyage. When Voyage
+   raised, the exception reached Flask, Flask sent an HTML error page, and
+   the widget called it a connection problem. Bookings never search, which is
+   why they kept working and hid the fault.
+2. **"order" anywhere meant "start an order".** The built-in booking rule
+   matched the whole word `order` (or `book`, `schedule`, `appointment`)
+   anywhere in a message, and ran before everything else, including the LLM
+   intent check that exists precisely to tell questions from bookings. It
+   also meant Sunrise's own "cancel my order" rule could never fire.
+
+**Fixes:**
+- `rag.retrieve` turns a failed search into `RetrievalUnavailable` (logged
+  with its traceback). "Searched and found nothing" still returns `[]`;
+  "couldn't search" is now a different thing.
+- `get_llm_reply` answers that with an honest "I can't look that up right now,
+  try again or call {phone}", and does NOT ask Claude to answer without the
+  policy text in front of it, which is how a receptionist invents a rule.
+- `safe_process_message` wraps both endpoints: any bug becomes the same
+  apology plus a full traceback in the log, never an error page (for SMS,
+  never silence).
+- The booking rule matches only a whole-message command ("book", "order
+  please", "I'd like to book an appointment"). Anything longer goes to the
+  intent check, whose prompt now says cancelling or asking about an existing
+  order is a question.
+- `reply_safety_test.py` (33 checks), run against the old code first to
+  prove it fails on the live messages.
+
+**Lessons:**
+1. An error message tells you who wrote it, not what happened. Find the line
+   that produces it before believing it.
+2. A `try` around the call you expect to fail isn't enough. Every network
+   call on a request path needs one, and so does the endpoint as a whole.
+3. "It works" for one path says nothing about a path that makes different
+   calls. The booking and question paths share an endpoint and not much else.
+4. A keyword rule placed in front of a smarter classifier overrules it.
+   Keywords are for commands; sentences go to the thing that reads them.

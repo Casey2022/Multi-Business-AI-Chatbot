@@ -406,6 +406,12 @@ def ensure_ingested(config):
 # ---------------------------------------------------------------------------
 
     
+class RetrievalUnavailable(Exception):
+    """The knowledge base couldn't be searched (embedding API down, rate
+    limited, bad key). Distinct from "searched and found nothing": an empty
+    result means the documents don't cover it, this means we don't know."""
+
+
 def retrieve(query, config):
     """Return relevant document chunks for a query, scoped to the given business.
 
@@ -426,7 +432,16 @@ def retrieve(query, config):
         return []
 
     log.debug("Collection opened. Embedding query and searching...")
-    results = collection.query(query_texts=[query], n_results=TOP_K)
+    try:
+        # Embedding the query is a network call to Voyage. It was the one
+        # unguarded call on the question path: on 2026-09-25 it failed on
+        # Render, the exception reached Flask, and the chat widget showed
+        # "couldn't reach the assistant" for every question while bookings
+        # (which never search) kept working.
+        results = collection.query(query_texts=[query], n_results=TOP_K)
+    except Exception as e:
+        log.exception("Knowledge-base search failed for '%s'", collection_name)
+        raise RetrievalUnavailable(f"{type(e).__name__}: {e}") from e
     log.debug(f"Search returned {len(results['documents'][0])} raw results.")
 
     documents = results["documents"][0]

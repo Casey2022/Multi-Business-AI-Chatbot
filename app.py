@@ -316,6 +316,24 @@ def is_valid_twilio_request():
 # Channel-agnostic brain
 # ---------------------------------------------------------------------------
 
+def safe_process_message(message, sender_id, business_id, config, channel):
+    """process_message, but a bug becomes an apology instead of a crash.
+
+    Without this, any exception reached Flask as an HTML error page. The
+    chat widget can't read that, so it showed "couldn't reach the assistant"
+    (2026-09-25), and Twilio would have sent the customer nothing at all.
+    The traceback still goes to the log in full.
+    """
+    try:
+        return process_message(message, sender_id, business_id, config,
+                               channel=channel)
+    except Exception:
+        log.exception("Unhandled error answering %s on %s (business %s)",
+                      sender_id, channel, business_id)
+        from llm import unavailable_reply
+        return unavailable_reply(config)
+
+
 def process_message(message, sender_id, business_id, config, channel="sms"):
     """Core message handler — channel-agnostic.
 
@@ -448,7 +466,7 @@ def sms_reply():
     log.info(f"Serving: {business['name']} (id={business_id})")
 
     # Run the message through the channel-agnostic brain.
-    reply_text = process_message(
+    reply_text = safe_process_message(
         incoming_msg, from_number, business_id, config, channel="sms"
     )
 
@@ -512,7 +530,7 @@ def webchat_reply(slug):
     log_web.info("%s <- %s (%s)", business["name"], session_id, scrub(message))
     log_web.debug("Web chat content from %s: %r", session_id, message)
 
-    reply_text = process_message(
+    reply_text = safe_process_message(
         message, session_id, business_id, config, channel="webchat"
     )
 
