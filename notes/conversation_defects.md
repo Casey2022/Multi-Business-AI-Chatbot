@@ -533,3 +533,17 @@ of cake.
 
 Lesson: write policy text in the shape of the questions it answers, and
 re-run the eval after ANY document edit, even one that only "clarifies".
+
+**Resolved (2026-09-24, `2fc50a8`).** Grouping by timing alone wasn't enough:
+Haiku still gave the wedding refund inside 7 days, though it listed the rule
+correctly when asked for the whole policy. It went wrong only when applying
+the rules to a customer of unknown cake type. Naming the exception in the
+line it applies to ("the whole deposit is forfeited, for any cake; for a
+wedding cake that includes anything paid above 25%") fixed it: Sunrise
+**12/12 core, 10/11 hard** under the Opus judge, with gluten-free Wednesday
+(the known Haiku limitation) the only failure. One run, so a flip is still
+possible.
+
+The same commit fixed a core check that expected "50%" (the deposit size)
+from "what's your cancellation policy". It had failed a correct, complete
+policy summary once the section stopped opening with the deposit amounts.
