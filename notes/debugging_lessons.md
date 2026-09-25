@@ -1324,13 +1324,21 @@ an order!"* Minutes earlier a 3pm booking on Bob's had worked perfectly.
 **Two bugs, one conversation.**
 
 1. **The message was the widget's, not the server's.** `demo.html` shows
-   "couldn't reach" whenever the response isn't readable JSON. The server
-   was reachable: it crashed. `get_llm_reply` wrapped the Claude call in a
-   `try`, but the step before it, the knowledge-base search, wasn't. That
-   search embeds the question with a network call to Voyage. When Voyage
-   raised, the exception reached Flask, Flask sent an HTML error page, and
-   the widget called it a connection problem. Bookings never search, which is
-   why they kept working and hid the fault.
+   "couldn't reach" whenever no readable reply arrives. The server was
+   reachable. It **hung**. Render's log showed the same pattern for both
+   questions: `Opening collection 'sunrise_bakery_and_cafe'...`, then
+   silence for exactly 60 seconds, then `WORKER TIMEOUT` and `SIGKILL`.
+   The step after that log line embeds the question with a network call to
+   Voyage, and chromadb builds its Voyage client with `timeout=None`, which
+   the voyageai library turns into **600 seconds**. A stalled call outlived
+   the worker ten times over, and a killed worker sends nothing. Bookings
+   never search, which is why they kept working and hid the fault.
+
+   My first fix (the same morning, before the logs) assumed an *exception*
+   and wrapped the search in a `try`. Right idea, wrong failure: nothing
+   raised, so it would have changed nothing. The logs turned "it errored"
+   into "it waited", and the fix into a deadline.
+
 2. **"order" anywhere meant "start an order".** The built-in booking rule
    matched the whole word `order` (or `book`, `schedule`, `appointment`)
    anywhere in a message, and ran before everything else, including the LLM
@@ -1338,6 +1346,11 @@ an order!"* Minutes earlier a 3pm booking on Bob's had worked perfectly.
    also meant Sunrise's own "cancel my order" rule could never fire.
 
 **Fixes:**
+- Every Voyage call has a deadline: `rag.make_voyage_embedding_fn` swaps
+  chromadb's client for one with `timeout=10` and 2 attempts (worst case
+  ~36s, inside the 60s worker limit). On Render, a missing `VOYAGE_API_KEY`
+  now fails at once instead of falling back to the local embedder, which
+  would hang the same way.
 - `rag.retrieve` turns a failed search into `RetrievalUnavailable` (logged
   with its traceback). "Searched and found nothing" still returns `[]`;
   "couldn't search" is now a different thing.
@@ -1351,15 +1364,18 @@ an order!"* Minutes earlier a 3pm booking on Bob's had worked perfectly.
   please", "I'd like to book an appointment"). Anything longer goes to the
   intent check, whose prompt now says cancelling or asking about an existing
   order is a question.
-- `reply_safety_test.py` (33 checks), run against the old code first to
+- `reply_safety_test.py` (37 checks), run against the old code first to
   prove it fails on the live messages.
 
 **Lessons:**
 1. An error message tells you who wrote it, not what happened. Find the line
    that produces it before believing it.
-2. A `try` around the call you expect to fail isn't enough. Every network
-   call on a request path needs one, and so does the endpoint as a whole.
-3. "It works" for one path says nothing about a path that makes different
+2. A network call without a timeout isn't a call, it's a wait. Check what a
+   library's "no timeout" really means (here: ten minutes), and give every
+   call on a request path a deadline shorter than the request's own.
+3. Get the logs before writing the fix. "It failed" has at least two
+   shapes, an error and a hang, and they need different fixes.
+4. "It works" for one path says nothing about a path that makes different
    calls. The booking and question paths share an endpoint and not much else.
-4. A keyword rule placed in front of a smarter classifier overrules it.
+5. A keyword rule placed in front of a smarter classifier overrules it.
    Keywords are for commands; sentences go to the thing that reads them.

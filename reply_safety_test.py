@@ -158,6 +158,69 @@ def test_search_failure(llm, rag, config):
           "call us directly" in llm.unavailable_reply({"business": {}}))
 
 
+def test_voyage_deadline(rag):
+    heading("every Voyage call has a deadline shorter than the worker's life")
+    # voyageai defaults to 600s per request; Render kills a worker at 60s.
+    made = {}
+
+    class FakeClient:
+        def __init__(self, api_key=None, max_retries=0, timeout=None):
+            made.update(api_key=api_key, max_retries=max_retries, timeout=timeout)
+
+    class FakeEmbedder:
+        def __init__(self, api_key=None, model_name=None):
+            self._client = "chromadb's own client, timeout=None"
+
+    real_voyage = sys.modules.get("voyageai")
+    real_embedder = getattr(rag.embedding_functions, "VoyageAIEmbeddingFunction", None)
+    sys.modules["voyageai"] = types.SimpleNamespace(Client=FakeClient)
+    rag.embedding_functions.VoyageAIEmbeddingFunction = FakeEmbedder
+    try:
+        fn = rag.make_voyage_embedding_fn("test-key")
+    finally:
+        if real_voyage is None:
+            del sys.modules["voyageai"]
+        else:
+            sys.modules["voyageai"] = real_voyage
+        rag.embedding_functions.VoyageAIEmbeddingFunction = real_embedder
+    check("chromadb's timeout-less client is replaced",
+          isinstance(fn._client, FakeClient))
+    check("the replacement has a timeout", made.get("timeout") == rag.VOYAGE_TIMEOUT
+          and rag.VOYAGE_TIMEOUT > 0, str(made))
+    worst = rag.VOYAGE_ATTEMPTS * rag.VOYAGE_TIMEOUT + 16 * (rag.VOYAGE_ATTEMPTS - 1)
+    check(f"worst case ({worst:.0f}s) fits inside Render's 60s worker timeout",
+          worst < 60, f"{rag.VOYAGE_ATTEMPTS} attempts x {rag.VOYAGE_TIMEOUT}s")
+
+    # The private attribute swapped above must still exist on the real class,
+    # or the replacement silently does nothing after a chromadb upgrade.
+    source = None
+    try:
+        import inspect
+        import chromadb.utils.embedding_functions.voyageai_embedding_function as m
+        source = inspect.getsource(m)
+    except Exception:
+        pass
+    if source is not None:
+        check("chromadb's Voyage embedder still keeps its client in self._client",
+              "self._client" in source)
+    else:
+        print("  [skip] chromadb not installed here; can't inspect its embedder")
+
+    heading("no Voyage key on Render fails fast instead of hanging")
+    real_fn, real_render = rag._embedding_fn, rag.ON_RENDER
+    rag._embedding_fn, rag.ON_RENDER = None, True
+    try:
+        try:
+            rag.retrieve("deposit?", {"business": {"name": "x"}})
+            raised = False
+        except rag.RetrievalUnavailable:
+            raised = True
+    finally:
+        rag._embedding_fn, rag.ON_RENDER = real_fn, real_render
+    check("retrieve refuses at once (the local embedder would hang the worker)",
+          raised)
+
+
 def test_endpoint_safety_net():
     heading("the chat and SMS endpoints never crash on a bug")
     source = Path("app.py").read_text(encoding="utf-8")
@@ -200,6 +263,7 @@ def main():
     config.setdefault("business", {})["id"] = 1
     test_booking_keyword(config)
     test_search_failure(llm, rag, config)
+    test_voyage_deadline(rag)
     test_endpoint_safety_net()
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:

@@ -33,12 +33,47 @@ log = logging.getLogger("rag")
 # 79MB model download on every cold start.
 VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY")
 
-if VOYAGE_API_KEY:
-    _embedding_fn = embedding_functions.VoyageAIEmbeddingFunction(
-        api_key=VOYAGE_API_KEY,
+# Every Voyage call gets a short deadline. chromadb builds its Voyage client
+# with timeout=None, which voyageai turns into 600 seconds: ten times longer
+# than Render lets a worker live. On
+# 2026-09-25 two live questions hung inside the query embedding until
+# gunicorn killed the worker at 60s, and the chat widget, getting no reply
+# at all, said "couldn't reach the assistant". With a deadline the call
+# fails, retrieve() raises RetrievalUnavailable, and the customer gets an
+# honest reply. Worst case is attempts x timeout plus voyageai's backoff
+# (at most 16s): about 36s, inside the 60s worker timeout.
+VOYAGE_TIMEOUT  = float(os.environ.get("VOYAGE_TIMEOUT", "10"))
+VOYAGE_ATTEMPTS = int(os.environ.get("VOYAGE_ATTEMPTS", "2"))
+
+# Render sets RENDER=true. There, the local fallback below isn't slow, it's
+# a hang, so a missing key must fail fast instead.
+ON_RENDER = bool(os.environ.get("RENDER"))
+
+
+def make_voyage_embedding_fn(api_key):
+    """chromadb's Voyage embedder, with a timeout on its client."""
+    import voyageai
+    fn = embedding_functions.VoyageAIEmbeddingFunction(
+        api_key=api_key,
         model_name="voyage-3-large",
     )
-    log.info("Using Voyage AI embeddings.")
+    # chromadb 1.5.9 exposes no timeout setting, so replace the client it
+    # made (a private attribute; reply_safety_test checks it's still there).
+    # voyageai's max_retries counts attempts, and it retries only rate
+    # limits, timeouts and 503s.
+    fn._client = voyageai.Client(api_key=api_key, timeout=VOYAGE_TIMEOUT,
+                                 max_retries=VOYAGE_ATTEMPTS)
+    return fn
+
+
+if VOYAGE_API_KEY:
+    _embedding_fn = make_voyage_embedding_fn(VOYAGE_API_KEY)
+    log.info("Using Voyage AI embeddings (timeout %ss, %d attempts).",
+             VOYAGE_TIMEOUT, VOYAGE_ATTEMPTS)
+elif ON_RENDER:
+    _embedding_fn = None
+    log.error("VOYAGE_API_KEY is not set on Render. Questions will get the "
+              "'can't look that up' reply until it is.")
 else:
     # Fallback: Chroma's local default. Works locally; too slow to deploy.
     _embedding_fn = None
@@ -420,6 +455,10 @@ def retrieve(query, config):
     collection hasn't been ingested yet.
     """
     collection_name = collection_for(config)
+    if _embedding_fn is None and ON_RENDER:
+        # The local embedder would run on Render's tiny CPU until the worker
+        # is killed. Refuse quickly instead.
+        raise RetrievalUnavailable("VOYAGE_API_KEY is not set on Render")
     log.info(f"Opening collection '{collection_name}'...")
 
     try:
