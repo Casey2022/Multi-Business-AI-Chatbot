@@ -525,3 +525,60 @@ strangers — which is what the rate limits, the live-demo ceiling and an
 account-level spend cap are for. Per-turn token usage is now logged (see
 the `cost` logger), so the question is answerable from the log rather than
 from a vendor dashboard the next day.
+
+## Routing to a stronger model with an evaluation model (Jev) — tested, parked
+
+**The question (2026-09-24):** could a cheap "checker" model decide, per
+reply, when Haiku's answer is good enough and when to escalate to a
+stronger, pricier model? The candidate was TypeSafe AI's Jev, an
+*evaluation* model on Vercel AI Gateway: it doesn't write text, it takes a
+state plus typed questions and returns probabilities ("does this reply meet
+the rubric?" → 0.93).
+
+**Why it was worth asking.** The Haiku vs Sonnet 5 comparison (see the
+project's rag-evaluation notes) found Sonnet 5 scored 49/50 to Haiku's
+48/50 at ~4x the cost, within run-to-run noise. Upgrading every reply
+isn't worth it. Upgrading only the risky replies might be, if something
+cheap can tell which ones are risky.
+
+**How it was tested, without committing to it.** Rather than wire Jev into
+the live reply path, it was dropped in as the grader for `judge_test.py`:
+34 receptionist replies whose correct verdict is already known, most of
+them real replies from eval runs. A checker in a cascade does exactly this
+job, so its score here predicts how it would do in production. The adapter
+is opt-in (`JUDGE_MODEL=typesafe-ai/jev`, commit `ff20845`); nothing else
+changed. Total cost: $0 (launch promo), about 600 input tokens per case.
+
+**Result: 33/34**, against 34/34 for the existing judge (Opus 5.5).
+
+- Blunt failures were caught confidently: every false promise, "just call
+  us" dodge and wrong cutoff scored 0.01–0.25. That includes every defect
+  the receptionist has actually produced (the $110 half-grey quote,
+  "gluten-free most days", "cancel by 9am to avoid the fee").
+- The one miss was the subtlest reply in the set: a wedding-cake answer
+  that states the 7-day rule correctly, then adds one wrong sentence
+  ("the deposit is just the 25%"). Jev scored it 0.78; a correct reply
+  scored 0.79. No threshold separates them.
+
+**Decision: not adopted.** In a cascade, the checker's misses are the
+replies that ship. Jev would catch the obvious errors, which are cheap to
+catch other ways (rubric tests, code-enforced rules), and pass the subtle
+wrong-fact reply, which is precisely the case a stronger model exists for.
+The 34-case set is also too small to trust a 97% figure.
+
+**What would reopen it:** a checker that separates the subtle cases, a
+larger labelled set (a few hundred real replies) to measure on, or a
+defect rate on Haiku high enough that even catching the blunt failures
+pays for itself.
+
+**Interview angle.** The story isn't "I tried a new model." It's:
+1. The cost/quality data said a blanket upgrade wasn't worth it, so the
+   question became *when* to upgrade, not *whether*.
+2. I tested the idea against a set of known answers I already had, in a
+   way that touched no production code and cost nothing, before building
+   any routing.
+3. I looked past the headline number (33/34 sounds great) at *which* case
+   failed and what that failure would cost in a cascade. The one miss was
+   the most expensive kind.
+4. Deciding not to ship something, with evidence written down, is a
+   result.
