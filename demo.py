@@ -249,11 +249,17 @@ def sweep_idle(idle_minutes=None, now=None):
     return removed
 
 
-def sweep_all():
-    """Delete every demo. For a restart: no visitor's session outlives one."""
+def sweep_all(drop_collections=True):
+    """Delete every demo. For a restart: no visitor's session outlives one.
+
+    app.bootstrap() passes drop_collections=False: it may be running in
+    gunicorn's manager process, which must not touch ChromaDB (see
+    vector_boot.py, which drops the orphaned collections instead).
+    """
     removed = []
     for row in get_demo_businesses():
-        _drop_forked_collection(row)
+        if drop_collections:
+            _drop_forked_collection(row)
         if delete_business(row["id"]):
             removed.append(row["slug"])
     if removed:

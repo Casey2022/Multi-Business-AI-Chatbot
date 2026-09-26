@@ -1379,3 +1379,57 @@ an order!"* Minutes earlier a 3pm booking on Bob's had worked perfectly.
    calls. The booking and question paths share an endpoint and not much else.
 5. A keyword rule placed in front of a smarter classifier overrules it.
    Keywords are for commands; sentences go to the thing that reads them.
+
+## The real cause: a flag nobody set (2026-09-26)
+
+The section above ends with a timeout fix. It didn't fix anything. The
+next deploy hung in the same place, with the Voyage deadline live.
+
+**Finding it took three rounds of instrumentation, each added because the
+last guess was wrong:**
+1. Timed log lines per step. They showed the client and collection were
+   fine (0.0s, 0.1s) and the *search* hung.
+2. A guard in `get_chroma_client` recording which process created the
+   client. It fired: `created in process 58 and inherited by worker 73`.
+   58 was gunicorn's *manager*.
+3. `faulthandler.dump_traceback_later(40)` around the search. It printed
+   the stuck line, inside chromadb's own `rust.py _query`, 20 seconds
+   before gunicorn's kill erased the evidence.
+
+**Cause:** Render sets `GUNICORN_CMD_ARGS="--preload --access-logfile -
+--bind=0.0.0.0:10000"` for every Python service. It's a platform default,
+listed in Render's docs, but not in the service's Environment tab, and it
+applies whatever the Start Command says. With `--preload`, gunicorn imports
+`app.py` once in the manager and forks workers from it. Since the demo
+sandbox (Sept 17), `bootstrap()` ran at import and built every vector
+collection, so the manager created a ChromaDB client and every worker
+inherited it. chromadb's Rust engine doesn't survive `fork()`: the first
+search in a worker waits forever. `app.py` even had a comment saying this
+was safe "because the Procfile does NOT use --preload". True, and
+irrelevant: Render doesn't read the Procfile's flags, and adds its own.
+
+The clue was in the logs all along: gunicorn access-log lines
+(`127.0.0.1 - - [...] "GET /chat/..."`) only appear with
+`--access-logfile -`, which the Start Command didn't have. Something else
+was passing flags.
+
+**Fix:** the manager never touches ChromaDB. `bootstrap()` now runs
+`python -m vector_boot`, a fresh interpreter that builds or checks every
+collection (and drops orphaned demo collections) and exits. Workers open
+their own client on first search. A startup check logs an error if a client
+exists after bootstrap. `startup_test.py` (14 checks) reads `app.py`'s
+source and fails if bootstrap or module scope calls anything that opens
+ChromaDB. The per-process guard stays as an alarm, but rebuilding the
+client in the worker did NOT help: chromadb's engine state is
+process-wide.
+
+**Lessons:**
+1. Your platform's defaults are part of your config. The Start Command
+   was one of three sources of gunicorn flags (command, config file,
+   `GUNICORN_CMD_ARGS`), and the only one anyone looked at.
+2. A comment that says "safe because X" is a test waiting to be written.
+   Now `startup_test.py` checks the property instead of the assumption.
+3. When a process hangs, make it tell you where. A stack dump on a timer
+   ended two days of inference in one deploy.
+4. Log lines have authors. An access-log line meant a flag was set
+   somewhere; reading it that way would have found this on day one.

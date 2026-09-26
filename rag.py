@@ -132,20 +132,25 @@ _chroma_pid = None      # the process that created _chroma_client
 def get_chroma_client():
     """Return the ChromaDB client, creating it in THIS process if needed.
 
-    "Created lazily" isn't enough on its own: app.py's bootstrap() creates
-    the client at import, so if gunicorn ever runs with --preload (import
-    once, then fork workers), every worker inherits the parent's client and
-    freezes on its first search. On 2026-09-25/26 live questions hung at
-    exactly that point until the worker was killed. So the client remembers
-    which process made it, and a worker that finds an inherited one builds
-    its own, after clearing chromadb's per-path cache, which would
-    otherwise hand back the inherited connection.
+    Render runs gunicorn with --preload, so app.py is imported in the
+    manager process and copied into workers. A client created before that
+    copy freezes the worker on its first search: that was every live
+    question from 2026-09-17 to 2026-09-26. The real fix is that the
+    manager never creates one (vector_boot.py builds the collections in a
+    separate process).
+
+    This check is the alarm, not the cure. It logs loudly if a worker finds
+    an inherited client and builds a fresh one, but on 2026-09-26 the fresh
+    one froze too: chromadb's engine keeps process-wide state that a new
+    client doesn't reset. If you see the error, find what opened a client
+    at import and move it into vector_boot.py.
     """
     global _chroma_client, _chroma_pid
     if _chroma_client is not None and _chroma_pid != os.getpid():
         log.error("ChromaDB client was created in process %s and inherited by "
-                  "worker %s (is gunicorn running with --preload?). Building "
-                  "a new one for this worker.", _chroma_pid, os.getpid())
+                  "worker %s (gunicorn --preload). Searches in this worker "
+                  "will likely hang: something opened a client at import; "
+                  "move it into vector_boot.py.", _chroma_pid, os.getpid())
         try:
             from chromadb.api.shared_system_client import SharedSystemClient
             SharedSystemClient.clear_system_cache()

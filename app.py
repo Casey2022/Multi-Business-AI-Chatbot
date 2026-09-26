@@ -82,7 +82,10 @@ def bootstrap():
     # used again and would otherwise sit there until the idle sweep notices.
     try:
         from demo import sweep_all
-        sweep_all()
+        # drop_collections=False: this runs in gunicorn's manager process,
+        # which must never touch ChromaDB (see vector_boot.py). The orphaned
+        # demo collections are dropped by vector_boot instead.
+        sweep_all(drop_collections=False)
     except Exception as e:
         # Tidying is not worth failing a boot over.
         log_boot.warning(f"Could not clear old demos: {e}")
@@ -129,20 +132,17 @@ def bootstrap():
                   "ADMIN_PASSWORD are not set — the admin portal is "
                   "unreachable.")
 
-    from rag import ensure_ingested
     from scheduling import (unknown_duration_services,
                             unknown_condition_services)
     from import_documents import import_for_business
     for b in businesses:
         if not b["active"]:
             continue
-        # A demo clone shares its template's vector collection until it
+        # A demo clone shares its template's knowledge base until it
         # publishes. sweep_all() above should already have deleted every
-        # demo, but that call is wrapped in a try/except that swallows —
-        # so if it ever fails, this loop would reach a clone and call
-        # ensure_ingested on a collection belonging to a real client, with
-        # the clone's documents as the source. Skipping demos here costs
-        # nothing and removes the dependency on the sweep having worked.
+        # demo, but that call is wrapped in a try/except that swallows, so
+        # skip them here too rather than depend on the sweep having worked.
+        # (vector_boot.ingest_all skips them for the same reason.)
         if b["is_demo"]:
             continue
         try:
@@ -179,11 +179,17 @@ def bootstrap():
                     "offer: %s — those questions will never be asked",
                     b["name"],
                     ", ".join(f"{key} -> {name!r}" for key, name in orphaned))
-            ensure_ingested(config)
         except Exception as e:
-            # A failed ingest shouldn't stop the server from starting —
-            # that business just won't have RAG until it's fixed.
-            log_boot.warning(f"Ingest failed for {b['name']}: {e}")
+            # A broken config shouldn't stop the server from starting —
+            # that business just won't be fully set up until it's fixed.
+            log_boot.warning(f"Setup failed for {b['name']}: {e}")
+
+    # The vector collections are built in a separate process, never here.
+    # With gunicorn --preload (Render's default) this function runs in the
+    # manager process, and a ChromaDB client created here is copied into
+    # every worker, where the first search freezes. See vector_boot.py.
+    from vector_boot import run_in_subprocess
+    run_in_subprocess()
 
     log_boot.info(f"Ready — {len(businesses)} business(es) registered.")
     
@@ -256,11 +262,14 @@ app.register_blueprint(admin_bp)
 # to do automatically was in fact being done by hand, and the only symptom
 # was a business whose bot knew nothing about it.
 #
-# Safe here because the Procfile does NOT use --preload: each worker
-# imports this module after forking, so the ChromaDB client is created in
-# the process that uses it. If --preload is ever added, this must move into
-# a post_fork hook or the client will be inherited across the fork and
-# break in ways that look like corruption.
+# Safe with or without gunicorn --preload, and Render turns --preload ON
+# (its GUNICORN_CMD_ARGS default, invisible in the dashboard). This module
+# may be imported in the manager process and copied into workers, so
+# nothing here may create a ChromaDB client: bootstrap() builds the
+# collections in a separate process (vector_boot.py), and workers open
+# their own client on their first search. Until 2026-09-26 this comment
+# said the Procfile didn't use --preload, which was true and irrelevant:
+# Render doesn't read the Procfile's flags, and adds its own.
 #
 # Wrapped because a business with a bad config should cost that business
 # its RAG, not cost everyone the server.
@@ -274,6 +283,19 @@ except Exception as e:
 try:
     import resources
     log_boot.info("After startup: %s", resources.summary())
+except Exception:
+    pass
+
+# The one thing startup must not leave behind. If a ChromaDB client exists
+# now, something in bootstrap() opened one in what may be gunicorn's
+# manager process, and every worker's first search will freeze.
+try:
+    import rag as _rag
+    if _rag._chroma_client is not None:
+        log_boot.error("Startup opened a ChromaDB client in process %s. Under "
+                       "gunicorn --preload every worker will inherit it and "
+                       "hang on its first search. Move that call into "
+                       "vector_boot.py.", _rag._chroma_pid)
 except Exception:
     pass
 
