@@ -530,23 +530,28 @@ def _free_text_keys(slots):
             and s.get("type", "text") == "text"}
 
 
-def _question_filed_as_answer(message, extracted, allowed_keys):
-    """A customer's question the extractor took for a free-text answer.
+def _what_a_question_really_answers(extracted, pending, missing, slots):
+    """The part of a question's extraction that is a genuine answer.
 
-    Live, 2026-09-26: asked "Anything else we should know? (allergies,
-    pickup person...)", a customer asked "do you have gluten free?". The
-    extractor filed it as the note "gluten free", the booking went through
-    with it, and the question was never answered: the question check only
-    ran when nothing was extracted.
+    - A value we already hold isn't an answer. On 2026-09-26 "do you fix
+      leaky faucets too?" came back as a slot the flow already had; nothing
+      changed, the question wasn't recognised as one, and the same prompt
+      went out again with no answer.
+    - A question never changes the service. "Do you fix leaky faucets too?"
+      is asking, not switching the job to a leak repair.
+    - Free text for the slot being asked is the question itself, filed as
+      an answer ("do you have gluten free?" as the note "gluten free").
 
-    So: a message that reads as a question, where everything extracted is
-    free text for the slots in `allowed_keys`, is a question. The cost is a
-    request phrased as a question ("can you write it in blue?") getting an
-    answer and the question asked again, instead of being stored at once;
-    a lost question was worse.
+    What's left (usually a time: "can you come Monday at 11?") is kept. An
+    empty result sends the message down the question path: answered, then
+    the missing slot asked again.
     """
-    return (bool(extracted) and _looks_like_a_question(message)
-            and set(extracted) <= set(allowed_keys))
+    real = {k: v for k, v in extracted.items()
+            if str(v).strip().lower() != str(pending.get(k, "")).strip().lower()
+            and k != "service"}
+    if missing and missing["key"] in _free_text_keys(slots):
+        real.pop(missing["key"], None)
+    return real
 
 
 def _answer_mid_booking(phone, message, config, business_id, channel="sms"):
@@ -1306,12 +1311,13 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             message, slots, config, already_filled=pending
         )
         missing = _first_missing_slot(pending, slots)
-        if (missing and missing["key"] in _free_text_keys(slots)
-                and _question_filed_as_answer(message, extracted,
-                                              {missing["key"]})):
-            log.info("Question mid-booking was read as an answer to '%s' — "
-                     "answering it instead", missing["key"])
-            extracted = {}
+        if _looks_like_a_question(message):
+            # Slot names only, never values: enough to see what a question
+            # was mistaken for.
+            log.info("Question mid-booking; extractor returned %s",
+                     sorted(extracted) or "nothing")
+            extracted = _what_a_question_really_answers(
+                extracted, pending, missing, slots)
 
         # Fallback: if extraction found nothing but we're clearly waiting on
         # a specific slot, treat the whole message as that slot's answer.
@@ -1370,15 +1376,17 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         # A question at the read-back ("do you charge a call-out fee?") gets
         # answered, then the read-back again. It used to get "Sorry, I
         # didn't quite catch that", or, if it looked like a note, got stored.
-        if _looks_like_a_question(message) and (
-                not extracted
-                or _question_filed_as_answer(message, extracted,
-                                             _free_text_keys(slots))):
-            log.info("Question at the read-back (%s) — answering, not storing",
-                     scrub(message))
-            answer = _answer_mid_booking(phone, message, config, business_id,
-                                         channel=channel)
-            return _confirmation_question(pending, config, lead=answer)
+        if _looks_like_a_question(message):
+            log.info("Question at the read-back; extractor returned %s",
+                     sorted(extracted) or "nothing")
+            real = {k: v for k, v in _what_a_question_really_answers(
+                        extracted, pending, None, slots).items()
+                    if k not in _free_text_keys(slots)}
+            if not real:
+                answer = _answer_mid_booking(phone, message, config,
+                                             business_id, channel=channel)
+                return _confirmation_question(pending, config, lead=answer)
+            extracted = real     # "could we do Wednesday at 10 instead?"
         if extracted:
             # A customer who restates an answer we already hold is usually
             # checking we heard them, not changing anything -- and until now

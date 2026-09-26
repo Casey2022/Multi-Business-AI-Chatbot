@@ -71,6 +71,27 @@ def main():
         check("and the notes question is asked again", "anything else" in reply.lower(),
               reply)
 
+        heading("a question the extractor reads as something else (the eval run)")
+        # conversation_eval, 2026-09-26: "do you fix leaky faucets too?" at the
+        # problem question got the same prompt back and no answer.
+        for extracted, label in (
+                ({"service": "cupcake orders (dozen minimum)"}, "the service we already hold"),
+                ({"service": "gluten-free cupcakes"}, "a different service"),
+                ({"service": "gluten-free cupcakes", "notes": "gluten free"},
+                 "a service and the note")):
+            set_state(phone, biz, "collecting", pending=dict(base))
+            extract_returns.clear(); extract_returns.update(extracted)
+            answered.clear()
+            reply = sched._handle_booking_inner(phone, "do you have gluten free?",
+                                                cfg, biz)
+            pending = get_state(phone, biz)["pending"]
+            check(f"({label}) the question is answered",
+                  answered and "gluten-free cupcakes" in reply, reply)
+            check(f"({label}) the service is unchanged",
+                  pending.get("service") == base["service"], str(pending))
+            check(f"({label}) nothing stored as the note", "notes" not in pending,
+                  str(pending))
+
         heading("a real note still gets stored")
         answered.clear()
         extract_returns.clear(); extract_returns["notes"] = "gluten free please"
@@ -95,7 +116,11 @@ def main():
         heading("a question at the read-back")
         full = dict(base, notes="none")
         for extracted, label in (({}, "nothing extracted"),
-                                 ({"notes": "gluten free"}, "read as a note")):
+                                 ({"notes": "gluten free"}, "read as a note"),
+                                 ({"service": "cupcake orders (dozen minimum)"},
+                                  "read as the service we hold"),
+                                 ({"service": "gluten-free cupcakes"},
+                                  "read as a new service")):
             set_state(phone, biz, "confirming", pending=dict(full))
             extract_returns.clear(); extract_returns.update(extracted)
             answered.clear()
