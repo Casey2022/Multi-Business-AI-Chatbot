@@ -199,6 +199,29 @@ def booking_completed(t):
         return "never reached a booking"
 
 
+def _asked_for_name(text):
+    return "what name should i put" in text.lower()
+
+
+def name_asked_at_most_once(t):
+    """The name question goes out once, and only while it's missing."""
+    asked = sum(1 for who, text in t.exchange if who == "bot" and _asked_for_name(text))
+    if asked > 1:
+        return f"asked for the customer's name {asked} times"
+
+
+def name_never_asked(t):
+    """A name given in the opening message isn't asked for again."""
+    if any(who == "bot" and _asked_for_name(text) for who, text in t.exchange):
+        return "asked for a name the customer had already given"
+
+
+def name_on_booking(t):
+    """A finished booking says who it's for."""
+    if t.booked and not t.booked.get("customer_name"):
+        return "the booking was saved without the customer's name"
+
+
 
 
 def answer_not_duplicated(t):
@@ -358,6 +381,7 @@ CHECKS = {f.__name__: f for f in (
     answer_not_duplicated, question_gets_a_real_reply,
     no_command_advice_mid_booking, bad_date_rejected_immediately,
     extra_answer_is_not_the_service, answers_are_read_back,
+    name_asked_at_most_once, name_never_asked, name_on_booking,
 )}
 
 
@@ -368,7 +392,8 @@ CHECKS = {f.__name__: f for f in (
 ALWAYS = ["no_repeated_reply", "no_stacked_greeting", "question_not_absorbed",
           "answer_not_duplicated", "question_gets_a_real_reply",
           "no_command_advice_mid_booking", "bad_date_rejected_immediately",
-          "extra_answer_is_not_the_service", "answers_are_read_back"]
+          "extra_answer_is_not_the_service", "answers_are_read_back",
+          "name_asked_at_most_once", "name_on_booking"]
 
 SCENARIOS = [
     {
@@ -379,7 +404,8 @@ SCENARIOS = [
                 "to describe the problem — and the next question, arriving "
                 "with no lead-in, collected their description into the "
                 "wrong field.",
-        "script": ["I need a leak fixed", "1738 William St, Rochester NY",
+        "script": ["I need a leak fixed", "Sam Rivera",
+                   "1738 William St, Rochester NY",
                    "Monday at 11", "a pipe is leaking under the sink",
                    "no", "yes"],
         "checks": ALWAYS,
@@ -393,7 +419,7 @@ SCENARIOS = [
                 "on and only complained about the date three questions "
                 "later.",
         "script": ["I'd like to schedule something", "leak repair",
-                   "1738 William St, Rochester NY", "appointment",
+                   "it's Dana", "1738 William St, Rochester NY", "appointment",
                    "Monday at 11", "a pipe is leaking", "no", "yes"],
         "checks": ALWAYS,
     },
@@ -403,8 +429,8 @@ SCENARIOS = [
                 "'appointment' to start booking — which they were already "
                 "doing — and the nudge itself risks being filed as a slot "
                 "answer.",
-        "script": ["book", "drain cleaning", "1738 William St, Rochester NY",
-                   "Hello?", "Can you come out Monday at 11?",
+        "script": ["book", "drain cleaning", "Pat",
+                   "1738 William St, Rochester NY", "Hello?", "Can you come out Monday at 11?",
                    "a pipe is leaking", "no", "yes"],
         "checks": ALWAYS,
     },
@@ -413,7 +439,8 @@ SCENARIOS = [
         "why":  "Answered with a service the config words differently. Both "
                 "this and the address were filed elsewhere while service "
                 "stayed empty, and the same prompt went out three times.",
-        "script": ["book", "pipe leak", "1738 William St, Rochester NY",
+        "script": ["book", "pipe leak", "my name is Lee Chen",
+                   "1738 William St, Rochester NY",
                    "Monday at 11", "yes"],
         "checks": ALWAYS + ["service_in_catalog"],
     },
@@ -424,8 +451,8 @@ SCENARIOS = [
                 "instead of its own offer.",
         "busy_dates": ["{d0}", "{d1}", "{d2}", "{d3}", "{d4}", "{d5}",
                        "{d6}", "{d7}"],
-        "script": ["book", "drain cleaning", "12 Elm St, Rochester NY",
-                   "{weekday2day} at 1", "{offer}", "clogged sink", "yes"],
+        "script": ["book", "drain cleaning", "Morgan",
+                   "12 Elm St, Rochester NY", "{weekday2day} at 1", "{offer}", "clogged sink", "yes"],
         "checks": ALWAYS + ["offer_honoured"],
     },
     {
@@ -433,14 +460,15 @@ SCENARIOS = [
         "why":  "'Happy to help with for next wednesday. Happy to schedule an "
                 "appointment!' — two greetings and a broken preposition.",
         "script": ["I'd like to book an appointment for next wednesday",
-                   "drain cleaning", "12 Elm St, Rochester NY", "yes"],
+                   "drain cleaning", "Jamie", "12 Elm St, Rochester NY", "yes"],
         "checks": ALWAYS,
     },
     {
         "name": "question asked mid-booking (2026-08-02)",
         "why":  "A customer asked two real questions during the form and got "
                 "the same prompt back three times.",
-        "script": ["book", "drain cleaning", "12 Elm St, Rochester NY",
+        "script": ["book", "drain cleaning", "this is Alex",
+                   "12 Elm St, Rochester NY",
                    "Tuesday at 2", "Do you charge a call-out fee?",
                    "clogged sink", "yes"],
         "checks": ALWAYS,
@@ -451,7 +479,8 @@ SCENARIOS = [
                 "'thats it' and the confirmation with 'thats correct'. "
                 "Neither was recognised: the first got filed AS the address, "
                 "the second made the bot repeat itself three times.",
-        "script": ["book", "leak repair", "522 Penbrooke Drive", "thats it",
+        "script": ["book", "leak repair", "Robin", "522 Penbrooke Drive",
+                   "thats it",
                    "Tuesday at 2", "leaky pipe", "thats correct"],
         "checks": ALWAYS + ["booking_completed"],
     },
@@ -459,18 +488,30 @@ SCENARIOS = [
         "name": "pushing back on the read-back (2026-09-16)",
         "why":  "'you just listed the address' is a complaint, not an "
                 "address — it must not be stored as one.",
-        "script": ["book", "leak repair", "522 Penbrooke Drive",
+        "script": ["book", "leak repair", "Taylor", "522 Penbrooke Drive",
                    "you just listed the address",
                    "yes", "Tuesday at 2", "leaky pipe", "yes"],
         "checks": ALWAYS,
     },
     {
+        "name": "the customer's name, asked and kept (2026-09-26)",
+        "why":  "Appointments had a phone number (on the demo, a random web "
+                "id) and no name. The name is asked right after the service, "
+                "tidied ('it's Casey, thanks!' is Casey), read back, and "
+                "saved with the booking.",
+        "script": ["book", "drain cleaning", "it's Casey, thanks!",
+                   "12 Elm St, Rochester NY", "Tuesday at 2",
+                   "clogged sink", "yes"],
+        "checks": ALWAYS + ["booking_completed"],
+    },
+    {
         "name": "everything in one breath",
         "why":  "Customers volunteer several slots at once; the flow should "
                 "not re-ask for what it already has.",
-        "script": ["I need drain cleaning at 12 Elm St, Rochester NY on "
-                   "Tuesday at 2, the kitchen sink is clogged", "yes"],
-        "checks": ALWAYS + ["service_in_catalog"],
+        "script": ["Hi, this is Sam Rivera. I need drain cleaning at 12 Elm "
+                   "St, Rochester NY on Tuesday at 2, the kitchen sink is "
+                   "clogged", "yes"],
+        "checks": ALWAYS + ["service_in_catalog", "name_never_asked"],
     },
 ]
 
@@ -525,7 +566,8 @@ def run(scenario, config, verbose=False):
     import db as _db
     original_save = _db.save_appointment
     def capture(phone_, service, when, business_id, details=None, **kw):
-        booked.update(service=service, when=when, details=details)
+        booked.update(service=service, when=when, details=details,
+                      customer_name=kw.get("customer_name"))
         return original_save(phone_, service, when, business_id,
                              details=details, **kw)
     _db.save_appointment = capture

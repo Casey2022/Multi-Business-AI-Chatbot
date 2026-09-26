@@ -42,6 +42,48 @@ ADDRESS_MAX_ATTEMPTS = 2
 # used, so appointments booked before this change keep reading correctly.
 ADDRESS_SLOT_KEY = "service_address"
 
+# Who the booking is for. A built-in question every business gets, like the
+# address, and stored in its own column rather than in `details` (see
+# db.save_appointment). Added 2026-09-26: until then an appointment had a
+# phone number (a random web id on the demo) and no name at all.
+NAME_SLOT_KEY = "customer_name"
+
+_NAME_GREETING = re.compile(r"^(?:hi|hello|hey)\b[\s,!.]*", re.I)
+_NAME_LEAD_IN = re.compile(
+    r"^(?:it'?s|its|this is|my name is|my name'?s|the name'?s|name'?s|"
+    r"i'?m|i am|call me|(?:you can )?put (?:it|me|this) (?:down )?under|"
+    r"under)\s+", re.I)
+_NAME_TRAILER = re.compile(r"[\s,.!]+(?:please|pls|thanks|thank you|thx)\b.*$",
+                           re.I)
+
+
+def clean_name(value):
+    """The name from a reply to "What name should I put this under?".
+
+    When the extractor finds nothing, the whole reply is stored as the answer
+    to the question just asked, so "It's Casey, thanks!" would become the
+    name verbatim. This strips the framing and keeps the name. Returns None
+    for nothing usable.
+    """
+    text = " ".join(str(value or "").split())
+    text = _NAME_GREETING.sub("", text)
+    text = _NAME_LEAD_IN.sub("", text)
+    text = _NAME_TRAILER.sub("", text)
+    text = text.strip(" .,!?:;\"'")
+    if text.islower():
+        text = text.title()          # "casey caudle" -> "Casey Caudle"
+    return text[:60] or None
+
+
+def _tidy_name(pending):
+    """Normalise the name slot in place, whoever filled it."""
+    if NAME_SLOT_KEY in pending:
+        name = clean_name(pending[NAME_SLOT_KEY])
+        if name:
+            pending[NAME_SLOT_KEY] = name
+        else:
+            pending.pop(NAME_SLOT_KEY, None)
+
 class StaleTurn(Exception):
     """Raised when this turn's state write is refused as out of date.
 
@@ -134,6 +176,26 @@ def get_slot_definitions(config):
         # and don't ask for it twice
         extras = [q for q in extras if q["key"] != ADDRESS_SLOT_KEY]
 
+    # The name goes right after the service: early, so the rest of the
+    # conversation can use it, and before the address and time so a customer
+    # who gives up partway has still said who they are. An owner who wrote
+    # their own name question keeps their wording, asked once.
+    own = next((q for q in extras if q["key"] == NAME_SLOT_KEY), None)
+    extras = [q for q in extras if q["key"] != NAME_SLOT_KEY]
+    slots.insert(1, {
+        "key": NAME_SLOT_KEY,
+        "prompt": ((own or {}).get("prompt")
+                   or BOOKING.get("ask_name",
+                                  f"What name should I put this {noun} under?")),
+        "description": ("the customer's own name, as they give it (a first "
+                        "name is enough). Only when they say their name "
+                        "(\"this is Casey\", \"it's Casey\", or just "
+                        "\"Casey\" when asked for it). Never the business's "
+                        "name, or the name of a staff member or stylist they "
+                        "want."),
+        "type": "name",
+    })
+
     for q in extras:
         slots.append({
             "key": q["key"],
@@ -176,9 +238,10 @@ def _finalize_booking(phone, business_id, pending, config):
     parsed  = pending.get("datetime_parsed") or pending.get("datetime")
 
     checks = pending.get("_checks") or {}
+    customer_name = pending.get(NAME_SLOT_KEY)
     extras = {
         k: v for k, v in pending.items()
-        if k not in ("service", "datetime", "datetime_parsed")
+        if k not in ("service", "datetime", "datetime_parsed", NAME_SLOT_KEY)
         and k not in INTERNAL_PENDING_KEYS
     }
 
@@ -204,6 +267,7 @@ def _finalize_booking(phone, business_id, pending, config):
                 start_iso=parsed,
                 customer_id=phone,
                 details=extras,
+                customer_name=customer_name,
             )
             # .get, not [...]: the simulated backend has no external
             # calendar to name, and a KeyError here would fire AFTER the
@@ -224,11 +288,15 @@ def _finalize_booking(phone, business_id, pending, config):
     save_appointment(phone, service, parsed, business_id, details=extras,
                      external_event_id=event_id, external_calendar=calendar_id,
                      sync_status=sync_status,
-                     address_check=checks or None)
+                     address_check=checks or None,
+                     customer_name=customer_name)
 
     noun = BOOKING.get("noun", "appointment")
-    log.info("Saved %s: %s | %s | %s | %d extra answer(s)",
-             noun, phone, service, parsed, len(extras))
+    # The name itself stays out of the log, like the other answers; that one
+    # was given is enough to debug with.
+    log.info("Saved %s: %s | %s | %s | name %s | %d extra answer(s)",
+             noun, phone, service, parsed,
+             "given" if customer_name else "missing", len(extras))
     log.debug("Extras for %s: %r", phone, extras)
 
     friendly_when = _dt.strptime(parsed, "%Y-%m-%d %H:%M").strftime(
@@ -899,7 +967,9 @@ def _confirmation_question(pending, config, lead=None):
         "%A, %B %-d at %-I:%M %p"
     )
 
-    lines = [f"Just to confirm: {service} on {friendly}."]
+    name = pending.get(NAME_SLOT_KEY)
+    lines = [f"Just to confirm: {service} on {friendly}"
+             + (f", under the name {name}." if name else ".")]
 
     # Every extra slot that was actually filled. Skip the bookkeeping keys,
     # and skip a "none" only where the question invited one.
@@ -915,7 +985,7 @@ def _confirmation_question(pending, config, lead=None):
     # So the test is the question, not the answer. A prompt that offers a
     # way out treats a "none" as taking it; every other prompt gets its
     # answer read back whatever the answer was.
-    skip_keys = {"service", "datetime", "datetime_parsed",
+    skip_keys = {"service", "datetime", "datetime_parsed", NAME_SLOT_KEY,
                  *INTERNAL_PENDING_KEYS}
     labels    = question_labels(config)
     prompts   = question_prompts(config)
@@ -1110,6 +1180,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         else:
             extracted = extract_booking_slots(message, slots, config)
             pending.update(_drop_restated_service(extracted, config))
+        _tidy_name(pending)
 
         early = _check_datetime_now(phone, business_id, pending,
                                     prefilled or {}, config)
@@ -1239,6 +1310,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                       f"treating message as '{missing['key']}'")
 
         pending.update(extracted)
+        _tidy_name(pending)
         if pending.get("service"):
             pending["service"] = _snap_to_catalogue(pending["service"], config)
         early = _check_datetime_now(phone, business_id, pending, extracted, config)
@@ -1271,6 +1343,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                     pending, config, lead="Thanks — I have that already.")
 
             pending.update(extracted)
+            _tidy_name(pending)
             pending.pop("datetime_parsed", None)   # force a re-parse
             _save_state(phone, business_id, "collecting", pending=pending)
             return _ask_next_or_finalize(phone, business_id, pending, config, slots)

@@ -92,7 +92,8 @@ def is_enabled(config):
     return bool(cal.get("enabled") and cal.get("calendar_id"))
 
 
-def create_event(config, service_name, start_iso, customer_id, details=None):
+def create_event(config, service_name, start_iso, customer_id, details=None,
+                 customer_name=None):
     """Create a calendar event for a booking. Returns the Google event ID.
 
     Raises on any failure — the caller must not confirm the booking unless
@@ -110,13 +111,18 @@ def create_event(config, service_name, start_iso, customer_id, details=None):
     end   = start + timedelta(minutes=duration)
 
     # Build a readable description from the booking details.
-    lines = [f"Booked via {business['name']} assistant.", f"Customer: {customer_id}"]
+    lines = [f"Booked via {business['name']} assistant."]
+    if customer_name:
+        lines.append(f"Name: {customer_name}")
+    lines.append(f"Customer: {customer_id}")
     labels = question_labels(config)
     for key, value in (details or {}).items():
         lines.append(f"{labels.get(key) or humanize(key)}: {value}")
 
     event = {
-        "summary": f"{service_name} — {customer_id}",
+        # The name when we have one: "Drain cleaning — Casey" is what an
+        # owner scanning their week needs, a phone number isn't.
+        "summary": f"{service_name} — {customer_name or customer_id}",
         "description": "\n".join(lines),
         "start": {"dateTime": start.isoformat(), "timeZone": tz},
         "end":   {"dateTime": end.isoformat(),   "timeZone": tz},

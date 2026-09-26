@@ -48,9 +48,10 @@
               {% for appt in slots.get((d.weekday(), h), []) %}
                 <a class="slot {{ 'is-highlighted' if highlight == appt.id }}"
                    href="{{ url_for('admin.appointment_detail', appointment_id=appt.id) }}"
-                   title="{{ appt.service }}">
+                   title="{{ appt.service }}{% if appt.customer_name %} — {{ appt.customer_name }}{% endif %}">
                   {% if appt.minute %}<span class="at">:{{ '%02d'|format(appt.minute) }}</span>{% endif %}
                   <span class="what">{{ appt.service }}</span>
+                  {% if appt.customer_name %}<span class="who">{{ appt.customer_name }}</span>{% endif %}
                 </a>
               {% endfor %}
             </td>

@@ -73,9 +73,11 @@ def is_enabled(config):
     return _backend(config).is_enabled(config)
 
 
-def create_event(config, service_name, start_iso, customer_id, details=None):
+def create_event(config, service_name, start_iso, customer_id, details=None,
+                 customer_name=None):
     return _backend(config).create_event(
-        config, service_name, start_iso, customer_id, details=details
+        config, service_name, start_iso, customer_id, details=details,
+        customer_name=customer_name,
     )
 
 

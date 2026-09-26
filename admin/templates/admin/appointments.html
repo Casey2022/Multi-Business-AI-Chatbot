@@ -46,8 +46,13 @@
       {% for appt in appointment_list %}
         <tr>
           <td data-label="Customer">
-            <a href="{{ url_for('admin.conversations', business_id=business.id) }}?phone={{ appt.phone | urlencode }}">{{ appt.phone }}</a>
-            <div class="cell-sub">#{{ appt.id }}</div>
+            {# The name leads: it's what an owner scans for. Bookings made
+               before names were collected show a dash, not a blank. #}
+            <span class="cell-strong">{{ appt.customer_name or "—" }}</span>
+            <div class="cell-sub">
+              <a href="{{ url_for('admin.conversations', business_id=business.id) }}?phone={{ appt.phone | urlencode }}">{{ appt.phone }}</a>
+              · #{{ appt.id }}
+            </div>
           </td>
 
           <td data-label="Service">

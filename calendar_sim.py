@@ -115,7 +115,8 @@ def slot_rejection_reason(config, start_iso, busy=None, service=None):
 # Writes — the appointment row IS the event
 # ---------------------------------------------------------------------------
 
-def create_event(config, service_name, start_iso, customer_id, details=None):
+def create_event(config, service_name, start_iso, customer_id, details=None,
+                 customer_name=None):
     """Return an event id without writing anywhere.
 
     The scheduler saves the appointment row immediately after this returns,

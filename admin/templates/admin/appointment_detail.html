@@ -28,8 +28,9 @@
         {% endif %}
       </td>
     </tr>
+    <tr><th>Customer</th><td>{{ appt.customer_name or "—" }}</td></tr>
     <tr>
-      <th>Customer</th>
+      <th>Contact</th>
       <td>
         <a href="{{ url_for('admin.conversations', business_id=business.id) }}?phone={{ appt.phone | urlencode }}">{{ appt.phone }}</a>
       </td>

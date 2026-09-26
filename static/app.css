@@ -598,6 +598,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .slot:hover { background: var(--pen-bright); color: #fff; }
 .slot .at { opacity: .8; }
 .slot .what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot .who { display: block; opacity: .85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Arrived here from a link that named one appointment — say which. */
 .slot.is-highlighted { background: var(--pending); box-shadow: 0 0 0 2px var(--pending-wash); }
 .slot.is-highlighted:hover { background: var(--pending); }

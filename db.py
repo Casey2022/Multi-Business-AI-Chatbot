@@ -219,6 +219,12 @@ def init_db():
     # column on an existing table needs an explicit ALTER. Guarded by an
     # inspection rather than a try/except so a genuine error still surfaces.
     _add_column_if_missing(conn, "appointments", "address_check", "TEXT")
+    # Who the booking is for (2026-09-26). Its own column, not a key in
+    # `details`: every business needs it, and the portal, the calendar event
+    # and future notifications all read it. Nullable: appointments booked
+    # before it existed show "—". Personal data with the same lifetime as the
+    # phone number beside it: kept while the appointment is.
+    _add_column_if_missing(conn, "appointments", "customer_name", "TEXT")
 
     # Demo tenancy. A visitor to the public demo gets their own throwaway
     # business, cloned from a template, so they can edit settings and watch
@@ -387,7 +393,8 @@ def get_recent_messages(phone, business_id, limit=10):
 
 def save_appointment(phone, service, when, business_id, details=None,
                      external_event_id=None, external_calendar=None,
-                     sync_status="none", address_check=None):
+                     sync_status="none", address_check=None,
+                     customer_name=None):
     """Write a completed booking.
 
     The external_* fields record where this booking was mirrored, so it can
@@ -399,12 +406,14 @@ def save_appointment(phone, service, when, business_id, details=None,
         """
         INSERT INTO appointments
             (business_id, phone, service, datetime, status, details,
-             external_event_id, external_calendar, sync_status, address_check)
-        VALUES (?, ?, ?, ?, 'booked', ?, ?, ?, ?, ?)
+             external_event_id, external_calendar, sync_status, address_check,
+             customer_name)
+        VALUES (?, ?, ?, ?, 'booked', ?, ?, ?, ?, ?, ?)
         """,
         (business_id, phone, service, when, _json.dumps(details or {}),
          external_event_id, external_calendar, sync_status,
-         _json.dumps(address_check) if address_check else None)
+         _json.dumps(address_check) if address_check else None,
+         customer_name or None)
     )
     conn.commit()
     conn.close()
