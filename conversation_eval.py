@@ -425,7 +425,7 @@ SCENARIOS = [
         "busy_dates": ["{d0}", "{d1}", "{d2}", "{d3}", "{d4}", "{d5}",
                        "{d6}", "{d7}"],
         "script": ["book", "drain cleaning", "12 Elm St, Rochester NY",
-                   "{plus2day} at 1", "{offer}", "clogged sink", "yes"],
+                   "{weekday2day} at 1", "{offer}", "clogged sink", "yes"],
         "checks": ALWAYS + ["offer_honoured"],
     },
     {
@@ -494,10 +494,16 @@ def _dates():
     # The business's clock, which is what the scheduler judges "past" by. The
     # machine's clock only agrees when the machine is in Eastern time.
     now = clock.business_now()
-    plus2 = now + timedelta(days=2)
+    # At least two days out, and a WEEKDAY. Plain "two days from now" was a
+    # Sunday when run on a Friday (2026-09-25): the bot said "we're closed",
+    # and with the scenario's eight busy days its 7-day search found nothing
+    # to offer. The scenario is about a BOOKED slot, so ask for an open day.
+    weekday2 = now + timedelta(days=2)
+    while weekday2.weekday() >= 5:
+        weekday2 += timedelta(days=1)
     out = {
-        "plus2": plus2.strftime("%Y-%m-%d"),
-        "plus2day": plus2.strftime("%A"),
+        "weekday2": weekday2.strftime("%Y-%m-%d"),
+        "weekday2day": weekday2.strftime("%A"),
     }
     for n in range(0, 10):
         out[f"d{n}"] = (now + timedelta(days=n)).strftime("%Y-%m-%d")
