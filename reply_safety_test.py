@@ -221,6 +221,54 @@ def test_voyage_deadline(rag):
           raised)
 
 
+def test_client_per_process(rag):
+    heading("each worker process gets its own ChromaDB client")
+    # With gunicorn --preload, a client made before the fork is inherited by
+    # every worker and freezes on its first search.
+    made, cleared = [], []
+
+    class FakeClient:
+        def __init__(self, path=None): made.append(self)
+
+    fake_chromadb = types.SimpleNamespace(PersistentClient=FakeClient)
+    fake_cache = types.SimpleNamespace(
+        SharedSystemClient=types.SimpleNamespace(
+            clear_system_cache=lambda: cleared.append(True)))
+    real = (rag.chromadb, rag._chroma_client, rag._chroma_pid, rag.os.getpid,
+            sys.modules.get("chromadb.api.shared_system_client"))
+    rag.chromadb = fake_chromadb
+    rag._chroma_client = rag._chroma_pid = None
+    sys.modules["chromadb.api.shared_system_client"] = fake_cache
+    logging.disable(logging.CRITICAL)
+    try:
+        rag.os.getpid = lambda: 100          # the gunicorn master, at import
+        parent = rag.get_chroma_client()
+        check("the same process reuses its client",
+              rag.get_chroma_client() is parent and len(made) == 1)
+        rag.os.getpid = lambda: 200          # a forked worker
+        child = rag.get_chroma_client()
+        check("a forked worker builds its own client", child is not parent)
+        check("and clears chromadb's per-path cache first", cleared == [True])
+        check("the worker then keeps reusing its own",
+              rag.get_chroma_client() is child and len(made) == 2)
+    finally:
+        (rag.chromadb, rag._chroma_client, rag._chroma_pid, rag.os.getpid,
+         cache) = real
+        if cache is None:
+            sys.modules.pop("chromadb.api.shared_system_client", None)
+        else:
+            sys.modules["chromadb.api.shared_system_client"] = cache
+        logging.disable(logging.NOTSET)
+
+    import inspect
+    try:
+        from chromadb.api.shared_system_client import SharedSystemClient
+        check("chromadb still has SharedSystemClient.clear_system_cache",
+              callable(getattr(SharedSystemClient, "clear_system_cache", None)))
+    except Exception:
+        print("  [skip] chromadb not installed here; can't check its cache API")
+
+
 def test_endpoint_safety_net():
     heading("the chat and SMS endpoints never crash on a bug")
     source = Path("app.py").read_text(encoding="utf-8")
@@ -264,6 +312,7 @@ def main():
     test_booking_keyword(config)
     test_search_failure(llm, rag, config)
     test_voyage_deadline(rag)
+    test_client_per_process(rag)
     test_endpoint_safety_net()
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:

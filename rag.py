@@ -126,13 +126,35 @@ DISTANCE_THRESHOLD = 0.50
 # ChromaDB's Rust-backed client is not fork-safe — a client created before the
 # fork deadlocks when the child first touches it.
 _chroma_client = None
+_chroma_pid = None      # the process that created _chroma_client
 
 
 def get_chroma_client():
-    """Return the ChromaDB client, creating it in this process if needed."""
-    global _chroma_client
+    """Return the ChromaDB client, creating it in THIS process if needed.
+
+    "Created lazily" isn't enough on its own: app.py's bootstrap() creates
+    the client at import, so if gunicorn ever runs with --preload (import
+    once, then fork workers), every worker inherits the parent's client and
+    freezes on its first search. On 2026-09-25/26 live questions hung at
+    exactly that point until the worker was killed. So the client remembers
+    which process made it, and a worker that finds an inherited one builds
+    its own, after clearing chromadb's per-path cache, which would
+    otherwise hand back the inherited connection.
+    """
+    global _chroma_client, _chroma_pid
+    if _chroma_client is not None and _chroma_pid != os.getpid():
+        log.error("ChromaDB client was created in process %s and inherited by "
+                  "worker %s (is gunicorn running with --preload?). Building "
+                  "a new one for this worker.", _chroma_pid, os.getpid())
+        try:
+            from chromadb.api.shared_system_client import SharedSystemClient
+            SharedSystemClient.clear_system_cache()
+        except Exception:
+            log.exception("Couldn't clear chromadb's client cache")
+        _chroma_client = None
     if _chroma_client is None:
         _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+        _chroma_pid = os.getpid()
     return _chroma_client
 
 
@@ -460,9 +482,15 @@ def retrieve(query, config):
         # is killed. Refuse quickly instead.
         raise RetrievalUnavailable("VOYAGE_API_KEY is not set on Render")
     log.info(f"Opening collection '{collection_name}'...")
+    # Timed steps, at info: on 2026-09-25/26 the log went silent after the
+    # line above and nobody could tell which of these three steps hung.
+    import time
+    started = time.monotonic()
 
     try:
-        collection = get_chroma_client().get_collection(
+        client = get_chroma_client()
+        log.info("  client ready (%.1fs)", time.monotonic() - started)
+        collection = client.get_collection(
             collection_name,
             embedding_function=_embedding_fn,
         )
@@ -470,7 +498,8 @@ def retrieve(query, config):
         log.warning(f"Collection '{collection_name}' not found: {e}")
         return []
 
-    log.debug("Collection opened. Embedding query and searching...")
+    log.info("  collection open (%.1fs); embedding the question and searching",
+             time.monotonic() - started)
     try:
         # Embedding the query is a network call to Voyage. It was the one
         # unguarded call on the question path: on 2026-09-25 it failed on
@@ -492,8 +521,8 @@ def retrieve(query, config):
         if dist <= DISTANCE_THRESHOLD
     ]
 
-    log.info("Retrieval: %d usable chunk(s) of %d returned",
-             len(filtered), len(documents))
+    log.info("Retrieval: %d usable chunk(s) of %d returned (%.1fs)",
+             len(filtered), len(documents), time.monotonic() - started)
     log.debug("Query was: %r", query)
     for doc, dist in filtered:
         preview = doc[:80] + ("..." if len(doc) > 80 else "")
