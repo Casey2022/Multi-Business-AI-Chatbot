@@ -269,6 +269,14 @@ try:
 except Exception as e:
     log_boot.exception("Bootstrap failed — serving anyway: %s", e)
 
+# What startup cost, in memory. Render's free plan has no metrics page, so
+# the log is the only place to see how close the worker starts to its limit.
+try:
+    import resources
+    log_boot.info("After startup: %s", resources.summary())
+except Exception:
+    pass
+
 # ---------------------------------------------------------------------------
 # Security — Twilio webhook signature verification
 # ---------------------------------------------------------------------------

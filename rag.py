@@ -463,6 +463,11 @@ def ensure_ingested(config):
 # ---------------------------------------------------------------------------
 
     
+# A search normally takes well under a second. Past this, dump every
+# thread's stack so the log shows where it's stuck.
+SLOW_SEARCH_DUMP_SECONDS = float(os.environ.get("SLOW_SEARCH_DUMP_SECONDS", "40"))
+
+
 class RetrievalUnavailable(Exception):
     """The knowledge base couldn't be searched (embedding API down, rate
     limited, bad key). Distinct from "searched and found nothing": an empty
@@ -481,11 +486,31 @@ def retrieve(query, config):
         # The local embedder would run on Render's tiny CPU until the worker
         # is killed. Refuse quickly instead.
         raise RetrievalUnavailable("VOYAGE_API_KEY is not set on Render")
-    log.info(f"Opening collection '{collection_name}'...")
+    import resources
+    log.info("Opening collection '%s'... [%s]", collection_name,
+             resources.summary())
     # Timed steps, at info: on 2026-09-25/26 the log went silent after the
     # line above and nobody could tell which of these three steps hung.
     import time
     started = time.monotonic()
+
+    # If this takes longer than any search should, print every thread's
+    # stack to the log BEFORE gunicorn kills the worker (at 60s on Render).
+    # faulthandler works at the C level, so it fires even if Python is stuck
+    # inside chromadb's Rust code. Cancelled in the finally below.
+    import faulthandler
+    import sys
+    faulthandler.dump_traceback_later(SLOW_SEARCH_DUMP_SECONDS, exit=False,
+                                      file=sys.stderr)
+    try:
+        return _retrieve_steps(query, collection_name, started)
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+
+
+def _retrieve_steps(query, collection_name, started):
+    """The three steps of retrieve(): client, collection, search."""
+    import time
 
     try:
         client = get_chroma_client()
@@ -521,8 +546,10 @@ def retrieve(query, config):
         if dist <= DISTANCE_THRESHOLD
     ]
 
-    log.info("Retrieval: %d usable chunk(s) of %d returned (%.1fs)",
-             len(filtered), len(documents), time.monotonic() - started)
+    import resources
+    log.info("Retrieval: %d usable chunk(s) of %d returned (%.1fs) [%s]",
+             len(filtered), len(documents), time.monotonic() - started,
+             resources.summary())
     log.debug("Query was: %r", query)
     for doc, dist in filtered:
         preview = doc[:80] + ("..." if len(doc) > 80 else "")

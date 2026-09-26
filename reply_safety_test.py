@@ -269,6 +269,50 @@ def test_client_per_process(rag):
         print("  [skip] chromadb not installed here; can't check its cache API")
 
 
+def test_slow_search_leaves_evidence(rag):
+    heading("a search that hangs prints where it's stuck before the worker dies")
+    import tempfile, time
+    import resources
+    check("resources.summary() returns a readable line",
+          "cpu" in resources.summary(), resources.summary())
+
+    class SlowCollection:
+        def __init__(self, delay): self.delay = delay
+        def query(self, **k):
+            time.sleep(self.delay)
+            return {"documents": [["# Deposits\nforfeited"]], "distances": [[0.2]]}
+
+    class Client:
+        def __init__(self, c): self.c = c
+        def get_collection(self, *a, **k): return self.c
+
+    real = (rag.get_chroma_client, rag.SLOW_SEARCH_DUMP_SECONDS, sys.stderr)
+    config = {"business": {"name": "x", "slug": "sunrise_bakery_and_cafe"}}
+    rag.SLOW_SEARCH_DUMP_SECONDS = 0.3
+    try:
+        for delay, should_dump in ((0.8, True), (0.0, False)):
+            with tempfile.TemporaryFile("w+") as err:
+                sys.stderr = err
+                rag.get_chroma_client = lambda: Client(SlowCollection(delay))
+                try:
+                    chunks = rag.retrieve("deposit?", config)
+                finally:
+                    sys.stderr = real[2]
+                time.sleep(0.5)        # a leaked timer would fire in here
+                err.seek(0)
+                text = err.read()
+            if should_dump:
+                check("a slow search dumps the stack, naming the stuck call",
+                      "Timeout" in text and "in query" in text, text[:300])
+                check("and still returns its result once it finishes",
+                      len(chunks) == 1)
+            else:
+                check("a fast search dumps nothing (the timer is cancelled)",
+                      text == "", text[:300])
+    finally:
+        rag.get_chroma_client, rag.SLOW_SEARCH_DUMP_SECONDS, sys.stderr = real
+
+
 def test_endpoint_safety_net():
     heading("the chat and SMS endpoints never crash on a bug")
     source = Path("app.py").read_text(encoding="utf-8")
@@ -313,6 +357,7 @@ def main():
     test_search_failure(llm, rag, config)
     test_voyage_deadline(rag)
     test_client_per_process(rag)
+    test_slow_search_leaves_evidence(rag)
     test_endpoint_safety_net()
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
