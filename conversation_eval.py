@@ -265,6 +265,38 @@ def question_gets_a_real_reply(t):
                     f"{reply[:60]!r}")
 
 
+_STRUCTURED = {"service", "datetime", "datetime_parsed", "customer_name",
+               "service_address"}
+
+
+def question_not_stored(t):
+    """A customer's question is never filed as a free-text answer.
+
+    Live, 2026-09-26: "do you have gluten free?" at the notes question was
+    saved as the note "gluten free" and never answered. Structured slots are
+    exempt: "Can you come out Monday at 11?" really does answer the time.
+    """
+    questions = [text.lower() for who, text in t.exchange
+                 if who == "cust" and text.strip().endswith("?")]
+    stored = dict(t.pending or {})
+    if t.booked:
+        stored.update(t.booked.get("details") or {})
+    for key, value in stored.items():
+        if key in _STRUCTURED or key.startswith("_") or not isinstance(value, str):
+            continue
+        v = value.strip().lower()
+        if len(v) >= 4 and any(v in q for q in questions):
+            return f"{key}={value!r} was taken from a question the customer asked"
+
+
+def question_not_brushed_off(t):
+    """A question gets an answer, not "I didn't quite catch that"."""
+    for i, (who, text) in enumerate(t.exchange):
+        if who == "cust" and text.strip().endswith("?") and i + 1 < len(t.exchange):
+            if "didn't quite catch" in t.exchange[i + 1][1].lower():
+                return f"answered {text!r} with 'didn't quite catch that'"
+
+
 def no_command_advice_mid_booking(t):
     """Mid-booking, the bot must never tell them to text a command to start.
 
@@ -382,6 +414,7 @@ CHECKS = {f.__name__: f for f in (
     no_command_advice_mid_booking, bad_date_rejected_immediately,
     extra_answer_is_not_the_service, answers_are_read_back,
     name_asked_at_most_once, name_never_asked, name_on_booking,
+    question_not_stored, question_not_brushed_off,
 )}
 
 
@@ -393,7 +426,8 @@ ALWAYS = ["no_repeated_reply", "no_stacked_greeting", "question_not_absorbed",
           "answer_not_duplicated", "question_gets_a_real_reply",
           "no_command_advice_mid_booking", "bad_date_rejected_immediately",
           "extra_answer_is_not_the_service", "answers_are_read_back",
-          "name_asked_at_most_once", "name_on_booking"]
+          "name_asked_at_most_once", "name_on_booking",
+          "question_not_stored", "question_not_brushed_off"]
 
 SCENARIOS = [
     {
@@ -502,6 +536,17 @@ SCENARIOS = [
         "script": ["book", "drain cleaning", "it's Casey, thanks!",
                    "12 Elm St, Rochester NY", "Tuesday at 2",
                    "clogged sink", "yes"],
+        "checks": ALWAYS + ["booking_completed"],
+    },
+    {
+        "name": "a question that looks like an answer (2026-09-26)",
+        "why":  "Asked 'anything else we should know? (allergies…)', a "
+                "customer asked 'do you have gluten free?'. It was saved as "
+                "the note 'gluten free' and never answered. And a question "
+                "at the read-back got 'Sorry, I didn't quite catch that'.",
+        "script": ["book", "drain cleaning", "Chris", "12 Elm St, Rochester NY",
+                   "Tuesday at 2", "do you fix leaky faucets too?",
+                   "clogged sink", "do you charge a call-out fee?", "yes"],
         "checks": ALWAYS + ["booking_completed"],
     },
     {

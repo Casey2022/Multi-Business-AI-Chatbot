@@ -517,6 +517,38 @@ def _looks_like_a_question(message):
     return text.startswith(QUESTION_OPENERS) and len(text.split()) > 2
 
 
+# Slots whose answers are structured: the extractor can't mistake a question
+# for one of these, and "Can you come out Monday at 11?" really does answer
+# the datetime question. Everything else is free text, and free text is where
+# a question can be filed as an answer.
+_STRUCTURED_SLOTS = {"service", "datetime", NAME_SLOT_KEY, ADDRESS_SLOT_KEY}
+
+
+def _free_text_keys(slots):
+    return {s["key"] for s in slots
+            if s["key"] not in _STRUCTURED_SLOTS
+            and s.get("type", "text") == "text"}
+
+
+def _question_filed_as_answer(message, extracted, allowed_keys):
+    """A customer's question the extractor took for a free-text answer.
+
+    Live, 2026-09-26: asked "Anything else we should know? (allergies,
+    pickup person...)", a customer asked "do you have gluten free?". The
+    extractor filed it as the note "gluten free", the booking went through
+    with it, and the question was never answered: the question check only
+    ran when nothing was extracted.
+
+    So: a message that reads as a question, where everything extracted is
+    free text for the slots in `allowed_keys`, is a question. The cost is a
+    request phrased as a question ("can you write it in blue?") getting an
+    answer and the question asked again, instead of being stored at once;
+    a lost question was worse.
+    """
+    return (bool(extracted) and _looks_like_a_question(message)
+            and set(extracted) <= set(allowed_keys))
+
+
 def _answer_mid_booking(phone, message, config, business_id, channel="sms"):
     """Answer a question asked during booking, using the normal Q&A path.
 
@@ -1273,6 +1305,13 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         extracted = extract_booking_slots(
             message, slots, config, already_filled=pending
         )
+        missing = _first_missing_slot(pending, slots)
+        if (missing and missing["key"] in _free_text_keys(slots)
+                and _question_filed_as_answer(message, extracted,
+                                              {missing["key"]})):
+            log.info("Question mid-booking was read as an answer to '%s' — "
+                     "answering it instead", missing["key"])
+            extracted = {}
 
         # Fallback: if extraction found nothing but we're clearly waiting on
         # a specific slot, treat the whole message as that slot's answer.
@@ -1328,6 +1367,18 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         extracted = extract_booking_slots(
             message, slots, config, already_filled=pending
         )
+        # A question at the read-back ("do you charge a call-out fee?") gets
+        # answered, then the read-back again. It used to get "Sorry, I
+        # didn't quite catch that", or, if it looked like a note, got stored.
+        if _looks_like_a_question(message) and (
+                not extracted
+                or _question_filed_as_answer(message, extracted,
+                                             _free_text_keys(slots))):
+            log.info("Question at the read-back (%s) — answering, not storing",
+                     scrub(message))
+            answer = _answer_mid_booking(phone, message, config, business_id,
+                                         channel=channel)
+            return _confirmation_question(pending, config, lead=answer)
         if extracted:
             # A customer who restates an answer we already hold is usually
             # checking we heard them, not changing anything -- and until now
