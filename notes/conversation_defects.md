@@ -85,7 +85,7 @@ Four consecutive bakery answers ended with "give us a call". Individually
 correct, cumulatively a brush-off. Worth a rule about not repeating the
 referral when the previous turn already made it.
 
-## 7. A question that looks like an answer is stored, not answered  (FIXED — `eda674e`)
+## 7. A question that looks like an answer is stored, not answered  (FIXED — `eda674e` + `ea17e59`)
 
 Live, 2026-09-26, Sunrise Bakery (Casey testing):
 
@@ -105,6 +105,15 @@ address) are exempt, so "can you come out Monday at 11?" still sets the
 time. `mid_booking_question_test.py` replays the conversation;
 `conversation_eval` now checks every scenario for a question stored as an
 answer or brushed off.
+
+**Second shape (`ea17e59`):** the first fix only caught a question filed as free
+text for the slot being asked. In `conversation_eval`, "do you fix leaky
+faucets too?" came back as a *service*, so nothing recognised it as a
+question and the same prompt went out again with no answer. Now a question's
+extraction loses any value already held, any service (a question never
+changes the job), and free text for the slot being asked; if nothing is
+left, it's answered. Lesson: when a fix is keyed on what the model returned,
+list every shape it can return, not just the one seen.
 
 The trade-off, chosen on purpose: a request phrased as a question at a
 free-text prompt ("can you write it in blue?") now gets an answer and the
