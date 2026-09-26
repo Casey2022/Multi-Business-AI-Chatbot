@@ -85,6 +85,32 @@ Four consecutive bakery answers ended with "give us a call". Individually
 correct, cumulatively a brush-off. Worth a rule about not repeating the
 referral when the previous turn already made it.
 
+## 7. A question that looks like an answer is stored, not answered  (FIXED — `eda674e`)
+
+Live, 2026-09-26, Sunrise Bakery (Casey testing):
+
+> **Bot:** Anything else we should know? (allergies, pickup person — or reply 'none')
+> **Customer:** do you have gluten free?
+> **Bot:** Just to confirm: cupcake orders (dozen minimum) on Tuesday, September 29 at 9:00 AM, under the name Casey. Notes: gluten free. Is that right?
+
+The prompt invites allergy notes, so the extractor read the question as the
+note "gluten free". Defect #5's fix answered questions mid-booking, but only
+when *nothing* was extracted, so this one slipped past it. The same week, a
+question at the read-back itself got "Sorry, I didn't quite catch that".
+
+Fix: a question whose only extraction is free text for the slot being asked
+is answered and the slot asked again; at the read-back a question is always
+answered, then the booking read back. Structured slots (service, time, name,
+address) are exempt, so "can you come out Monday at 11?" still sets the
+time. `mid_booking_question_test.py` replays the conversation;
+`conversation_eval` now checks every scenario for a question stored as an
+answer or brushed off.
+
+The trade-off, chosen on purpose: a request phrased as a question at a
+free-text prompt ("can you write it in blue?") now gets an answer and the
+question again, instead of being stored at once. One extra turn is cheaper
+than a customer's question silently becoming part of their order.
+
 ## Status check, 2026-09-24
 
 The headings above said CURRENT for nine days after `70c0e2f` (2026-09-15)
