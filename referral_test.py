@@ -47,8 +47,8 @@ def main():
         ("how much is delivery?",
          "Delivery is $15 for cake orders over $50 within 5 miles. For anything "
          "else, give us a call at (585) 555-0188.",
-         "Delivery is $15 for cake orders over $50 within 5 miles. For anything "
-         "else, give us a call."),
+         # right after a referral, the repeat "go call us" goes entirely
+         "Delivery is $15 for cake orders over $50 within 5 miles."),
         ("do you use organic flour?",
          "I'm not sure about that — please call (585) 555-0188 and the team can "
          "tell you.",
@@ -58,12 +58,31 @@ def main():
          "ask the kitchen.",
          "I don't have that detail."),
         ("anything nut free?", "Nut-free isn't something we can promise. "
-         "Call 585.555.0188.", "Nut-free isn't something we can promise. Call us."),
+         "Call 585.555.0188.", "Nut-free isn't something we can promise."),
         ("anything nut free?", "Please ring us on 5855550188 about that.",
          "Please ring us about that."),
     ]:
         got = strip(reply, GAVE_IT, message, CFG)
         check(f"{reply[:48]!r}…", got == expected, f"got {got!r}")
+
+    heading("a second 'go call us' in a row is dropped, number or not")
+    wedding = [{"role": "assistant", "content": "We do three-tier cakes. To get "
+                "started, give us a call at (585) 555-0188 so we can talk design."}]
+    flavours = ("Our flavors are vanilla, chocolate, lemon and red velvet. "
+                "Give us a call to set up a tasting!")
+    got = strip(flavours, wedding, "what flavours do you have?", CFG)
+    check("qa_eval 2026-09-29: 'Give us a call to set up a tasting!' goes",
+          got == "Our flavors are vanilla, chocolate, lemon and red velvet.", repr(got))
+    for lead in ("For anything else, give us a call.", "Please call us.",
+                 "Just give the bakery a call.", "Feel free to reach out."):
+        got = strip("Delivery is $15. " + lead, wedding, "delivery?", CFG)
+        check(f"{lead!r} goes", got == "Delivery is $15.", repr(got))
+    mixed = "Since it's custom, the bakery can confirm both when you call."
+    check("a sentence with real information that mentions calling stays",
+          strip(mixed, wedding, "delivery?", CFG) == mixed)
+    quiet = [{"role": "assistant", "content": "We're open Tue-Sun, 7am-3pm."}]
+    check("left alone when the previous reply didn't send them to call",
+          strip(flavours, quiet, "flavours?", CFG) == flavours)
 
     heading("left alone when it should be")
     reply = "Delivery is $15. Call us at (585) 555-0188 for anything else."
@@ -78,8 +97,8 @@ def main():
     only = "(585) 555-0188."
     check("a reply that's nothing but the number stays (never empty)",
           strip(only, GAVE_IT, "hmm", CFG) == only)
-    check("no phone configured: unchanged",
-          strip(reply, GAVE_IT, "x", {"business": {}}) == reply)
+    check("no phone configured: a repeated 'call us' still goes, nothing breaks",
+          strip(reply, GAVE_IT, "x", {"business": {}}) == "Delivery is $15.")
     check("other numbers in the reply are untouched",
           strip("Trays feed 8-12 people for $65.", GAVE_IT, "trays?", CFG)
           == "Trays feed 8-12 people for $65.")

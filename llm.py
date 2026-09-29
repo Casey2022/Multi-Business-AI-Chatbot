@@ -555,49 +555,79 @@ def _phone_pattern(phone):
     return re.compile(r"\(?" + r"[\s().-]*".join(digits) + r"\)?")
 
 
+# A sentence whose main clause is "go call us": "Give us a call to set up a
+# tasting!", "For anything else, give us a call.", "Please call us.".
+_REFERRAL_SENTENCE = re.compile(
+    r"^(?:(?:so|just|please|feel free to|to get started|for (?:that|this|"
+    r"anything else|more(?: details)?|details|the rest|specifics)|otherwise|"
+    r"and)[\s,]+)*"
+    r"(?:give us a (?:call|ring)|give the (?:bakery|shop|team|office|kitchen) "
+    r"a call|call us|call the (?:bakery|shop|team|office|kitchen)|phone us|"
+    r"ring us|reach out)\b", re.I)
+_MENTIONS_CALLING = re.compile(
+    r"\b(?:give us a (?:call|ring)|call us|when you call|call the "
+    r"(?:bakery|shop|team|office|kitchen)|phone us|ring us)\b", re.I)
+
+
 def without_repeated_number(reply, history, message, config):
-    """Take the phone number out of a reply that already gave it recently.
+    """Stop a reply sending the customer to the phone again.
 
     Defect #6 (2026-08-02, open until 2026-09-29): four bakery answers in a
     row ended "give us a call at (585) 555-0188". Each was fine; together
-    they read as a brush-off. The prompt now says to give the number once;
-    this makes it so, because a prompt rule alone has been ignored before.
+    they read as a brush-off. The prompt now says to refer once; this makes
+    it so, because a prompt rule alone has been ignored before. Two rules,
+    both off when the customer asks how to reach us:
 
-    Only the NUMBER goes: "call us at (585) 555-0188 to check" becomes "call
-    us to check", so the reply still says the team can confirm it. Left
-    alone when the customer asks how to reach us, and when the number
-    wasn't in one of the last REFERRAL_LOOKBACK replies.
+    - The NUMBER, if it was in one of the last REFERRAL_LOOKBACK replies, is
+      taken out: "call us at N to check" becomes "call us to check"; a
+      sentence that was only the number ("Our number is N") is dropped.
+    - A sentence that is only "go call us" ("Give us a call to set up a
+      tasting!") is dropped when the previous reply already sent them to
+      call. qa_eval, 2026-09-29: the number was left out as intended, but
+      the reply still ended "Give us a call to set up a tasting!". A
+      sentence with real information that mentions calling stays.
+
+    A reply is never left empty.
     """
+    if not reply or _ASKS_FOR_CONTACT.search(message or ""):
+        return reply
     phone = ((config or {}).get("business") or {}).get("phone")
     pattern = _phone_pattern(phone)
-    if not reply or not pattern or not pattern.search(reply):
-        return reply
-    if _ASKS_FOR_CONTACT.search(message or ""):
-        return reply
     earlier = [m.get("content", "") for m in (history or [])
                if m.get("role") == "assistant"][-REFERRAL_LOOKBACK:]
-    if not any(pattern.search(text) for text in earlier):
+    number_recent = bool(pattern) and any(pattern.search(t) for t in earlier)
+    last = earlier[-1] if earlier else ""
+    referred_last = bool(_MENTIONS_CALLING.search(last)
+                         or (pattern and pattern.search(last)))
+    if not number_recent and not referred_last:
         return reply
 
-    num = pattern.pattern
-    kept = []
-    for sentence in re.split(r"(?<=[.!?])\s+", reply.strip()):
-        if not pattern.search(sentence):
-            kept.append(sentence)
-            continue
-        # Where the sentence reads fine without the number, keep it.
-        s2 = re.sub(r"\s+(?:at|on)\s+" + num, "", sentence, flags=re.I)  # call us at N
-        s2 = re.sub(r"\b(call|text|ring|dial)\s+" + num, r"\1 us", s2,
-                    flags=re.I)                                          # Call N
-        if not pattern.search(s2):
-            kept.append(re.sub(r"\s+([.,!?;:])", r"\1", s2))
-        # Otherwise the number was the point of the sentence ("Our number
-        # is N", "Questions? N"): drop the sentence rather than leave it
-        # broken.
-    text = " ".join(kept).strip()
-    if not text:
-        return reply            # nothing left: better to repeat the number
-    log.info("Took a repeated phone number out of a reply (defect #6)")
+    num = pattern.pattern if pattern else None
+
+    def without_number(sentence):
+        """The sentence minus the number, or None if it was the point."""
+        s2 = re.sub(r"\s+(?:at|on)\s+" + num, "", sentence, flags=re.I)
+        s2 = re.sub(r"\b(call|text|ring|dial)\s+" + num, r"\1 us", s2, flags=re.I)
+        return None if pattern.search(s2) else re.sub(r"\s+([.,!?;:])", r"\1", s2)
+
+    sentences = re.split(r"(?<=[.!?])\s+", reply.strip())
+    # First the number (when it's recent), sentence by sentence.
+    numberless = []
+    for sentence in sentences:
+        if number_recent and pattern.search(sentence):
+            sentence = without_number(sentence)
+        if sentence:
+            numberless.append(sentence)
+    # Then a repeated "go call us" sentence, if the last reply already said it.
+    kept = [s for s in numberless
+            if not (referred_last and _REFERRAL_SENTENCE.search(s))]
+    # Prefer the shortest version that still says something: without the
+    # repeat; else just without the number ("Please ring us about that.");
+    # never an empty reply.
+    text = " ".join(kept).strip() or " ".join(numberless).strip()
+    if not text or text == reply.strip():
+        return reply
+    log.info("Took a repeated phone referral out of a reply (defect #6)")
     return text
 
 

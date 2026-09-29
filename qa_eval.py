@@ -34,7 +34,7 @@ from datetime import datetime
 
 import progress
 from progress import say
-from llm import get_llm_reply, _phone_pattern
+from llm import get_llm_reply, _phone_pattern, _REFERRAL_SENTENCE
 from rag_eval import config_for
 
 # Tuesday 10am: every business open, nothing about the clock in play.
@@ -75,7 +75,15 @@ SCENARIOS = [
     },
 ]
 
-_REFERRAL = re.compile(r"\b(call|give us a (?:call|ring)|phone us|ring us)\b", re.I)
+def sends_them_to_call(reply, pattern):
+    """The number, or a sentence whose point is "go call us" ("Give us a
+    call to set up a tasting!"). The same definition the guard in llm.py
+    uses; a sentence with real information that mentions calling
+    ("…confirm both when you call") doesn't count."""
+    if pattern and pattern.search(reply):
+        return True
+    return any(_REFERRAL_SENTENCE.search(s)
+               for s in re.split(r"(?<=[.!?])\s+", reply.strip()))
 
 
 def run(scenario):
@@ -103,8 +111,7 @@ def check(scenario, config, turns):
         if i not in with_number:
             problems.append(("number_when_asked",
                              f"asked for the number in turn {i + 1} and didn't get it"))
-    refers = [bool(_REFERRAL.search(r)) or i in with_number
-              for i, (_, r) in enumerate(turns)]
+    refers = [sends_them_to_call(r, pattern) for _, r in turns]
     for i in range(1, len(turns)):
         if refers[i] and refers[i - 1] and i not in asked and i - 1 not in asked:
             problems.append(("no_back_to_back_referral",
