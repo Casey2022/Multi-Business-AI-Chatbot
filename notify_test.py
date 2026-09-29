@@ -136,6 +136,10 @@ def test_outbox():
 def test_calendar_path():
     heading("a move or deletion in Google Calendar tells the customer too")
     import reconcile
+    # The same event id on ANOTHER business's appointment, saved first so an
+    # unscoped lookup would find it first. It must be left alone.
+    db.save_appointment("web_other", "custom cake", future(4, 9), 2,
+                        external_event_id="evt-move")
     moved_appt = book("web_cal01", future(4, 9), event="evt-move")
     gone_appt = book("web_cal02", future(4, 13), event="evt-gone")
     new_start = datetime.strptime(future(7, 15), "%Y-%m-%d %H:%M")
@@ -144,19 +148,88 @@ def test_calendar_path():
               {"id": "evt-gone", "status": "cancelled"}]
     fake_cal = types.SimpleNamespace(is_enabled=lambda cfg: True,
                                      fetch_changes=lambda cfg, tok: (events, "tok2"))
+    loaded_with = []
     real = (reconcile.calendar_sync, reconcile.load_config)
     reconcile.calendar_sync = fake_cal
-    reconcile.load_config = lambda path, *a: CONFIG
+    reconcile.load_config = lambda path, *a: loaded_with.append(a) or CONFIG
     try:
         reconcile.reconcile_business({"id": 1, "name": "Sunrise", "config_path": "x"})
     finally:
         reconcile.calendar_sync, reconcile.load_config = real
+    check("reconcile loads the business's own settings (a demo stays on its "
+          "simulated calendar)", loaded_with == [(1,)], str(loaded_with))
+    other = [a for a in db.get_appointments(2) if a["phone"] == "web_other"][0]
+    check("another business's appointment with the same event id is untouched",
+          other["datetime"] == future(4, 9) and
+          not db.notifications_for_appointment(other["id"]))
     moved = db.notifications_for_appointment(moved_appt["id"])
     gone = db.notifications_for_appointment(gone_appt["id"])
     check("the calendar move produced a 'moved' notice",
           len(moved) == 1 and moved[0]["kind"] == "moved", str(moved))
     check("the calendar deletion produced a 'cancelled' notice",
           len(gone) == 1 and gone[0]["kind"] == "cancelled", str(gone))
+
+
+def test_reconcile_runs_often_enough():
+    heading("Google Calendar changes are pulled in wherever they'd be seen")
+    import reconcile
+    calls = []
+    real = reconcile.reconcile_business
+    reconcile.reconcile_business = lambda b: calls.append(b["id"]) or ["x"]
+    reconcile._last_run.clear()
+    try:
+        biz = {"id": 7, "name": "Bob's"}
+        reconcile.maybe_reconcile(biz, min_interval=60)
+        reconcile.maybe_reconcile(biz, min_interval=60)
+        check("throttled: twice within a minute is one call", calls == [7], str(calls))
+        reconcile.maybe_reconcile(biz, min_interval=0)
+        check("min_interval=0 always runs (the appointments list)", calls == [7, 7])
+        reconcile.maybe_reconcile({"id": 8, "name": "Sunrise"}, min_interval=60)
+        check("per business", calls == [7, 7, 8])
+        def boom(b): raise RuntimeError("Google is down")
+        reconcile.reconcile_business = boom
+        logging.disable(logging.CRITICAL)
+        try:
+            out = reconcile.maybe_reconcile({"id": 9, "name": "X"}, min_interval=0)
+        finally:
+            logging.disable(logging.NOTSET)
+        check("a Google failure doesn't break the page", out == [])
+    finally:
+        reconcile.reconcile_business = real
+        reconcile._last_run.clear()
+
+    routes = ast.parse(Path("admin/routes.py").read_text())
+    funcs = {n.name: n for n in routes.body if isinstance(n, ast.FunctionDef)}
+    for page in ("appointments", "calendar_view", "appointment_detail"):
+        calls = {getattr(c.func, "id", None) for c in ast.walk(funcs[page])
+                 if isinstance(c, ast.Call)}
+        check(f"portal page {page} pulls calendar changes", "maybe_reconcile" in calls)
+    app_tree = ast.parse(Path("app.py").read_text())
+    upd = next(n for n in app_tree.body if isinstance(n, ast.FunctionDef)
+               and n.name == "webchat_updates")
+    check("the customer's open chat pulls them too (throttled)",
+          "maybe_reconcile" in {getattr(c.func, "id", None) for c in ast.walk(upd)
+                                if isinstance(c, ast.Call)})
+
+    heading("every page of Google's results is read")
+    import calendar_google
+    pages = [{"items": [{"id": "a"}], "nextPageToken": "p2"},
+             {"items": [{"id": "b"}], "nextSyncToken": "sync-final"}]
+    asked = []
+    class Events:
+        def list(self, **params):
+            asked.append(dict(params))
+            return type("R", (), {"execute": lambda self: pages[len(asked) - 1]})()
+    real_service = calendar_google._get_service
+    calendar_google._get_service = lambda: type("S", (), {"events": lambda self: Events()})()
+    try:
+        items, token = calendar_google.fetch_changes(
+            {"calendar": {"calendar_id": "c", "timezone": "America/New_York"}}, "tok")
+    finally:
+        calendar_google._get_service = real_service
+    check("events from both pages", [e["id"] for e in items] == ["a", "b"], str(items))
+    check("and the sync token from the last page", token == "sync-final")
+    check("the second request asked for page 2", asked[1].get("pageToken") == "p2")
 
 
 def test_wiring():
@@ -218,6 +291,7 @@ def main():
     test_words()
     test_outbox()
     test_calendar_path()
+    test_reconcile_runs_often_enough()
     test_wiring()
     test_retention()
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")

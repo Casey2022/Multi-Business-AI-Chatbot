@@ -135,6 +135,27 @@ def main():
                   state["state"] == "confirming"
                   and state["pending"].get("notes") == "none", str(state))
 
+        heading("a yes with a question: booked AND answered (live, 2026-09-28)")
+        import db as _db
+        for message, expect_answer in (("yes, do you charge for service calls?", True),
+                                       ("yes", False), ("yes, thanks!", False)):
+            phone_y = f"web_yes{abs(hash(message)) % 10000}"
+            set_state(phone_y, biz, "confirming", pending=dict(full))
+            extract_returns.clear()
+            answered.clear()
+            reply = sched._handle_booking_inner(phone_y, message, cfg, biz)
+            saved = [a for a in _db.get_appointments(biz) if a["phone"] == phone_y]
+            check(f"{message!r}: the booking is saved", len(saved) == 1, reply)
+            if expect_answer:
+                check(f"{message!r}: the question is answered, after the confirmation",
+                      answered == ["do you charge for service calls?"]
+                      and reply.index("About your question:")
+                      > reply.lower().index("order placed" if "order placed" in reply.lower()
+                                            else "perfect"), reply)
+            else:
+                check(f"{message!r}: no question, no extra answer",
+                      not answered and "About your question" not in reply, reply)
+
         heading("a correction at the read-back is still a correction")
         set_state(phone, biz, "confirming", pending=dict(full))
         extract_returns.clear(); extract_returns["datetime"] = "Wednesday at 10"

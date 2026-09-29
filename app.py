@@ -577,8 +577,8 @@ def webchat_updates(slug):
     each one is shown once. Returns {"messages": [text, ...]}.
 
     No model or embedding call, so it isn't counted against the chat rate
-    limit; it's one indexed read per call. The session id is the only key,
-    as it is for /webchat itself.
+    limit: one indexed read, plus at most one Google Calendar sync a minute
+    per business. The session id is the only key, as it is for /webchat.
     """
     business = get_business_by_slug(slug)
     if not business:
@@ -586,6 +586,13 @@ def webchat_updates(slug):
     session_id = (request.args.get("session_id") or "").strip()
     if not re.fullmatch(r"web_[a-z0-9]{1,32}", session_id):
         return {"error": "session_id is required"}, 400
+
+    # A move or cancellation the owner made in Google Calendar only becomes
+    # a notice once reconcile has seen it. The owner may never open the
+    # portal, so the customer's open chat pulls changes too, at most once a
+    # minute per business (one cheap sync-token call to Google).
+    from reconcile import maybe_reconcile
+    maybe_reconcile(business, min_interval=60)
 
     import clock
     from db import collect_notifications

@@ -297,12 +297,20 @@ def fetch_changes(config, sync_token=None):
         # first sync skipped the next four hours of real events.
         params["timeMin"] = datetime.now(tz).isoformat()
 
+    # Every page. Google puts nextSyncToken only on the LAST page, so reading
+    # one page of a busy calendar returned no token and every later poll
+    # started a full resync from scratch.
+    items = []
     try:
-        result = _get_service().events().list(**params).execute()
+        while True:
+            result = _get_service().events().list(**params).execute()
+            items.extend(result.get("items", []))
+            page = result.get("nextPageToken")
+            if not page:
+                return items, result.get("nextSyncToken")
+            params["pageToken"] = page
     except HttpError as e:
         if e.resp.status == 410:
             log.warning("Sync token expired — full resync needed")
             return None, None
         raise
-
-    return result.get("items", []), result.get("nextSyncToken")

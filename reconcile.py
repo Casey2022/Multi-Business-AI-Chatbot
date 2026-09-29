@@ -27,7 +27,11 @@ def reconcile_business(business):
 
     Returns a list of human-readable descriptions of what changed.
     """
-    config = load_config(business["config_path"])
+    # With the business id, so its overrides apply and, above all, a demo
+    # copy gets its demo config: without it a demo of Bob's read Bob's REAL
+    # Google Calendar (the template file's settings) and could apply those
+    # changes to the real business's appointments.
+    config = load_config(business["config_path"], business["id"])
     if not calendar_sync.is_enabled(config):
         return []
 
@@ -43,7 +47,8 @@ def reconcile_business(business):
     changes = []
 
     for event in events:
-        appt = get_appointment_by_event_id(event.get("id"))
+        appt = get_appointment_by_event_id(event.get("id"),
+                                           business_id=business["id"])
         if not appt:
             # An event with no matching appointment — the owner created it
             # by hand, or it predates sync. Availability checking already
@@ -86,3 +91,32 @@ def reconcile_business(business):
             log.debug(f"  {c}")
 
     return changes
+
+
+# When each business was last reconciled, in this process. Reconciling is
+# one Google call (usually returning nothing), but the customer's chat checks
+# for notices every 10 seconds, so those checks are throttled.
+_last_run = {}
+
+
+def maybe_reconcile(business, min_interval=60):
+    """Reconcile unless this business was reconciled in the last min_interval
+    seconds. Never raises. Returns the changes, or [] when skipped.
+
+    Called from every portal page that shows appointments (the list, the
+    calendar, an appointment) and from the customer's chat window. Until
+    2026-09-28 only the appointments list ran it: an owner who moved a
+    booking in Google Calendar and then looked at the portal's calendar saw
+    the old time, and the customer was never told.
+    """
+    import time
+    now = time.monotonic()
+    last = _last_run.get(business["id"])
+    if last is not None and now - last < min_interval:
+        return []
+    _last_run[business["id"]] = now
+    try:
+        return reconcile_business(business)
+    except Exception as e:
+        log.warning("Reconcile failed for %s: %s", business.get("name"), e)
+        return []

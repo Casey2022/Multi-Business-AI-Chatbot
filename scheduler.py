@@ -943,6 +943,25 @@ def _is_affirmative(message):
     return text.split()[0] in AFFIRMATIVE
 
 
+_LEADING_YES = re.compile(
+    r"^(?:yes|yeah|yep|yup|correct|sure|ok|okay|perfect|great|"
+    r"that'?s (?:right|correct|it)|sounds good|looks good|yes please)"
+    r"\b[\s,.!;:\u2013\u2014-]*", re.I)
+
+
+def _question_after_yes(message):
+    """The question in "yes, do you charge for service calls?", or None.
+
+    Only a real question counts: "yes?" or "yes, thanks" is just a yes.
+    """
+    rest = _LEADING_YES.sub("", (message or "").strip(), count=1).strip()
+    if rest == (message or "").strip():
+        return None                     # didn't start with a yes
+    if len(rest.split()) >= 3 and _looks_like_a_question(rest):
+        return rest
+    return None
+
+
 # Answers that mean "nothing to add" — but only where the question offered
 # that as an option. See _confirmation_question.
 SKIPPABLE_ANSWERS = {"none", "n/a", "na", "no", "nope", "nothing", "-", "n"}
@@ -1366,7 +1385,15 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
     # --- Confirming: read-back accepted, rejected, or corrected ---
     if state == "confirming":
         if _is_affirmative(message):
-            return _finalize_booking(phone, business_id, pending, config)
+            # "yes, do you charge for service calls?" is a yes AND a question.
+            # Live, 2026-09-28: the booking went through and the question was
+            # dropped. Book it (they said yes), then answer.
+            question = _question_after_yes(message)
+            answer = (_answer_mid_booking(phone, question, config, business_id,
+                                          channel=channel)
+                      if question else None)
+            final = _finalize_booking(phone, business_id, pending, config)
+            return f"{final} About your question: {answer}" if answer else final
 
         # Not a plain yes — see if they're correcting something
         # ("no, 2pm instead" / "make it Thursday").

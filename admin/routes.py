@@ -95,11 +95,8 @@ def appointments(business_id):
     # Pull any owner-made calendar changes before rendering. Opportunistic
     # rather than scheduled — Render's free tier has no cron. Sync-token
     # polling makes this cheap: usually one API call returning nothing.
-    from reconcile import reconcile_business
-    try:
-        reconcile_business(business)
-    except Exception as e:
-        log_rec.warning(f"Failed for {business['name']}: {e}")
+    from reconcile import maybe_reconcile
+    maybe_reconcile(business, min_interval=0)
 
     # Sweep expired rate-limit counters while we're already doing
     # housekeeping. The table only ever grows: every window a caller opens
@@ -538,9 +535,11 @@ def knowledge_history(document_id):
 def calendar_view(business_id):
     """Week view of appointments, rendered from the database.
 
-    Deliberately not read from Google: the appointments table has everything
-    needed, is already scoped per business, and avoids an API call per page
-    load. The gap is that events the owner creates directly in their calendar
+    Drawn from the appointments table, not from Google: it has everything
+    needed and is already scoped per business. Changes the owner makes to
+    the bot's events in Google are pulled in first by maybe_reconcile (one
+    cheap sync-token call, throttled). The gap is that events the owner
+    creates directly in their calendar
     (a dentist appointment, say) block availability but never appear here,
     because reconciliation only updates appointments the bot created.
     """
@@ -549,6 +548,13 @@ def calendar_view(business_id):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+
+    # Pull moves made in Google Calendar first (throttled, so paging through
+    # weeks doesn't call Google each time). Until 2026-09-28 only the
+    # appointments list did this, and a move made in Google showed here at
+    # the old time.
+    from reconcile import maybe_reconcile
+    maybe_reconcile(business, min_interval=15)
 
     from datetime import datetime, timedelta
     from db import get_appointments
@@ -638,6 +644,13 @@ def appointment_detail(appointment_id):
     require_business_access(appt["business_id"])
 
     business = get_business_by_id(appt["business_id"])
+
+    # A move made in Google Calendar should show here, so reconcile, then
+    # read the appointment again.
+    if business:
+        from reconcile import maybe_reconcile
+        if maybe_reconcile(business, min_interval=15):
+            appt = get_appointment(appointment_id)
 
     # details is stored as JSON text; parse for display.
     import json

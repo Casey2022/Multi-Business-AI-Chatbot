@@ -834,12 +834,23 @@ def cancel_appointment(appointment_id):
     conn.commit()
     conn.close()
 
-def get_appointment_by_event_id(event_id):
-    """Find the appointment mirroring a given calendar event, or None."""
+def get_appointment_by_event_id(event_id, business_id=None):
+    """Find the appointment mirroring a given calendar event, or None.
+
+    business_id scopes the search to one business. Reconcile always passes
+    it: an event on one business's calendar must never touch another's
+    appointment.
+    """
     conn = get_connection()
-    row = conn.execute(
-        "SELECT * FROM appointments WHERE external_event_id = ?", (event_id,)
-    ).fetchone()
+    if business_id is None:
+        row = conn.execute(
+            "SELECT * FROM appointments WHERE external_event_id = ?", (event_id,)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT * FROM appointments WHERE external_event_id = ? "
+            "AND business_id = ?", (event_id, business_id)
+        ).fetchone()
     conn.close()
     return dict(row) if row else None
 
