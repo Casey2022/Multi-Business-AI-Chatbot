@@ -103,26 +103,35 @@ def main():
           strip("Trays feed 8-12 people for $65.", GAVE_IT, "trays?", CFG)
           == "Trays feed 8-12 people for $65.")
 
-    heading("the prompt says it, and every Q&A reply goes through the guard")
+    heading("the rule is in the prompt only once they've been sent to call")
     from config import load_config
     cfg = load_config("config/sunrise_bakery_and_cafe.yaml")
-    prompt = llm.build_system_prompt(cfg)
-    check("the answering rules say to give the number once",
-          "Give the phone number once" in prompt)
-    check("and when that doesn't apply (they ask for it)",
-          "asks how to reach us" in prompt)
-
+    plain = llm.build_system_prompt(cfg)
+    check("the standing prompt doesn't carry it (single questions unchanged)",
+          "already given the customer our phone number" not in plain)
+    sent = []
     real = (llm._create, llm.retrieve)
     llm.retrieve = lambda *a, **k: []
     text = types.SimpleNamespace(type="text",
                                  text="Not sure about that — call us at (585) 555-0188.")
-    llm._create = lambda **k: types.SimpleNamespace(
-        content=[text], stop_reason="end_turn",
-        usage=types.SimpleNamespace(input_tokens=0, output_tokens=0))
+    def fake(**k):
+        sent.append(k["system"])
+        return types.SimpleNamespace(content=[text], stop_reason="end_turn",
+                                     usage=types.SimpleNamespace(input_tokens=0,
+                                                                 output_tokens=0))
+    llm._create = fake
     try:
+        first = llm.get_llm_reply("do you use organic flour?", [], cfg)
         got = llm.get_llm_reply("do you use organic flour?", GAVE_IT, cfg)
+        llm.get_llm_reply("do you use organic flour?", long_ago, cfg)
     finally:
         llm._create, llm.retrieve = real
+    check("a first question: no rule", llm.REFERRAL_RULE not in sent[0])
+    check("after a referral: the rule is added", llm.REFERRAL_RULE in sent[1])
+    check("a referral more than 3 replies back: no rule", llm.REFERRAL_RULE not in sent[2])
+    check("the rule still says never claim what the facts don't say",
+          "never claim something the facts" in llm.REFERRAL_RULE)
+    check("a first answer keeps its number", first.endswith("(585) 555-0188."))
     check("get_llm_reply removes the repeat", got == "Not sure about that — call us.",
           repr(got))
 

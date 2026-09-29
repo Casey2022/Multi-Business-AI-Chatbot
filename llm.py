@@ -424,13 +424,6 @@ Answering rules that apply whatever the persona says:
   particular item is in, and one item's notice period is not another's.
 - "Usually can't" is an answer. If the documents say something usually
   isn't possible, say so first, then offer to check.
-- Give the phone number once. If one of your earlier replies in this
-  conversation already gave it or sent them to call, don't do it again:
-  answer what the facts above cover, and for what they don't, say in a few
-  words that it's a detail the team would confirm. Several replies in a row
-  that end "give us a call" read as a brush-off, however correct each one
-  is. This does NOT apply when the customer asks how to reach us, or asks
-  for the number again: then give it.
 
 Behavioral rules: {guardrails_text}"""
 
@@ -569,6 +562,23 @@ _MENTIONS_CALLING = re.compile(
     r"(?:bakery|shop|team|office|kitchen)|phone us|ring us)\b", re.I)
 
 
+REFERRAL_RULE = """
+
+This conversation has already given the customer our phone number or told
+them to call. Don't do it again in this reply unless they ask how to reach
+us. Everything else above still applies: never claim something the facts
+don't say, and if the facts don't cover it, say so plainly."""
+
+
+def referred_recently(history, config):
+    """Did one of the bot's recent replies give the number or say "call us"?"""
+    pattern = _phone_pattern(((config or {}).get("business") or {}).get("phone"))
+    earlier = [m.get("content", "") for m in (history or [])
+               if m.get("role") == "assistant"][-REFERRAL_LOOKBACK:]
+    return any((pattern and pattern.search(t)) or _MENTIONS_CALLING.search(t)
+               for t in earlier)
+
+
 def without_repeated_number(reply, history, message, config):
     """Stop a reply sending the customer to the phone again.
 
@@ -668,6 +678,14 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # Build the system prompt fresh for this request's channel and business.
     system_for_call = build_system_prompt(config, channel=channel,
                                           mid_booking=mid_booking, now=now)
+    # Only in a conversation that has already sent them to call, so every
+    # other prompt is exactly what it was. First written as a standing
+    # answering rule, it made rag_eval worse on single questions with no
+    # history at all (2026-09-29: invented cookies, both wedding-deposit rows
+    # regressed): its advice for unknowns read as "claim it, defer the
+    # details". It now says only what it's for.
+    if referred_recently(history, config):
+        system_for_call += REFERRAL_RULE
 
     # RAG retrieval: find document chunks relevant to this specific message.
     # retrieve() now takes config so it queries the right business collection.
