@@ -79,11 +79,30 @@ the "treat the whole message as this slot's answer" fallback was added, the
 newer risk is the opposite: the question gets stored AS the answer. Both
 are wrong; confirm which happens now before designing the fix.
 
-## 6. Every miss becomes a phone number  (OPEN — 2026-08-02)
+## 6. Every miss becomes a phone number  (FIX IN — `3e07f51`; awaiting qa_eval on the real model)
 
 Four consecutive bakery answers ended with "give us a call". Individually
 correct, cumulatively a brush-off. Worth a rule about not repeating the
 referral when the previous turn already made it.
+
+Seen again live, 2026-09-28: "do you have gluten free cakes?" ended "call
+us at (585) 555-0188", and the very next answer (delivery) ended "the
+bakery can confirm both when you call". The standing guardrails push this:
+"If unsure, give the phone number and stop", and Sunrise's "for custom
+cake orders, always direct them to call".
+
+Fix, two layers (a prompt rule alone has been ignored before):
+- an answering rule: give the number once; afterwards answer what the facts
+  cover and say in a few words that the team would confirm the rest; give
+  it again whenever the customer asks how to reach us;
+- `llm.without_repeated_number`: if the number was in one of the last three
+  replies and the customer didn't ask for it, it's taken out ("call us at N"
+  becomes "call us"; a sentence that was only the number is dropped; a reply
+  is never left empty).
+
+`referral_test.py` covers the guard; `qa_eval.py` runs five-question
+conversations against the real model (number once, no back-to-back
+referrals, every reply says something).
 
 ## 7. A question that looks like an answer is stored, not answered  (FIXED — `eda674e` + `ea17e59`)
 
