@@ -11,8 +11,9 @@ right on its own, together a brush-off.
 
 Each scenario mixes questions the documents answer with ones they don't, so
 the bot has every reason to reach for the phone. Checks:
-- number_given_once: the business's number appears in at most one reply,
-  unless the customer asked how to reach us;
+- number_not_repeated_soon: the business's number isn't given again within
+  3 replies (llm.REFERRAL_LOOKBACK), unless the customer asked how to reach
+  us;
 - no_back_to_back_referral: no two replies in a row both send them to call;
 - every_reply_says_something: no empty or phone-only replies.
 
@@ -34,7 +35,7 @@ from datetime import datetime
 
 import progress
 from progress import say
-from llm import get_llm_reply, _phone_pattern, _REFERRAL_SENTENCE
+from llm import get_llm_reply, _phone_pattern, _REFERRAL_SENTENCE, REFERRAL_LOOKBACK
 from rag_eval import config_for
 
 # Tuesday 10am: every business open, nothing about the clock in play.
@@ -103,10 +104,16 @@ def check(scenario, config, turns):
     pattern = _phone_pattern(config["business"].get("phone"))
     asked = set(scenario.get("asks_for_number_at", []))
     with_number = [i for i, (_, r) in enumerate(turns) if pattern and pattern.search(r)]
+    # Not "only once per conversation": the rule (and the guard in llm.py)
+    # is "not again within REFERRAL_LOOKBACK replies". qa_eval 2026-09-29
+    # failed a conversation for giving it in replies 1 and 5, and reply 5
+    # was a severe-allergy answer where the document says to call first.
     unasked = [i for i in with_number if i not in asked]
-    if len(unasked) > 1:
-        problems.append(("number_given_once",
-                         f"the number was in replies {[i + 1 for i in unasked]}"))
+    for a, b in zip(unasked, unasked[1:]):
+        if b - a <= REFERRAL_LOOKBACK:
+            problems.append(("number_not_repeated_soon",
+                             f"the number was in replies {a + 1} and {b + 1}"))
+            break
     for i in asked:
         if i not in with_number:
             problems.append(("number_when_asked",
