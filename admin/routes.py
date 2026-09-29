@@ -5,7 +5,7 @@ from admin import admin_bp
 from admin.auth import login_required, operator_required, require_business_access, current_user
 from config import load_config
 import calendar_sync
-from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment)
+from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment, notifications_for_appointment)
 
 import logging
 log = logging.getLogger("admin")
@@ -197,7 +197,9 @@ def cancel(appointment_id):
                                     business_id=appt["business_id"]))
 
     cancel_appointment(appointment_id)
-    flash("Appointment cancelled.", "success")
+    from notify import notify_change, status_line
+    status, reason = notify_change(appt, config, "cancelled")
+    flash(f"Appointment cancelled. {status_line(status, reason)}", "success")
     return redirect(url_for("admin.appointments", business_id=appt["business_id"]))
 
 
@@ -239,7 +241,13 @@ def reschedule(appointment_id):
                                     business_id=appt["business_id"]))
 
     reschedule_appointment(appointment_id, new_dt)
-    flash(f"Appointment moved to {new_dt}.", "success")
+    if new_dt != appt.get("datetime"):
+        from notify import notify_change, status_line
+        status, reason = notify_change(appt, config, "moved", new_datetime=new_dt)
+        flash(f"Appointment moved to {new_dt}. {status_line(status, reason)}",
+              "success")
+    else:
+        flash("That's the time it already had; nothing changed.", "success")
     return redirect(url_for("admin.appointments", business_id=appt["business_id"]))
 
 
@@ -661,4 +669,5 @@ def appointment_detail(appointment_id):
         details  = details,
         detail_labels = detail_labels,
         address_checks = address_checks,
+        notices  = notifications_for_appointment(appointment_id),
     )

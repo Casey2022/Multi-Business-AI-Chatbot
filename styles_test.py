@@ -31,6 +31,7 @@ TEMPLATE_DIRS = [ROOT / "admin" / "templates", ROOT / "templates"]
 # else — an exception nobody wrote down is just a hole.
 ADDED_BY_SCRIPT = {
     "typing",     # demo.html, on the "…" bubble while waiting
+    "notice",     # demo.html, on a notice the business sent unprompted
     "col-grip",   # table-resize.js, the draggable column edge
 }
 

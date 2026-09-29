@@ -174,6 +174,7 @@ def main():
         "/demo/<slug>":  "its original address, now a redirect",
         "/demo":         "the sandbox picker",
         "/webchat/<slug>": "the endpoint the chat page posts to",
+        "/webchat/<slug>/updates": "where the chat page collects notices",
         "/sms":          "the Twilio webhook",
     }
     rules = {rule for _n, (_p, _f, rule) in endpoints.items() if rule}

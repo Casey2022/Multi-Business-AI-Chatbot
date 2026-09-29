@@ -137,6 +137,33 @@ def init_db():
         )
     """)
 
+    # notifications — telling a customer their appointment moved or was
+    # cancelled (2026-09-28). An outbox, not a fire-and-forget send: the web
+    # chat has no way to push, so a notice waits here as 'pending' until the
+    # customer's chat window picks it up, and the owner's appointment page
+    # reads this table to say what was sent, when, or why not.
+    #   status: pending    waiting for the customer's chat to collect it
+    #           delivered  shown to the customer (and added to `messages`)
+    #           superseded replaced by a later change before delivery
+    #           not_sent   no way to reach them (see `reason`)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id     INTEGER NOT NULL,
+            appointment_id  INTEGER NOT NULL,
+            recipient       TEXT    NOT NULL,
+            channel         TEXT    NOT NULL,
+            kind            TEXT    NOT NULL,
+            body            TEXT    NOT NULL,
+            status          TEXT    NOT NULL,
+            reason          TEXT,
+            created_at      TEXT    NOT NULL,
+            delivered_at    TEXT,
+            FOREIGN KEY (business_id) REFERENCES businesses(id),
+            FOREIGN KEY (appointment_id) REFERENCES appointments(id)
+        )
+    """)
+
     # documents — the RAG knowledge base, one row per section.
     # Markdown files under documents/<slug>/ are the seed; this table is
     # authoritative once imported. Same relationship YAML has to
@@ -547,6 +574,8 @@ def get_demo_businesses(idle_before=None):
 # tenant-scoped table without thinking about teardown shows up as a review
 # question here instead of as a demo that leaves rows behind forever.
 _TENANT_TABLES = (
+    # notifications first: its rows point at appointments.
+    ("notifications",      "business_id"),
     ("messages",           "business_id"),
     ("appointments",       "business_id"),
     ("conversation_state", "business_id"),
@@ -835,6 +864,79 @@ def reschedule_appointment(appointment_id, new_datetime):
     )
     conn.commit()
     conn.close()
+
+# ---------------------------------------------------------------------------
+# Notifications (see the table's comment in init_db)
+# ---------------------------------------------------------------------------
+
+def add_notification(business_id, appointment_id, recipient, channel, kind,
+                     body, status, created_at, reason=None):
+    """Record a notification. Returns its id.
+
+    A new notice for an appointment supersedes any still-pending one for the
+    same appointment: an owner who moves a booking twice in a minute sends
+    the customer the latest time, not two messages with the first one wrong.
+    """
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE notifications SET status = 'superseded' "
+            "WHERE appointment_id = ? AND status = 'pending'",
+            (appointment_id,))
+        cur = conn.execute(
+            """INSERT INTO notifications
+                   (business_id, appointment_id, recipient, channel, kind,
+                    body, status, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (business_id, appointment_id, recipient, channel, kind, body,
+             status, reason, created_at))
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def collect_notifications(business_id, recipient, delivered_at):
+    """Hand over a web-chat customer's pending notices, and mark them delivered.
+
+    Each is also added to the conversation log, so the owner's Conversations
+    page shows what the customer was told, in order. Returns
+    [{"id", "body"}], oldest first.
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """SELECT id, body FROM notifications
+               WHERE business_id = ? AND recipient = ? AND status = 'pending'
+               ORDER BY id""",
+            (business_id, recipient)).fetchall()
+        for row in rows:
+            conn.execute(
+                "UPDATE notifications SET status = 'delivered', delivered_at = ? "
+                "WHERE id = ? AND status = 'pending'",
+                (delivered_at, row["id"]))
+            conn.execute(
+                """INSERT INTO messages (business_id, phone, role, content,
+                                         source, timestamp)
+                   VALUES (?, ?, 'assistant', ?, 'notification', ?)""",
+                (business_id, recipient, row["body"], datetime.now().isoformat()))
+        conn.commit()
+        return [{"id": r["id"], "body": r["body"]} for r in rows]
+    finally:
+        conn.close()
+
+
+def notifications_for_appointment(appointment_id):
+    """Every notice about one appointment, newest first, for the owner."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM notifications WHERE appointment_id = ? ORDER BY id DESC",
+            (appointment_id,)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
 
 def get_sync_token(business_id):
     """Return the stored calendar sync token, or None for a full resync."""
@@ -1205,6 +1307,12 @@ def prune_personal_data(now=None):
         cur = conn.execute("DELETE FROM conversation_state WHERE last_updated < ?",
                            (_cutoff(STATE_RETENTION_DAYS),))
         removed["conversation_state"] = cur.rowcount
+
+        # Notices quote the customer's name and appointment; they go with the
+        # conversation log they were copied into.
+        cur = conn.execute("DELETE FROM notifications WHERE created_at < ?",
+                           (_cutoff(MESSAGE_RETENTION_DAYS),))
+        removed["notifications"] = cur.rowcount
 
         cur = conn.execute("DELETE FROM geocode_cache WHERE fetched_at < ?",
                            (_cutoff(GEOCODE_RETENTION_DAYS),))

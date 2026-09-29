@@ -19,6 +19,7 @@ load_dotenv()  # Must run before any module reads os.environ
 
 import logging
 import os
+import re
 from datetime import timedelta
 
 # Logging is configured BEFORE our own modules are imported, and that order
@@ -565,6 +566,36 @@ def webchat_reply(slug):
     )
 
     return {"reply": reply_text}
+
+@app.route("/webchat/<slug>/updates", methods=["GET"])
+def webchat_updates(slug):
+    """Messages the business sent this chat without being asked.
+
+    The chat page calls this every few seconds. Today that means notices
+    from notify.py: the owner moved or cancelled this customer's appointment.
+    Collected notices are marked delivered and added to the conversation, so
+    each one is shown once. Returns {"messages": [text, ...]}.
+
+    No model or embedding call, so it isn't counted against the chat rate
+    limit; it's one indexed read per call. The session id is the only key,
+    as it is for /webchat itself.
+    """
+    business = get_business_by_slug(slug)
+    if not business:
+        return {"error": "Unknown business"}, 404
+    session_id = (request.args.get("session_id") or "").strip()
+    if not re.fullmatch(r"web_[a-z0-9]{1,32}", session_id):
+        return {"error": "session_id is required"}, 400
+
+    import clock
+    from db import collect_notifications
+    config = load_config(business["config_path"], business["id"])
+    delivered_at = clock.business_now(config).isoformat(timespec="seconds")
+    notes = collect_notifications(business["id"], session_id, delivered_at)
+    if notes:
+        log_web.info("Delivered %d notice(s) to %s", len(notes), session_id)
+    return {"messages": [n["body"] for n in notes]}
+
 
 @app.route("/demo", methods=["GET"])
 def demo_picker():

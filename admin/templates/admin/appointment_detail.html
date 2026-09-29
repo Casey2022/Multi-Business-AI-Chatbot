@@ -86,6 +86,33 @@
 </div>
 {% endif %}
 
+{% if notices %}
+<div class="card">
+  <div class="card-title">What we told the customer</div>
+  <table class="facts">
+    {% for n in notices %}
+    <tr>
+      <th>{{ n.created_at | friendly_time }}</th>
+      <td>
+        {{ n.body }}
+        <div class="mt-1">
+          {% if n.status == 'delivered' %}
+            <span class="chip chip-booked">Seen in their chat {{ n.delivered_at | friendly_time }}</span>
+          {% elif n.status == 'pending' %}
+            <span class="chip chip-pending">Waiting for their chat to pick it up</span>
+          {% elif n.status == 'superseded' %}
+            <span class="chip chip-quiet">Replaced by a later change before they saw it</span>
+          {% else %}
+            <span class="chip chip-quiet">Not sent: {{ n.reason }}</span>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 {% if appt.status != 'cancelled' %}
 <div class="card">
   <div class="card-title">Move this appointment</div>
@@ -99,6 +126,7 @@
     </form>
     <p class="danger-note mt-3">
       Availability isn't checked here — you're the authority on your own schedule.
+      The customer is told about the change automatically.
     </p>
   </div>
 </div>
@@ -107,12 +135,13 @@
   <div class="card-title">Cancel</div>
   <div class="card-pad">
     <form method="POST" action="{{ url_for('admin.cancel', appointment_id=appt.id) }}"
-          onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar.');">
+          onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar and tells the customer.');">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger" type="submit">Cancel appointment</button>
     </form>
     <p class="danger-note mt-3">
-      Removes the event from your calendar as well. This can't be undone.
+      Removes the event from your calendar as well, and tells the customer.
+      This can't be undone.
     </p>
   </div>
 </div>

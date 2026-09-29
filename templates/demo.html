@@ -118,6 +118,24 @@
     e.preventDefault();
     send();
   });
+
+  // Messages the business sends without being asked: today, a notice that
+  // the owner moved or cancelled this customer's appointment. The page has
+  // no way to be pushed to, so it asks every 10 seconds while it's visible.
+  // Each notice is handed over once, then marked delivered on the server.
+  async function checkForUpdates() {
+    if (document.hidden) return;
+    try {
+      const res = await fetch(
+        `/webchat/${slug}/updates?session_id=${encodeURIComponent(sessionId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.messages || []).forEach((text) => addMsg(text, "bot", "notice"));
+    } catch (err) {
+      // Offline for a moment; the next check picks it up.
+    }
+  }
+  setInterval(checkForUpdates, 10000);
 </script>
 
 </body>

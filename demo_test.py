@@ -176,6 +176,11 @@ def main():
     save_appointment("visitor-a", "Drain cleaning", "2026-09-20T10:00:00",
                      clone["id"])
     set_state("visitor-a", clone["id"], "collecting", {"service": "Drain cleaning"})
+    # A notice about the visitor's appointment: the sweep must take it too.
+    visit = [a for a in db.get_appointments(clone["id"]) if a["phone"] == "visitor-a"][0]
+    db.add_notification(clone["id"], visit["id"], "visitor-a", "webchat", "moved",
+                        "We've moved your appointment.", "pending",
+                        "2026-09-19T09:00:00")
     check("one demo's messages are invisible to another",
           get_recent_messages("visitor-a", other["id"]) == [])
     check("one demo's bookings are invisible to another",

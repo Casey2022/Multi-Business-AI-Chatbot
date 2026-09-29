@@ -4,9 +4,10 @@
 # the database is authoritative for conversations and metadata. When they
 # disagree about a time, the calendar wins.
 #
-# Deliberately does NOT notify customers. Telling someone their appointment
-# moved requires outbound messaging this system doesn't have, and a silent
-# reschedule is a product decision, not an oversight — see future_directions.
+# Customers are told (2026-09-28): a move or cancellation made in Google
+# Calendar goes through the same notify step as the portal's buttons. This
+# used to say it deliberately didn't notify, because there was no way to
+# send anything; notify.py is that way.
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ import calendar_sync
 from config import load_config
 from db import (get_sync_token, set_sync_token, get_appointment_by_event_id,
                 cancel_appointment, reschedule_appointment, mark_calendar_change)
+from notify import notify_change
 
 import logging
 log = logging.getLogger("reconcile")
@@ -53,6 +55,7 @@ def reconcile_business(business):
                 cancel_appointment(appt["id"])
                 note = f"Cancelled in calendar on {datetime.now(tz):%b %d at %-I:%M %p}"
                 mark_calendar_change(appt["id"], note)
+                notify_change(appt, config, "cancelled")
                 changes.append(f"#{appt['id']} {appt['service']} — cancelled")
             continue
 
@@ -69,6 +72,7 @@ def reconcile_business(business):
             note = (f"Moved in calendar from {appt['datetime']} "
                     f"on {datetime.now(tz):%b %d at %-I:%M %p}")
             mark_calendar_change(appt["id"], note)
+            notify_change(appt, config, "moved", new_datetime=new_start)
             changes.append(
                 f"#{appt['id']} {appt['service']} — moved to {new_start}"
             )

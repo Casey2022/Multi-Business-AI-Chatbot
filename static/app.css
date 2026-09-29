@@ -787,6 +787,9 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   border: 1px solid var(--rule); border-radius: 14px 14px 14px 4px; }
 .chatcard .msg-from-bot { justify-content: flex-start; }
 .bubble.typing { color: var(--ink-faint); font-style: italic; }
+/* A notice the business sent unprompted (an appointment moved or was
+   cancelled): the bot's side, marked so it doesn't read as a reply. */
+.chatcard .msg-from-bot .bubble.notice { border-left: 3px solid var(--pen); }
 
 /* ---------------------------------------------------------------------- *
  * Small adjustments used in more than one place
