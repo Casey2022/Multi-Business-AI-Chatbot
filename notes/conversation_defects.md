@@ -356,6 +356,26 @@ Whether the live prompt should carry the time is a separate decision. A
 receptionist reasoning about "today" and "tomorrow" without a clock will
 keep hitting this.
 
+### Root cause, found a week later (2026-09-29)
+
+It wasn't invented. Sunrise's config FAQ, which goes into every system
+prompt, said: "We have a few gluten-free pastries each day, and gluten-free
+cakes by special order. Call to discuss!" The reply above is that answer
+almost word for word. The document said Wednesdays and Saturdays; the prompt
+said each day; the model believed the prompt. `c27e6dd`'s answering rules
+("never widen a condition") were arguing with the business's own settings,
+which is why this family kept coming back, including the batch-day muffin
+below.
+
+Found by `qa_eval.py`, when a five-question conversation's first reply said
+"a few gluten-free pastries most days" and the phrase was grepped. Fixed by
+rewriting the FAQ to match the document (Casey's call: the document is
+right), along with the delivery FAQ, which left out the $15 cake fee.
+
+Lesson: before blaming the model for a claim, search every place the prompt
+is built from for the claim's own words. A sentence the model "made up" may
+be one we gave it.
+
 ## Gluten-free muffins on a batch day (2026-09-23)  (OPEN)
 
 Just after midnight the prompt's date rolled over to Wednesday, a

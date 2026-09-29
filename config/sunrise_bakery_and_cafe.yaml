@@ -70,12 +70,17 @@ bot:
       Plain text only — no markdown formatting. Emojis are fine in moderation.
 
 faq:
+  # Rewritten 2026-09-29 to match the bakery's document (Casey's call). It
+  # said "a few gluten-free pastries each day" and "Call to discuss!": the
+  # prompt then told the bot "each day" while the document said Wednesdays
+  # and Saturdays, and every gluten-free answer ended in a phone referral.
   - question: "Do you have gluten-free options?"
-    answer: "We have a few gluten-free pastries each day, and gluten-free cakes by special order. Call to discuss!"
+    answer: "Yes: gluten-free vanilla and chocolate sponge cakes, and gluten-free muffins, made to order with 96 hours' notice. We also bake dedicated gluten-free batches on Wednesdays and Saturdays. Our kitchen handles wheat daily, so we can't guarantee against cross-contamination."
   - question: "How much notice do you need for a custom cake?"
     answer: "We ask for at least 72 hours' notice on custom cakes, and 2 weeks for wedding cakes."
+  # The $15 fee was missing, so "do you deliver?" read as free delivery.
   - question: "Do you deliver?"
-    answer: "We deliver custom cake orders over $50 within 5 miles. Pickup is free anytime during open hours."
+    answer: "Yes, within 5 miles on orders over $50: cake orders for a $15 fee, pastry trays free. Pickup is free anytime during open hours."
 
 rules:
   - name: "greeting"
