@@ -424,6 +424,13 @@ Answering rules that apply whatever the persona says:
   particular item is in, and one item's notice period is not another's.
 - "Usually can't" is an answer. If the documents say something usually
   isn't possible, say so first, then offer to check.
+- Give the phone number once. If one of your earlier replies in this
+  conversation already gave it or sent them to call, don't do it again:
+  answer what the facts above cover, and for what they don't, say in a few
+  words that it's a detail the team would confirm. Several replies in a row
+  that end "give us a call" read as a brush-off, however correct each one
+  is. This does NOT apply when the customer asks how to reach us, or asks
+  for the number again: then give it.
 
 Behavioral rules: {guardrails_text}"""
 
@@ -530,6 +537,70 @@ examples, however it is phrased.
 # Main LLM + RAG reply path
 # ---------------------------------------------------------------------------
 
+# How many of the bot's own recent replies to look back through for the
+# number. The history passed in is the last 10 messages, about 5 replies.
+REFERRAL_LOOKBACK = 3
+
+_ASKS_FOR_CONTACT = re.compile(
+    r"\b(phone|number|call|contact|reach|talk to (?:someone|a person|a human)"
+    r"|speak to)\b", re.I)
+
+
+def _phone_pattern(phone):
+    """The business's number however it's punctuated: (585) 555-0188,
+    585-555-0188, 585.555.0188, 5855550188."""
+    digits = re.sub(r"\D", "", phone or "")
+    if len(digits) < 7:
+        return None
+    return re.compile(r"\(?" + r"[\s().-]*".join(digits) + r"\)?")
+
+
+def without_repeated_number(reply, history, message, config):
+    """Take the phone number out of a reply that already gave it recently.
+
+    Defect #6 (2026-08-02, open until 2026-09-29): four bakery answers in a
+    row ended "give us a call at (585) 555-0188". Each was fine; together
+    they read as a brush-off. The prompt now says to give the number once;
+    this makes it so, because a prompt rule alone has been ignored before.
+
+    Only the NUMBER goes: "call us at (585) 555-0188 to check" becomes "call
+    us to check", so the reply still says the team can confirm it. Left
+    alone when the customer asks how to reach us, and when the number
+    wasn't in one of the last REFERRAL_LOOKBACK replies.
+    """
+    phone = ((config or {}).get("business") or {}).get("phone")
+    pattern = _phone_pattern(phone)
+    if not reply or not pattern or not pattern.search(reply):
+        return reply
+    if _ASKS_FOR_CONTACT.search(message or ""):
+        return reply
+    earlier = [m.get("content", "") for m in (history or [])
+               if m.get("role") == "assistant"][-REFERRAL_LOOKBACK:]
+    if not any(pattern.search(text) for text in earlier):
+        return reply
+
+    num = pattern.pattern
+    kept = []
+    for sentence in re.split(r"(?<=[.!?])\s+", reply.strip()):
+        if not pattern.search(sentence):
+            kept.append(sentence)
+            continue
+        # Where the sentence reads fine without the number, keep it.
+        s2 = re.sub(r"\s+(?:at|on)\s+" + num, "", sentence, flags=re.I)  # call us at N
+        s2 = re.sub(r"\b(call|text|ring|dial)\s+" + num, r"\1 us", s2,
+                    flags=re.I)                                          # Call N
+        if not pattern.search(s2):
+            kept.append(re.sub(r"\s+([.,!?;:])", r"\1", s2))
+        # Otherwise the number was the point of the sentence ("Our number
+        # is N", "Questions? N"): drop the sentence rather than leave it
+        # broken.
+    text = " ".join(kept).strip()
+    if not text:
+        return reply            # nothing left: better to repeat the number
+    log.info("Took a repeated phone number out of a reply (defect #6)")
+    return text
+
+
 def unavailable_reply(config):
     """What the customer sees when the assistant can't do its job right now."""
     phone = ((config or {}).get("business") or {}).get("phone")
@@ -617,7 +688,7 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         _note_usage(response, "Q&A reply")
         reply = text_of(response)
         log.debug(f"Claude replied: {reply!r}")
-        return reply
+        return without_repeated_number(reply, history, message, config)
 
     except Exception as e:
         log.error(f"ERROR calling Claude: {e}")
