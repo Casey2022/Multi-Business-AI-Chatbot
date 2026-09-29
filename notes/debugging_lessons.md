@@ -34,7 +34,7 @@ Say it as one action in your head: "delete and restart."
 
 curl prints nothing because **nothing is listening on the port**. The
 server either crashed or was never started. Glance at terminal 1:
-- Is it still showing `* Running on http://127.0.0.1:5000` and `Press CTRL+C to quit`?
+- Is it still showing `* Running on http://127.0.0.1:5001` and `Press CTRL+C to quit`?
 - Or did a Python traceback fire and the prompt come back?
 
 If the server died with a traceback, **debug.py auto-reload doesn't help.**
@@ -217,6 +217,10 @@ Lessons:
 
 ## 403 at 127.0.0.1:5000 on Mac = Flask probably isn't running
 
+**Fixed for good (2026-09-29):** the third time this happened, the
+"use a different port" fix finally went in. `python3 app.py` now serves
+on **5001** (`LOCAL_PORT` overrides it), so AirPlay can't answer for it.
+
 macOS AirPlay Receiver also listens on port 5000 and returns HTTP 403.
 If Flask crashes (e.g. syntax error killed the reloader), the browser
 still reaches AirPlay and shows "Access denied / HTTP ERROR 403" instead
@@ -339,6 +343,10 @@ The line is valid Python. The giveaway is the phrase "f-string" in the error: th
 Mental model: everything before return is the kitchen (where variables get cooked); the f-string is the plate (where finished variables get arranged). Code goes in the kitchen; only {variable_name} goes on the plate.
 
 ## 403 at 127.0.0.1:5000 on a Mac usually means Flask isn't running
+
+**Fixed for good (2026-09-29):** the third time this happened, the
+"use a different port" fix finally went in. `python3 app.py` now serves
+on **5001** (`LOCAL_PORT` overrides it), so AirPlay can't answer for it.
 
 macOS AirPlay Receiver also listens on port 5000 and answers with HTTP 403. When Flask dies (e.g. a syntax error killed the reloader), the browser still reaches something and shows "Access denied / HTTP ERROR 403" instead of the connection-refused you'd expect from a dead server.
 

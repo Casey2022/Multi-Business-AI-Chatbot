@@ -181,8 +181,8 @@ The app self-heals on boot: it creates tables, registers any business missing
 from the registry, imports its knowledge base, and ingests the documents into
 a vector collection if any of that hasn't happened yet.
 
-Then visit `http://127.0.0.1:5000/demo` to pick a business, or go straight to
-one: `http://127.0.0.1:5000/chat/bobs_plumbing`.
+Then visit `http://127.0.0.1:5001/demo` to pick a business, or go straight to
+one: `http://127.0.0.1:5001/chat/bobs_plumbing`.
 
 URLs worth knowing:
 

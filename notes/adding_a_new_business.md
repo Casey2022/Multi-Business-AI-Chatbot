@@ -246,15 +246,15 @@ Then test in terminal 2 using the new business's Twilio number in the `To` field
 
 ```bash
 # Rules test
-curl -X POST http://127.0.0.1:5000/sms \
+curl -X POST http://127.0.0.1:5001/sms \
   --data "Body=hi&From=%2B15550001111&To=%2B1<new-twilio-number>"
 
 # RAG test (something only the document would know)
-curl -X POST http://127.0.0.1:5000/sms \
+curl -X POST http://127.0.0.1:5001/sms \
   --data "Body=<service-specific question>&From=%2B15550001111&To=%2B1<new-twilio-number>"
 
 # Booking test
-curl -X POST http://127.0.0.1:5000/sms \
+curl -X POST http://127.0.0.1:5001/sms \
   --data "Body=book&From=%2B15550001111&To=%2B1<new-twilio-number>"
 ```
 

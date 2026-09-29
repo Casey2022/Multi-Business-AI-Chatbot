@@ -725,4 +725,9 @@ def index():
     return redirect(url_for("demo_picker"))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Local development only (Render runs gunicorn). Port 5001, not Flask's
+    # default 5000: macOS's AirPlay Receiver listens on 5000 and answers a
+    # browser with a bare 403 ("Access to 127.0.0.1 was denied"), which
+    # looks exactly like the app refusing you (2026-09-29). LOCAL_PORT
+    # overrides it.
+    app.run(debug=True, port=int(os.environ.get("LOCAL_PORT", "5001")))
