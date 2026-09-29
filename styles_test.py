@@ -32,6 +32,7 @@ TEMPLATE_DIRS = [ROOT / "admin" / "templates", ROOT / "templates"]
 ADDED_BY_SCRIPT = {
     "typing",     # demo.html, on the "…" bubble while waiting
     "notice",     # demo.html, on a notice the business sent unprompted
+    "picker-hidden",  # date-picker.js, hides the field its button replaces
     "col-grip",   # table-resize.js, the draggable column edge
 }
 

@@ -188,7 +188,7 @@ def main():
     routes_src   = (ROOT / "admin" / "routes.py").read_text(encoding="utf-8")
 
     # A script nobody includes is the same bug as a route nobody registers.
-    for script in ("table-resize.js", "field-deps.js"):
+    for script in ("table-resize.js", "field-deps.js", "date-picker.js"):
         check(f"{script} exists", (ROOT / "static" / script).exists())
         check(f"{script} is loaded by base.html",
               f"filename='{script}'" in base_src,

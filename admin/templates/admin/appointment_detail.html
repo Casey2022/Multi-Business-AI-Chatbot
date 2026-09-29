@@ -117,12 +117,25 @@
 <div class="card">
   <div class="card-title">Move this appointment</div>
   <div class="card-pad">
+    {# date-picker.js turns this into one button that opens the calendar;
+       without it, the plain field below still works. The field starts at
+       the current time so the calendar opens on the right day. #}
     <form method="POST" action="{{ url_for('admin.reschedule', appointment_id=appt.id) }}"
-          class="toolbar">
+          class="toolbar move-form" data-move-picker>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <label class="sr-only" for="new_datetime">New date and time</label>
-      <input class="w-auto" type="datetime-local" id="new_datetime" name="new_datetime">
-      <button class="btn btn-primary" type="submit">Move appointment</button>
+      <input class="w-auto" type="datetime-local" id="new_datetime" name="new_datetime"
+             value="{{ appt.datetime | replace(' ', 'T') }}" required data-picker-input>
+      <button class="btn btn-quiet" type="button" data-picker-open hidden>
+        <svg class="icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="3" y="5" width="18" height="16" rx="2"/>
+          <path d="M3 10h18M8 3v4M16 3v4"/>
+        </svg>
+        Choose a new date &amp; time
+      </button>
+      <span class="picker-choice" data-picker-choice aria-live="polite"></span>
+      <button class="btn btn-primary" type="submit" data-picker-submit>Move appointment</button>
     </form>
     <p class="danger-note mt-3">
       Availability isn't checked here — you're the authority on your own schedule.

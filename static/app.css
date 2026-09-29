@@ -155,6 +155,15 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; letter-spacing: -.
 }
 
 .toolbar { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+/* "Move this appointment": one button opens the calendar (date-picker.js).
+   The real field stays rendered under the button, invisible, so the
+   browser's picker opens beside it and the form still submits it. */
+.move-form { position: relative; }
+.move-form .picker-hidden { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px;
+  opacity: 0; pointer-events: none; }
+.btn .icon { vertical-align: -3px; margin-right: 4px; }
+.picker-choice { font-weight: 600; }
+.picker-choice:empty { display: none; }
 /* The destination row sits a little clear of the header above it — it is a
    change of subject, not a continuation of the title. */
 .toolbar-nav { margin-block: var(--s1) var(--s2); }
