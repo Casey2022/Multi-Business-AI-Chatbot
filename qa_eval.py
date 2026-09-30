@@ -15,7 +15,8 @@ the bot has every reason to reach for the phone. Checks:
   3 replies (llm.REFERRAL_LOOKBACK), unless the customer asked how to reach
   us;
 - no_back_to_back_referral: no two replies in a row both send them to call;
-- every_reply_says_something: no empty or phone-only replies.
+- every_reply_says_something: no empty or phone-only replies;
+- reply_must / reply_must_not: per-scenario patterns for one reply.
 
 Costs a few cents per run (about 5 model calls per scenario). Uses the
 real document search, so run it on the Mac with the app's collections
@@ -74,6 +75,33 @@ SCENARIOS = [
         ],
         "asks_for_number_at": [2],
     },
+    {
+        # Casey's live test after the FAQ fold (2026-09-30). Turn 4 got "I
+        # can't actually place orders myself — text 'order' and our booking
+        # system will walk you through": the prompt called the booking flow
+        # "a separate system, not you", and the model told the customer so.
+        "name": "the live bakery conversation (2026-09-30)",
+        "slug": "sunrise_bakery_and_cafe",
+        "script": [
+            "Hello, do you sell cakes?",
+            "just checking, do you make cookies?",
+            "Do you have gluten free options?",
+            "can I place an order through you?",
+            "do you deliver?",
+            "so there is no delivery fee for pastry trays over $50?",
+        ],
+        "reply_must_not": [
+            (1, r"^\W*(yes|yep|yeah|we do|we sure do|absolutely)\b",
+             "cookies aren't in the documents, so no \"yes\""),
+            (3, r"\b(can'?t|cannot|can not|unable to)\b.{0,25}\b(place|take|"
+                r"handle|process)\b.{0,15}\borders?\b",
+             "this chat IS where they order"),
+            (3, r"separate system", "no talk of a separate system"),
+        ],
+        "reply_must": [
+            (3, r"'(order|book)'", "tells them how: text 'order'"),
+        ],
+    },
 ]
 
 def sends_them_to_call(reply, pattern):
@@ -124,6 +152,12 @@ def check(scenario, config, turns):
             problems.append(("no_back_to_back_referral",
                              f"replies {i} and {i + 1} both send them to call"))
             break
+    for i, regex, why in scenario.get("reply_must_not", []):
+        if i < len(turns) and re.search(regex, turns[i][1], re.I):
+            problems.append(("reply_must_not", f"reply {i + 1}: {why}"))
+    for i, regex, why in scenario.get("reply_must", []):
+        if i < len(turns) and not re.search(regex, turns[i][1], re.I):
+            problems.append(("reply_must", f"reply {i + 1}: {why}"))
     for i, (_, r) in enumerate(turns):
         if i in asked:
             continue            # "It's (585) 555-0188." IS the answer there

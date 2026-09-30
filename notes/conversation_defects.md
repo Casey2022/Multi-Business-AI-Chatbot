@@ -692,3 +692,22 @@ three runs out of three, though:
 Same two rows broke when the referral rule was briefly a standing rule
 during the defect #6 work. They are the canaries for any standing-prompt change: when
 the prompt moves, run Sunrise twice before the full suite.
+
+### Casey's live test after the fold (2026-09-30)
+
+Cookies, the phone number (once), and both delivery rules were right. Two
+replies weren't:
+
+- **"Can I place an order through you?" → "I can't actually place orders
+  myself — text 'order' and our booking system will walk you through."**
+  The prompt described the booking flow as "a separate system, not you",
+  which is true inside the code and nonsense to a customer: it's one chat.
+  The prompt now says so, and that the answer to "can I order here?" is yes.
+- **Gluten-free muffins "made to order with 96 hours' notice on those batch
+  days".** My own sentence from the night before, "with 96 hours' notice,
+  on batch days too", read as "only on batch days". Now "whatever the day".
+  The FAQ-fold lesson again, written by the person who'd just learned it.
+
+The conversation is now a qa_eval scenario, with a new per-reply check
+(`reply_must` / `reply_must_not`): no "yes" to cookies, no "can't take
+orders", and it has to say how to order.

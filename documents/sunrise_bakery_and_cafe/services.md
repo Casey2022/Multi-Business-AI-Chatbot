@@ -47,8 +47,8 @@ Our kitchen handles wheat, eggs, dairy, soy, and tree nuts daily. We
 cannot guarantee any product is free from cross-contamination. We have
 dedicated gluten-free batches on Wednesdays and Saturdays. Those batches
 bake gluten-free orders placed ahead of time; they don't put gluten-free
-muffins in the case. Gluten-free muffins are only made to order, with 96
-hours' notice, on batch days too. Customers with severe allergies should call to discuss
+muffins in the case. Gluten-free muffins are made to order only, with 96
+hours' notice, whatever the day. Customers with severe allergies should call to discuss
 before ordering.
 
 ## Deposits and Cancellation
