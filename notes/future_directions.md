@@ -479,8 +479,8 @@ delivery address has no way to skip that question for a pickup order —
 and worse, the service-radius check then refuses a pickup customer for
 living too far away to deliver to.
 
-Crosstown Pizza ships as delivery-only because of this, with the FAQ
-pointing pickup customers at the phone. That's honest but it's a visible
+Crosstown Pizza ships as delivery-only because of this, with its
+knowledge base pointing pickup customers at the phone. That's honest but it's a visible
 seam in a demo whose job is to look finished.
 
 What it needs: a question that can depend on an earlier answer. The

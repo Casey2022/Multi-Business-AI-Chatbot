@@ -12,7 +12,7 @@
 # Known limitation, deliberately visible: extra questions are asked every
 # time, so this bot takes DELIVERY orders only — it can't skip the address
 # question for a pickup order. Conditional questions are the fix and they
-# don't exist yet; the FAQ points pickup customers at the phone.
+# don't exist yet; the knowledge base points pickup customers at the phone.
 
 business:
   name: "Crosstown Pizza Co."
@@ -88,16 +88,6 @@ bot:
     webchat: |
       Keep replies conversational and under 3 short sentences.
       Plain text only — no markdown formatting. Emojis are fine in moderation.
-
-faq:
-  - question: "Do you deliver?"
-    answer: "We deliver within 6 miles, $3 fee, $15 minimum. Outside that, pickup at the counter is always open."
-  - question: "How long does delivery take?"
-    answer: "Usually 30-45 minutes, longer on Friday and Saturday nights. The kitchen will confirm when your order goes in."
-  - question: "Can I order for pickup here?"
-    answer: "Pickup orders go through the phone at (585) 555-0177 — this chat is set up for delivery."
-  - question: "Do you have gluten-free crust?"
-    answer: "Yes, gluten-free 10-inch crust is $3 extra. Our kitchen handles wheat all day, so we can't call it allergen-safe."
 
 rules:
   - name: "greeting"

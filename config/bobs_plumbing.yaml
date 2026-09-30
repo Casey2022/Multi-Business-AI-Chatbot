@@ -79,14 +79,6 @@ bot:
       Keep replies conversational and under 3 short sentences.
       Plain text only — no markdown formatting. Emojis are fine in moderation.
 
-faq:
-  - question: "Do you offer free estimates?"
-    answer: "Yes, all estimates are free."
-  - question: "Do you accept credit cards?"
-    answer: "Yes, we accept all major credit cards."
-  - question: "Are you licensed and insured?"
-    answer: "Yes, fully licensed and insured in New York State."
-
 rules:
   - name: "greeting"
     keywords: ["hi", "hello", "hey", "yo"]

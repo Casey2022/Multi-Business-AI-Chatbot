@@ -638,3 +638,34 @@ possible.
 The same commit fixed a core check that expected "50%" (the deposit size)
 from "what's your cancellation policy". It had failed a correct, complete
 policy summary once the section stopped opening with the deposit amounts.
+
+## One source of truth: the FAQ folded into the documents (2026-09-29)
+
+Two defects this month had the same shape: the YAML `faq:` list and the
+knowledge document said different things (gluten-free "each day" vs
+Wednesdays and Saturdays; the FAQ's "Call to discuss!" turning every
+gluten-free answer into a phone referral). The FAQ was pasted into every
+system prompt, so it was always in view and won against the retrieved
+document. Fixing the wording in both places works once; an owner editing
+one copy and not the other brings it straight back.
+
+So there is now one copy. Every FAQ fact was checked against its document:
+Sunrise, Crosstown and most of Belmont/Ridgeline were already covered. Five
+facts lived only in an FAQ and moved into a section, seed markdown and
+database alike:
+
+- Bob's: free estimates, major credit cards, licensed and insured in NYS —
+  a new "Estimates, Payment, and Licensing" section.
+- Belmont: walk-ins when a chair is free — "Payment and Hours".
+- Ridgeline: start date depends on project and season — "How Estimates Work".
+
+Removed: the `faq:` blocks, the prompt's FAQ section, the owner-editable
+field, its settings card (now a pointer to the Knowledge page). Startup
+warns if a `faq:` block reappears; `one_source_test.py` (25 checks) keeps
+it gone, including that a planted FAQ leaves the prompt byte-identical.
+rag_eval gained a row for each folded fact — before this, none of them
+was checked by anything.
+
+Watch: the Sunrise gluten-free Wednesday row. Its FAQ had been rewritten
+to repeat "batch days don't change the muffin rule"; the document says the
+same, but the prompt no longer repeats it.

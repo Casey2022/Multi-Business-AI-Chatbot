@@ -85,14 +85,6 @@ bot:
       Keep replies conversational and under 3 short sentences.
       Plain text only — no markdown formatting. Emojis are fine in moderation.
 
-faq:
-  - question: "How long does a colour take?"
-    answer: "Colour is about 2 hours, and a cut and colour together is about 2.5. Balayage runs closer to 3."
-  - question: "Do you take walk-ins?"
-    answer: "We take walk-ins when a chair is free, but booking ahead is the only way to be sure."
-  - question: "Do I need a patch test?"
-    answer: "Yes — new colour clients need a patch test at least 48 hours before the appointment. It takes five minutes."
-
 rules:
   - name: "greeting"
     keywords: ["hi", "hello", "hey", "yo"]

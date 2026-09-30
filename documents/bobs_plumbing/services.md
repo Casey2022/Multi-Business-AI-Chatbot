@@ -45,3 +45,7 @@ We do not handle septic tank pumping, well drilling, or commercial
 industrial plumbing projects. If you ask about septic systems, well work,
 or commercial plumbing, we can recommend trusted partners in the area —
 just call and ask.
+
+## Estimates, Payment, and Licensing
+Estimates are free. We accept all major credit cards. Bob's Plumbing is
+fully licensed and insured in New York State.

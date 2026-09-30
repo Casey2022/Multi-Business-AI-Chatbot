@@ -123,7 +123,7 @@ def init_db():
     # inherits any YAML improvements it hasn't explicitly overridden, and
     # keeps the difference between "as onboarded" and "as edited" visible.
     # `field` is a dotted path into the config: "business.phone",
-    # "bot.persona_preset". `value` is JSON so lists (services, faq, etc) work
+    # "bot.persona_preset". `value` is JSON so lists (services, etc) work
     # alongside plain strings.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS config_overrides (

@@ -1,12 +1,14 @@
 # Ridgeline Contracting — Services & Policies
 
-## How Estimates Work (Topics: estimate, quote, free, visit, how it works)
+## How Estimates Work (Topics: estimate, quote, free, visit, how it works, how soon, start)
 Estimates are free and carry no obligation. An estimator visits the
 property, walks the space with you, takes measurements and photos, and
 sends a written quote within three business days. Most estimate visits
 take an hour; whole-room remodels take about ninety minutes. We book
 estimates two to five business days out, sooner if we have a
-cancellation.
+cancellation. How soon we can start the work itself depends on the
+project and the season; the estimator will give you a realistic start
+window at the visit.
 
 ## Kitchen Remodels (Topics: kitchen, cabinets, countertops, island)
 Past kitchen projects have run from $18,000 for a cabinet-and-counter

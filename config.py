@@ -25,8 +25,6 @@ EDITABLE_FIELDS = {
                              "type": "text"},
     "business.service_area":{"label": "Service area",    "type": "text"},
     "services":             {"label": "Services offered","type": "list"},
-    "faq":                  {"label": "Frequently asked questions",
-                             "type": "faq"},
     "booking.noun":         {"label": "What you call a booking",
                              "type": "text"},
     "bot.persona_preset":   {"label": "Bot personality", "type": "choice"},

@@ -309,17 +309,16 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
     business = config["business"]
     bot      = config["bot"]
     services = config["services"]
-    faq      = config.get("faq", [])
 
     services_text = "\n".join(f"- {s}" for s in services)
 
-    faq_text = ""
-    if faq:
-        faq_lines = [
-            f"Q: {item['question']}\nA: {item['answer']}"
-            for item in faq
-        ]
-        faq_text = "\n\nFrequently asked questions:\n" + "\n\n".join(faq_lines)
+    # There is no FAQ block. Every fact the bot states comes from one
+    # place, the knowledge base, retrieved per question. A second copy in
+    # the prompt drifted from the document twice (gluten-free "each day"
+    # vs Wednesdays and Saturdays; a deposit refund the document didn't
+    # give), and the prompt copy won every time because it was always in
+    # view. One source of truth means one place for an owner to edit and
+    # one place to check. See notes/conversation_defects.md.
 
     # Describe the booking process so the LLM answers consistently with it
     # and never contradicts what the business actually collects.
@@ -392,7 +391,6 @@ Business facts:
 
 Services we offer:
 {services_text}
-{faq_text}
 {booking_text}
 
 Persona: {bot['persona']}

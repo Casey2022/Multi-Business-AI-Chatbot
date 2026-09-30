@@ -134,6 +134,11 @@ TESTS = {
         ("how fast can you get here in an emergency", "Emergency",     "90 minutes"),
         ("is there a fee for after hours",        "Emergency",         "$75"),
         ("what's the warranty on a water heater", "Water Heater",      "10-year"),
+        # These three lived only in the FAQ until 2026-09-29, with no row
+        # checking them. Now they're in the document, retrieval has to find them.
+        ("are estimates free",                    "Estimates",         "free"),
+        ("do you take credit cards",              "Estimates",         ("credit card", "cards")),
+        ("are you licensed and insured",          "Estimates",         ["licensed", "insured"]),
         ("do you install solar panels",           "ANSWER_ONLY",       DECLINE),
         ("do you do electrical work",               "ANSWER_ONLY",       DECLINE),
         ("can you clean my gutters",                "ANSWER_ONLY",       DECLINE),
@@ -178,6 +183,8 @@ TESTS = {
         ("is there a deposit for colour",         "Cancellation",      "$30"),
         ("what time is the last colour appointment", "Payment and Hours", "3pm"),
         ("are you open on Sunday",                "Payment and Hours", "closed"),
+        # Was FAQ-only until 2026-09-29.
+        ("do you take walk-ins",                  "Payment and Hours", ("chair", "book ahead", "booking ahead")),
         ("what products do you use",              "Products",          ("Davines", "Olaplex")),
         # Nothing in the knowledge base covers this.
         ("do you do facials",                       "ANSWER_ONLY",       DECLINE),
@@ -188,6 +195,8 @@ TESTS = {
     "ridgeline_contracting": [
         ("is the estimate free",                  "How Estimates Work", "free"),
         ("how long until I get the quote",        "How Estimates Work", "three business days"),
+        # Was FAQ-only until 2026-09-29.
+        ("how soon can you start",                "How Estimates Work", ("season", "estimator", "window")),
         ("what does a kitchen remodel cost",      "Kitchen Remodels",   ("$18,000", "$75,000")),
         ("how long does a kitchen take",          "Kitchen Remodels",   ("five to eight", "5 to 8")),
         ("what about a bathroom",                 "Bathroom Remodels",  ("$12,000", "$38,000")),

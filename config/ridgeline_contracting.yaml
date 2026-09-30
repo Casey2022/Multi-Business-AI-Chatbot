@@ -94,14 +94,6 @@ bot:
       Keep replies conversational and under 3 short sentences.
       Plain text only — no markdown formatting. Emojis are fine in moderation.
 
-faq:
-  - question: "Do you charge for estimates?"
-    answer: "No — on-site estimates are free, and there's no obligation."
-  - question: "Are you licensed and insured?"
-    answer: "Yes, fully licensed and insured in New York State, and we carry workers' comp on every crew."
-  - question: "How soon can you start?"
-    answer: "That depends on the project and the season. The estimator will give you a realistic window when they visit."
-
 rules:
   - name: "greeting"
     keywords: ["hi", "hello", "hey", "yo"]

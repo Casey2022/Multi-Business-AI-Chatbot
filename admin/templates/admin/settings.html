@@ -109,12 +109,10 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Frequently asked questions</div>
-    <div class="field">
-      <label for="faq">One per line, as <code>Question | Answer</code></label>
-      <textarea id="faq" name="faq" rows="8">{% for item in config.faq %}{{ item.question }} | {{ item.answer }}
-{% endfor %}</textarea>
-    </div>
+    <div class="card-title">Answers to customer questions</div>
+    <p class="hint">Prices, policies, and anything customers ask about live in
+      one place: the <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge
+      base</a>. Add or edit a section there and press Publish.</p>
   </div>
 
   <div class="card">

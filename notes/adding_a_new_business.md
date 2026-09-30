@@ -65,11 +65,9 @@ bot:
       Reply in 1-2 short sentences (under 8 seconds spoken).
       No emojis, no markdown, no parentheticals or asides.
 
-faq:                                      # Common questions with canned answers
-  - question: "<question 1>"             # These get injected into the system prompt
-    answer: "<answer 1>"
-  - question: "<question 2>"
-    answer: "<answer 2>"
+# No faq: block. Common questions and their answers go in services.md
+# (Step 2) — one source of truth. A faq: block is ignored, and startup
+# logs a warning if it finds one.
 
 rules:                                    # Keyword rules for instant replies
   - name: "greeting"
@@ -152,6 +150,10 @@ Embeddings struggle with negation — "We don't do X" is hard to match.
   heading improves retrieval for customers who use different words.
 - **Negation needs explicit headings.** "What We Don't Do" is nearly invisible
   to semantic search. "Septic Tanks and Well Drilling (Not Offered)" is not.
+- **Quick answers belong here too.** Walk-ins, card payments, licensing,
+  free estimates: a one-line fact gets a sentence in the section it fits.
+  There is no separate FAQ — two copies of a fact drift apart, and the
+  bot then contradicts itself.
 - **Aim for 300-500 characters per section.** Too short = not enough context.
   Too long = the chunk gets split mid-thought.
 

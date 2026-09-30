@@ -306,14 +306,6 @@ def settings(business_id):
 
             if spec["type"] == "list":
                 value = [line.strip() for line in raw.splitlines() if line.strip()]
-            elif spec["type"] == "faq":
-                value = []
-                for line in raw.splitlines():
-                    if "|" not in line:
-                        continue
-                    q, a = line.split("|", 1)
-                    if q.strip() and a.strip():
-                        value.append({"question": q.strip(), "answer": a.strip()})
             elif spec["type"] == "select":
                 if raw not in spec["options"]:
                     flash(f"{spec['label']}: {raw!r} isn't one of the choices.",

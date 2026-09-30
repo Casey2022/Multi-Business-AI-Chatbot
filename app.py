@@ -164,6 +164,14 @@ def bootstrap():
             # at all — the booking silently takes the default length. Said
             # once at startup, it's a typo; left unsaid, it's a stylist
             # wondering why her afternoon keeps getting double-booked.
+            # The FAQ was folded into the knowledge base (2026-09-29) and is
+            # no longer read. A faq: block left in a YAML would be answers
+            # an operator believes are live and aren't — say so at startup.
+            if config.get("faq"):
+                log_boot.warning(
+                    "%s still has a faq: block in its config. It is ignored "
+                    "— move those answers into the knowledge base",
+                    b["name"])
             stale = unknown_duration_services(config)
             if stale:
                 log_boot.warning(
