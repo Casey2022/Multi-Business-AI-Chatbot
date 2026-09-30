@@ -20,9 +20,12 @@ DEPOSIT_THREE_DAYS = Rubric(
     comes back when cancelling inside 7 days.""")
 
 WEDDING_CANCEL_MONTH_OUT = Rubric(
-    quote="More than 7 days before the order date: a custom cake deposit is "
-          "refunded in full; for a wedding cake, anything paid above 25% of the "
-          "order price is refunded and the 25% is kept.",
+    # Reworded 2026-09-29: "a custom cake deposit is refunded in full; for a
+    # wedding cake, ..." had the model promise a full wedding refund in four
+    # runs out of four. The exception now opens its own sentence.
+    quote=("More than 7 days before the order date: a custom cake deposit comes "
+           "back in full. Wedding cakes are different: 25% of the order price is "
+           "kept, and only anything paid above that 25% is refunded."),
     criteria="""Says a month out is more than 7 days, so anything the customer
     paid above 25% of the order price is refunded and the 25% is kept. Adding
     "if you only paid the 25% minimum, there's nothing to refund" is fine.
