@@ -75,7 +75,7 @@ faq:
   # prompt then told the bot "each day" while the document said Wednesdays
   # and Saturdays, and every gluten-free answer ended in a phone referral.
   - question: "Do you have gluten-free options?"
-    answer: "Yes: gluten-free vanilla and chocolate sponge cakes, and gluten-free muffins, made to order with 96 hours' notice. We also bake dedicated gluten-free batches on Wednesdays and Saturdays. Our kitchen handles wheat daily, so we can't guarantee against cross-contamination."
+    answer: "Yes: gluten-free vanilla and chocolate sponge cakes, and gluten-free muffins, made to order with 96 hours' notice. Gluten-free muffins are not part of the daily selection, and our Wednesday and Saturday gluten-free batch days don't change that. Our kitchen handles wheat daily, so we can't guarantee against cross-contamination."
   - question: "How much notice do you need for a custom cake?"
     answer: "We ask for at least 72 hours' notice on custom cakes, and 2 weeks for wedding cakes."
   # The $15 fee was missing, so "do you deliver?" read as free delivery.

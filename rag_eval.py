@@ -151,7 +151,11 @@ TESTS = {
         # "50%" is the deposit SIZE, not the cancellation policy. A complete,
         # correct policy summary failed on it (2026-09-24) once the section
         # stopped opening with "Custom cakes require a 50% deposit".
-        ("what's your cancellation policy",       "Deposits",          ["7 days", "forfeit"]),
+        # The substance, not one word: "you lose it" / "the whole deposit is
+        # gone" is a correct answer that failed on "forfeit" (2026-09-29).
+        ("what's your cancellation policy",       "Deposits",
+         ["7 days", ("forfeit", "lose it", "lose the deposit", "lose your deposit",
+                     "deposit is gone", "keep the deposit", "not refunded")]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
         ("do you sell coffee beans",                "ANSWER_ONLY",       DECLINE),
