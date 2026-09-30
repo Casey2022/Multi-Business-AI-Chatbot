@@ -3,9 +3,10 @@
 ## Pizza Sizes and Prices (Topics: pizza, size, small, medium, large, price)
 Our pizzas come in three sizes: 10-inch personal at $11, 14-inch
 medium at $17, and 18-inch large at $22. Toppings are $1.75 each on a
-personal, $2.25 on a medium, $2.75 on a large. A 10-inch gluten-free
-crust is available for $3 extra. Sicilian square pan is 16x16 for $26
-and takes an extra ten minutes in the oven.
+personal, $2.25 on a medium, $2.75 on a large. Gluten-free crust comes
+in the 10-inch size only, for $3 extra; we can't make a medium or large
+gluten-free. Sicilian square pan is 16x16 for $26 and takes an extra
+ten minutes in the oven.
 
 ## Toppings (Topics: toppings, pepperoni, veggie, meat, cheese)
 Meats: pepperoni, sausage, bacon, ham, meatball, grilled chicken,
