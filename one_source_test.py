@@ -100,6 +100,18 @@ def main():
     check("bootstrap warns on a leftover faq: block",
           'config.get("faq")' in app_src and "still has a faq: block" in app_src)
 
+    heading("rules kept as data aren't also kept as prose")
+    import policy
+    for path in sorted((ROOT / "config").glob("*.yaml")):
+        data = yaml.safe_load(path.read_text()) or {}
+        if not policy.cancellation(data):
+            continue
+        doc_path = ROOT / "documents" / path.stem / "services.md"
+        doc = doc_path.read_text().lower() if doc_path.exists() else ""
+        check(f"{path.stem}: cancellation rules only in policies:, not the document",
+              "## deposits" not in doc and "forfeit" not in doc
+              and "refunded" not in doc)
+
     heading("the facts that only lived in an FAQ are in the documents")
     for slug, head, needles in FOLDED:
         chunk = section(slug, head)

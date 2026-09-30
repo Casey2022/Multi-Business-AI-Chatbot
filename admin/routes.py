@@ -342,6 +342,7 @@ def settings(business_id):
     # controls are the only settings whose effect depends on something the
     # owner can't see or set, so they're the only ones that have to say so.
     from geocode import key_configured
+    from policy import policy_text
     return render_template(
         "admin/settings.html",
         address_check_ready = key_configured(),
@@ -349,6 +350,10 @@ def settings(business_id):
         offered_services    = config.get("services") or [],
         business = business,
         config   = config,
+        # Rules kept as data (policy.py), shown read-only: the owner should
+        # see exactly what the assistant applies, and the Knowledge page no
+        # longer has them.
+        policy_lines = policy_text(config).splitlines(),
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
         max_extra_questions = MAX_EXTRA_QUESTIONS,

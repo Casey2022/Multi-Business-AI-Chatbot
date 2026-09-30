@@ -115,6 +115,19 @@
       base</a>. Add or edit a section there and press Publish.</p>
   </div>
 
+  {% if policy_lines %}
+  <div class="card">
+    <div class="card-title">{{ policy_lines[0].rstrip(':') }}</div>
+    <p class="hint">Set up with your operator. The assistant applies these
+      rules exactly, working out the timing itself, so it never has to
+      interpret wording. To change them, ask your operator.</p>
+    <ul>
+      {% for line in policy_lines[1:] %}<li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <div class="card">
     <div class="card-title">Booking</div>
 

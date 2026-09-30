@@ -51,19 +51,6 @@ muffins in the case. Gluten-free muffins are made to order only, with 96
 hours' notice, whatever the day. Customers with severe allergies should call to discuss
 before ordering.
 
-## Deposits and Cancellation
-Deposits: custom cakes 50% at ordering; wedding cakes at least 25% of
-the order price.
-Custom cake cancelled more than 7 days before the order date: the
-deposit comes back in full.
-Wedding cake cancelled more than 7 days before: 25% of the order price
-is kept, and only what was paid above that 25% is refunded. A customer
-who paid just the 25% minimum gets nothing back.
-Any cake cancelled less than 7 days before, wedding cakes included: the
-whole deposit is forfeited. Nothing comes back, however much was paid.
-Any cake cancelled less than 48 hours before: the full order price is
-charged.
-
 ## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
 We bake a rotating daily selection of muffins, scones, croissants, and
 danishes. Standard muffin flavors are blueberry, banana nut, lemon poppyseed,

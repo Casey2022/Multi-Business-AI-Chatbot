@@ -17,6 +17,37 @@ services:
   - "cupcake orders (dozen minimum)"
   - "pastry trays for events"
 
+# Deposits and cancellation, as data (2026-09-30). This is the ONLY copy:
+# the knowledge document's "Deposits and Cancellation" section was removed.
+# policy.py renders the text the bot reads from these numbers, and the
+# cancellation_outcome tool applies them, so the model never has to work out
+# which window "three days before" falls in, or what 25% of what is kept.
+# A week of rewording the prose section moved the wrong answer from one
+# question to another; see notes/conversation_defects.md.
+#
+# Windows: a cancellation falls in the first window whose at_least_hours it
+# reaches. Exactly 7 days before counts as "7 days or more" (the old text
+# said "more than 7" and "less than 7" and left exactly 7 to guess).
+# Outcomes: refund_deposit, forfeit_deposit, charge_full_price,
+# {keep_percent: N} (N% of the order price kept, the rest of what was paid
+# refunded).
+policies:
+  cancellation:
+    title: "Deposits and cancellation"
+    what: "cake"
+    before: "the order date"
+    deposits:
+      custom cake:  {percent: 50, when: "paid at ordering"}
+      wedding cake: {min_percent: 25}
+    windows:
+      - at_least_hours: 168          # 7 days
+        custom cake: refund_deposit
+        wedding cake: {keep_percent: 25}
+      - at_least_hours: 48
+        any: forfeit_deposit
+      - at_least_hours: 0
+        any: charge_full_price
+
 calendar:
   enabled: true
   calendar_id: "2d9f6f7490b6cbdc8c6b25021ec393b12b21264b8d369861fbc6a45122c79a11@group.calendar.google.com"

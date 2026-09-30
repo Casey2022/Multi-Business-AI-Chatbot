@@ -7,8 +7,11 @@
 #
 # Config is passed explicitly per-request — no module-level CONFIG global.
 
+import json
 import os
 import re
+
+import policy
 from anthropic import Anthropic
 from config import substitute
 from rag import retrieve, RetrievalUnavailable
@@ -371,6 +374,11 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
                 f"has been placed, confirmed, or scheduled. A {noun} only exists "
                 f"once the booking flow has run."
             )
+    # Rule arithmetic (notice periods, cancellation windows) is done by
+    # tools in policy.py; this says when to call them, plus the business's
+    # rendered cancellation rules if it has any.
+    policy_rules = policy.prompt_section(config)
+
     # Combine universal guardrails with channel-specific ones.
     # The isinstance check keeps backwards-compat with older YAML configs
     # that had guardrails as a single string rather than a dict.
@@ -431,7 +439,7 @@ Answering rules that apply whatever the persona says:
   that we do. If the customer asks whether we make, sell or offer something
   and neither the services list nor the excerpts name it, don't say yes:
   say it isn't something you can confirm we offer, and give the phone
-  number.
+  number.{policy_rules}
 
 Behavioral rules: {guardrails_text}"""
 
@@ -657,6 +665,55 @@ def unavailable_reply(config):
             f"minute, {reach}.")
 
 
+# A question needs one tool call, occasionally two (a notice check and a
+# cancellation in one message). A model still asking after this many rounds
+# is looping, and the last round forbids tools so it has to answer.
+MAX_TOOL_ROUNDS = 3
+
+
+def _as_param(block):
+    """A response content block, as the API accepts it back in `messages`."""
+    dump = getattr(block, "model_dump", None)
+    if dump:
+        return dump(exclude_none=True)
+    fields = {k: v for k, v in vars(block).items() if not k.startswith("_")}
+    return fields
+
+
+def _reply_using_tools(call, config, now):
+    """Call the model, run any policy tools it asks for, return its answer.
+
+    The model does the reading and the phrasing; policy.run_tool does the
+    arithmetic. A tool result is data, returned as JSON, never instructions.
+    Text the model writes alongside a tool call ("let me check") is dropped:
+    only the answer written after the result reaches the customer.
+    """
+    messages = list(call["messages"])
+    for round_ in range(MAX_TOOL_ROUNDS + 1):
+        call["messages"] = messages
+        if round_ == MAX_TOOL_ROUNDS:
+            call["tool_choice"] = {"type": "none"}
+        response = _create(**call)
+        _note_usage(response, "Q&A reply" if not round_ else "Q&A reply, after a tool")
+        uses = [b for b in response.content
+                if getattr(b, "type", None) == "tool_use"]
+        if not uses or round_ == MAX_TOOL_ROUNDS:
+            return text_of(response)
+        results = []
+        for use in uses:
+            result = policy.run_tool(use.name, use.input, config, now)
+            log.info("Tool %s: %s", use.name,
+                     "error" if "error" in result else "ok")
+            log.debug("Tool %s(%s) -> %s", use.name, use.input, result)
+            results.append({"type": "tool_result", "tool_use_id": use.id,
+                            "content": json.dumps(result)})
+        messages = messages + [
+            {"role": "assistant",
+             "content": [_as_param(b) for b in response.content]},
+            {"role": "user", "content": results},
+        ]
+
+
 def get_llm_reply(message, history=None, config=None, channel="sms",
                   mid_booking=False, temperature=None, now=None):
     """Send the customer's message to Claude with full context and return reply.
@@ -736,13 +793,16 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     messages.append({"role": "user", "content": message})
 
     try:
-        call = dict(max_tokens=200,
-                    system=effective_system, messages=messages)
+        call = dict(max_tokens=200, system=effective_system,
+                    messages=messages, tools=policy.tools_for(config))
         if temperature is not None:
             call["temperature"] = temperature
-        response = _create(**call)
-        _note_usage(response, "Q&A reply")
-        reply = text_of(response)
+        reply = _reply_using_tools(call, config, now)
+        if not reply:
+            # Every round spent on tool calls and nothing said. Rare, but a
+            # blank bubble is worse than an honest "try again".
+            log.warning("No reply text after tool use")
+            return unavailable_reply(config)
         log.debug(f"Claude replied: {reply!r}")
         return without_repeated_number(reply, history, message, config)
 

@@ -726,3 +726,42 @@ paid just the 25% minimum gets nothing back.
 Lesson, again: a rewrite that fixes one row can break its neighbour. Diff
 the old and new wording word by word and ask what each dropped word was
 doing.
+
+## Rule arithmetic moved into code: `policy.py` (2026-09-30)
+
+Thirteen Sunrise runs in one day: the two deposit rows passed together in
+five. Each rewording fixed one and broke the other ("differs between the
+two", "25% or less, you get it all back", "75% of what you paid above"),
+and "it depends whether it was custom or wedding" is the same hedge the
+2026-09-23 notes recorded. The 6pm muffins row failed 6 of 8 calling 14
+hours "just under" 24. Sonnet 5 had failed the same family on other rows.
+Not a wording problem: the model doing arithmetic on rules.
+
+The split now is a cashier and a till. The model reads what the customer
+wants and phrases the answer; code does the sums, through two tools:
+
+- **`check_notice(needed_by, notice_hours, what)`**, offered at every
+  business. The notice still comes from the document (the model reads
+  "24 hours' notice" and passes 24), so there's no second copy; only the
+  subtraction moved. Returns hours available, met or missed, by how much,
+  the order-by time and the earliest-ready time, and a sentence to answer
+  from ("the notice is missed by 10 hours: it can't be promised").
+- **`cancellation_outcome(hours_before | days_before, kind?, amount_paid?,
+  order_price?)`**, offered where `policies.cancellation` exists (Sunrise).
+  The rules are data in the YAML: deposits per kind, windows by
+  `at_least_hours`, outcomes (`refund_deposit`, `forfeit_deposit`,
+  `charge_full_price`, `{keep_percent: 25}`). The prompt's text is rendered
+  from the same data, and the document's deposits section is gone, so it
+  stays one copy (`one_source_test.py`). Given amounts, it does the money:
+  $200 paid on $600, a month out, wedding: $50 back, $150 kept.
+
+`llm._reply_using_tools` runs the loop: at most `MAX_TOOL_ROUNDS` (3) tool
+rounds, the last forbids tools, a blank result becomes "try again", and a
+bad call reaches the model as an error it can recover from. Owners see the
+rules read-only on Settings. `policy_test.py` (69 checks) pins windows and
+their boundaries, amounts, notice arithmetic, the rendered text the rubrics
+quote, and the loop against a fake model; breaking the boundary rule or the
+tool result makes it fail.
+
+Decided in passing: exactly 7 days before counts as "7 days or more". The
+old text said "more than 7" and "less than 7" and left exactly 7 unsaid.

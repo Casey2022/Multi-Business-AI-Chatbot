@@ -8,13 +8,13 @@ that text, not which words it must use.
 from judge import Rubric
 
 DEPOSIT_THREE_DAYS = Rubric(
-    # Reworded 2026-09-30: the line used to end "for a wedding cake that
-    # includes anything paid above 25%", and the model echoed "above 25%"
-    # as a refund in three runs out of three. Each rule now names its cake
-    # AND its window, and this one says outright that nothing comes back.
-    quote=("Any cake cancelled less than 7 days before, wedding cakes included: "
-           "the whole deposit is forfeited. Nothing comes back, however much "
-           "was paid."),
+    # 2026-09-30: the rules are data now (policies.cancellation, rendered by
+    # policy.py) and the bot applies them with the cancellation_outcome tool.
+    # A week of rewording the prose moved the wrong answer between this row
+    # and WEDDING_CANCEL_MONTH_OUT without ever fixing both.
+    quote=("Cancelled between 48 hours and 7 days before the order date: the "
+           "whole deposit is forfeited and none of it comes back, for every "
+           "cake."),
     criteria="""States the policy that cancelling less than 7 days before
     means the deposit is forfeited, and applies it: three days is inside that
     window, so the deposit is not refunded. This holds for ANY cake, wedding
@@ -25,16 +25,11 @@ DEPOSIT_THREE_DAYS = Rubric(
     comes back when cancelling inside 7 days.""")
 
 WEDDING_CANCEL_MONTH_OUT = Rubric(
-    # Reworded 2026-09-29: "a custom cake deposit is refunded in full; for a
-    # wedding cake, ..." had the model promise a full wedding refund in four
-    # runs out of four. The exception now opens its own sentence.
-    # 2026-09-30: the 8fdca25 rewrite dropped "only" ("only anything paid
-    # above that 25%"), and the model inverted it three runs in three: "if
-    # your deposit was 25% or less, you'd get it all back". The minimum
-    # case is now stated outright.
-    quote=("Wedding cake cancelled more than 7 days before: 25% of the order "
-           "price is kept, and only what was paid above that 25% is refunded. "
-           "A customer who paid just the 25% minimum gets nothing back."),
+    # 2026-09-30: rendered from policies.cancellation (see DEPOSIT_THREE_DAYS).
+    quote=("Cancelled 7 days or more before the order date: custom cake, the "
+           "deposit comes back in full; wedding cake, 25% of the order price is "
+           "kept, and only what was paid above that 25% is refunded; someone "
+           "who paid just the 25% minimum gets nothing back."),
     criteria="""Says a month out is more than 7 days, so anything the customer
     paid above 25% of the order price is refunded and the 25% is kept. Adding
     "if you only paid the 25% minimum, there's nothing to refund" is fine.

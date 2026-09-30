@@ -158,7 +158,10 @@ TESTS = {
         # stopped opening with "Custom cakes require a 50% deposit".
         # The substance, not one word: "you lose it" / "the whole deposit is
         # gone" is a correct answer that failed on "forfeit" (2026-09-29).
-        ("what's your cancellation policy",       "Deposits",
+        # "ANSWER_ONLY" since 2026-09-30: the deposit rules moved out of the
+        # document into policies.cancellation (policy.py), so there is no
+        # section to retrieve. The answer is still scored.
+        ("what's your cancellation policy",       "ANSWER_ONLY",
          ["7 days", ("forfeit", "lose it", "lose the deposit", "lose your deposit",
                      "deposit is gone", "keep the deposit", "not refunded")]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
@@ -335,7 +338,7 @@ HARD = {
         ("cheapest way to feed twenty people at a morning meeting",
                                                   "Pastry Trays",      "$140"),
         ("I cancelled three days before, do I get my deposit back",
-                                                  "Deposits",          rubrics.DEPOSIT_THREE_DAYS),
+                                                  "ANSWER_ONLY",       rubrics.DEPOSIT_THREE_DAYS),
         # The assistant answered "a few gluten-free pastries available most
         # days", which the documents contradict three separate times: the
         # sponge needs 96 hours, the dedicated batches are Wednesdays and
@@ -355,7 +358,7 @@ HARD = {
         # Trap: "full refund" is the wrong half — 25% of a wedding deposit
         # is non-refundable however early you cancel.
         ("if I cancel my wedding cake a month out do I get my deposit back",
-                                                  "Deposits",          rubrics.WEDDING_CANCEL_MONTH_OUT),
+                                                  "ANSWER_ONLY",       rubrics.WEDDING_CANCEL_MONTH_OUT),
         ("I'd like to order a wedding cake for next weekend",
                                                   "Wedding Cakes",     rubrics.WEDDING_NEXT_WEEKEND),
         # The clock is in the question because the prompt carries the date
@@ -525,6 +528,15 @@ def validate_tests():
             problems.append(f"{slug}: no documents/{slug}/services.md")
             continue
         document = path.read_text(encoding="utf-8")
+        # Rules kept as data (policies: in the YAML) are part of what the
+        # business says; the bot reads them as rendered by policy.py.
+        config_path = Path("config") / f"{slug}.yaml"
+        if config_path.exists():
+            import yaml
+            import policy
+            rules = policy.policy_text(yaml.safe_load(config_path.read_text()))
+            if rules:
+                document += "\n\n" + rules
         lowered  = document.lower()
         headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", document, re.M)]
 
