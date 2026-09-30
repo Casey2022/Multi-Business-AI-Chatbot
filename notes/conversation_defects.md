@@ -765,3 +765,27 @@ tool result makes it fail.
 
 Decided in passing: exactly 7 days before counts as "7 days or more". The
 old text said "more than 7" and "less than 7" and left exactly 7 unsaid.
+
+### First eval of the tools: two fixes (2026-09-30)
+
+What worked: 6pm muffins and gluten-free Wednesday passed every run (the
+tool's "missed by 10 hours: can't be promised" reached the reply), and
+conversations 12/12, Q&A 4/4. What didn't:
+
+- **Both deposit rows asked instead of answering**: "What kind of cake?
+  How much did you pay?" The tool offered optional amount_paid /
+  order_price and promised an "exact outcome", so the model collected
+  inputs first. Amounts are out of the schema (the function still handles
+  them), and the rule says to call it straight away without asking.
+- **Tools on every question moved unrelated answers** (Belmont's patch test
+  lost "48 hours"; Ridgeline read "how long until I get the quote" as an
+  order lookup) and cost ~60% more input tokens a run ($0.30 → $0.44). Now
+  offered, with their rules and the rendered policy, only to a message that
+  names a time or (where there are cancellation rules) mentions cancelling,
+  refunds or deposits: `policy.needs_tools`. Every other prompt is
+  byte-identical to before the tools (`policy_test.py` checks, and fails if
+  the gate is removed). Same lesson as the referral rule, learned twice now.
+
+Known gap: a deposit question with none of those words ("what if I change
+my mind about the cake?") doesn't get the policy text, so the bot won't
+know the rules and should say so.

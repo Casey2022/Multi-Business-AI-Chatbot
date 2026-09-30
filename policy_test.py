@@ -170,25 +170,44 @@ def main():
                                      yaml_config("bobs_plumbing")))
     check("an unknown tool: error", "error" in policy.run_tool("rm_rf", {}, cfg))
 
-    heading("the prompt says when to use them")
+    heading("which questions get the tools")
+    gets = lambda q, slug="sunrise_bakery_and_cafe": policy.needs_tools(q, yaml_config(slug))
+    for q in ("it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow",
+              "it's Wednesday, can I pop in today and grab a gluten free muffin",
+              "I cancelled three days before, do I get my deposit back",
+              "if I cancel my wedding cake a month out do I get my deposit back",
+              "my kid wants a themed cake for Saturday and it's Friday",
+              "it's Friday at five and I need food for twenty people"):
+        check(f"tools: {q[:50]}", gets(q))
+    for q in ("do I need a patch test", "how long until I get the quote",
+              "how soon can you start", "how much notice for a custom cake",
+              "are you open Mondays", "do you make cookies"):
+        check(f"no tools: {q}", not gets(q))
+    check("'cancel' alone gets tools only where there are cancellation rules",
+          gets("can I cancel?") and not gets("can I cancel?", "bobs_plumbing"))
+    schema = policy.cancellation_tool(cfg)["input_schema"]["properties"]
+    check("the tool doesn't offer amounts (they made the model ask for them)",
+          "amount_paid" not in schema and "order_price" not in schema)
+
+    heading("the prompt says when to use them, only when they're offered")
     helpers._load_scheduler()
     import llm
     from config import load_config
+    flat = lambda s: " ".join(s.split())      # rules are line-wrapped
     sunrise = load_config(str(ROOT / "config" / "sunrise_bakery_and_cafe.yaml"))
     bobs = load_config(str(ROOT / "config" / "bobs_plumbing.yaml"))
-    flat = lambda s: " ".join(s.split())      # rules are line-wrapped
-    p_sun = llm.build_system_prompt(sunrise, now=TUE_6PM)
-    p_bob = llm.build_system_prompt(bobs, now=TUE_6PM)
-    check("Sunrise prompt carries the rendered rules", text in p_sun)
-    check("Sunrise prompt says to call cancellation_outcome",
-          "call cancellation_outcome" in flat(p_sun))
-    check("every prompt says to call check_notice",
-          "call check_notice" in flat(p_sun) and "call check_notice" in flat(p_bob))
-    check("Bob's prompt has no cancellation rules",
-          "cancellation_outcome" not in p_bob and "Deposits and cancellation" not in p_bob)
-    check("mid-booking prompts get the rules too",
-          "call cancellation_outcome" in
-          flat(llm.build_system_prompt(sunrise, mid_booking=True, now=TUE_6PM)))
+    check("the standing prompt has no tool rules or policy text",
+          "check_notice" not in llm.build_system_prompt(sunrise, now=TUE_6PM)
+          and text not in llm.build_system_prompt(sunrise, now=TUE_6PM))
+    sec_sun, sec_bob = flat(policy.prompt_section(sunrise)), flat(policy.prompt_section(bobs))
+    check("Sunrise's section carries the rendered rules",
+          flat(text) in sec_sun and "call cancellation_outcome" in sec_sun)
+    check("it says not to ask for the kind or amount first",
+          "Don't ask which kind of cake or how much they paid" in sec_sun)
+    check("every business's section says to call check_notice",
+          "call check_notice" in sec_sun and "call check_notice" in sec_bob)
+    check("Bob's section has no cancellation rules",
+          "cancellation_outcome" not in sec_bob and "Deposits" not in sec_bob)
 
     heading("the tool loop, against a fake model")
     real = (llm._create, llm.retrieve)
@@ -223,6 +242,9 @@ def main():
         check("tools offered on the first call",
               {t["name"] for t in sent[0]["tools"]} ==
               {"check_notice", "cancellation_outcome"})
+        check("with their rules and the policy in the system prompt",
+              "call cancellation_outcome" in flat(sent[0]["system"])
+              and flat(text) in flat(sent[0]["system"]))
         results = sent[1]["messages"][-1]["content"]
         check("the second call carries the tool result for t1",
               results[0]["type"] == "tool_result" and
@@ -241,6 +263,10 @@ def main():
         got = llm.get_llm_reply("when are you open", [], sunrise, now=TUE_6PM)
         check("no tool asked for: one call, answer as written",
               len(sent) == 1 and got == "We're open 7am to 3pm.")
+        check("an unrelated question gets no tools",
+              "tools" not in sent[0])
+        check("and exactly the standing prompt, nothing added",
+              sent[0]["system"] == llm.build_system_prompt(sunrise, now=TUE_6PM))
 
         sent.clear()
         loop = [reply(use_block(f"t{i}", "check_notice",
@@ -261,7 +287,7 @@ def main():
             reply(use_block("t1", "check_notice", {"needed_by": "whenever",
                                                   "notice_hours": 24, "what": "x"})),
             reply(text_block("Could you tell me the day and time?"))])
-        got = llm.get_llm_reply("muffins soon?", [], sunrise, now=TUE_6PM)
+        got = llm.get_llm_reply("muffins by 8am tomorrow?", [], sunrise, now=TUE_6PM)
         payload = json.loads(sent[1]["messages"][-1]["content"][0]["content"])
         check("a bad tool call reaches the model as an error it can recover from",
               "error" in payload and got.startswith("Could you"), payload)

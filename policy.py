@@ -330,8 +330,10 @@ def cancellation_tool(config):
             "cancellation. Use it whenever the customer asks what happens if "
             "they cancel, or whether they get a deposit back, and says or "
             "implies how far ahead (three days before, a month out, "
-            "tomorrow). Returns the exact outcome and a sentence to base the "
-            "answer on; don't recompute or soften it."),
+            "tomorrow). Call it straight away with the timing they gave: it "
+            "needs nothing else, so never ask which kind or how much they "
+            "paid first. Answer from the sentence it returns; don't "
+            "recompute or soften it."),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -344,17 +346,50 @@ def cancellation_tool(config):
                     "description": "The same in days, if that's how they "
                                    "said it (a month = 30). Give one of the "
                                    "two."},
+                # No amount_paid / order_price here, though
+                # cancellation_outcome can use them: offered, they had the
+                # model ask "how much did you pay?" instead of answering
+                # (rag_eval, 2026-09-30, both deposit rows, every run).
                 "kind": {
                     "type": "string", "enum": _kinds(policy),
                     "description": f"Which kind of {what}, only if the "
-                                   f"customer said. Leave it out otherwise."},
-                "amount_paid": {"type": "number",
-                                "description": "Deposit paid, if they said."},
-                "order_price": {"type": "number",
-                                "description": "Order total, if they said."},
+                                   f"customer already said. Leave it out "
+                                   f"otherwise: the result then covers "
+                                   f"every kind."},
             },
         },
     }
+
+
+# Tools, and the rules for using them, are offered only to a message that
+# needs them: one that names a time, or asks about cancelling. Offered on
+# every question (71212cc) they cost ~60% more input tokens a run, and the
+# extra rules moved answers that had nothing to do with them (Belmont's
+# patch test lost "48 hours"; Ridgeline read "how long until I get the
+# quote" as an order lookup). Same lesson as llm.REFERRAL_RULE: every
+# other prompt stays exactly what it was.
+_DAYS = r"(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?s?"
+_TIME_NAMED = re.compile(
+    r"\b(?:today|tonight|tomorrow|tmrw|this (?:morning|afternoon|evening)"
+    r"|noon|midnight|asap|right now|same[- ]day|weekend"
+    r"|(?:this|next|coming) (?:week|month)"
+    # A weekday only as a deadline or today's date ("for Saturday", "it's
+    # Friday"), not "are you open Mondays".
+    rf"|(?:by|on|for|until|till|this|next|it'?s|it is|before) {_DAYS}"
+    r"|\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)"
+    r"|at (?:\d{1,2}(?::\d{2})?|one|two|three|four|five|six|seven|eight"
+    r"|nine|ten|eleven|twelve)\b"
+    r"|in (?:\d+|a|an|one|two|three|four|five|six) (?:hours?|days?|weeks?)"
+    r"|(?:\d+|one|two|three|four|five|six|seven|a) (?:hours?|days?|weeks?|months?) "
+    r"(?:before|out|ahead|away|from now))\b", re.I)
+_ABOUT_CANCELLING = re.compile(r"\b(?:cancel\w*|refund\w*|deposits?)\b", re.I)
+
+
+def needs_tools(message, config):
+    """Does this message get the policy tools (and the rules for them)?"""
+    text = message or ""
+    return bool(_TIME_NAMED.search(text)
+                or (cancellation(config) and _ABOUT_CANCELLING.search(text)))
 
 
 def tools_for(config):
@@ -371,8 +406,8 @@ def _rule(text):
 
 
 def prompt_section(config):
-    """Rules (and rendered policy) to append to the answering rules."""
-    text = _rule(
+    """Rules (and rendered policy) added to the prompt with the tools."""
+    text = "\n\nRules for this question, on top of the answering rules:" + _rule(
         "When the customer names a time they need something by and the facts "
         "give a notice period for it, call check_notice and answer from its "
         "result: say plainly whether the notice is met, and if it isn't, that "
@@ -384,10 +419,12 @@ def prompt_section(config):
         what = policy.get("what", "order")
         text += _rule(
             "For a question about cancelling, refunds or getting a deposit "
-            "back, call cancellation_outcome when they've said or implied how "
-            "far ahead, and answer from its result. If it says the outcome is "
-            f"the same for every {what}, say so; don't ask which kind. With no "
-            "timing given, state the rules below.")
+            "back, call cancellation_outcome straight away when they've said "
+            "or implied how far ahead, and answer from its result: state the "
+            "rule and what it means for them. Don't ask which kind of "
+            f"{what} or how much they paid before answering. If the result "
+            f"is the same for every {what}, say so. With no timing given, "
+            "state the rules below.")
         text += "\n\n" + policy_text(config)
     return text
 

@@ -374,11 +374,6 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
                 f"has been placed, confirmed, or scheduled. A {noun} only exists "
                 f"once the booking flow has run."
             )
-    # Rule arithmetic (notice periods, cancellation windows) is done by
-    # tools in policy.py; this says when to call them, plus the business's
-    # rendered cancellation rules if it has any.
-    policy_rules = policy.prompt_section(config)
-
     # Combine universal guardrails with channel-specific ones.
     # The isinstance check keeps backwards-compat with older YAML configs
     # that had guardrails as a single string rather than a dict.
@@ -439,7 +434,7 @@ Answering rules that apply whatever the persona says:
   that we do. If the customer asks whether we make, sell or offer something
   and neither the services list nor the excerpts name it, don't say yes:
   say it isn't something you can confirm we offer, and give the phone
-  number.{policy_rules}
+  number.
 
 Behavioral rules: {guardrails_text}"""
 
@@ -751,6 +746,13 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # details". It now says only what it's for.
     if referred_recently(history, config):
         system_for_call += REFERRAL_RULE
+    # Rule arithmetic (notice periods, cancellation windows) is done by the
+    # tools in policy.py, offered only when the message needs them; so is
+    # the text saying when to call them, and the business's rendered
+    # cancellation rules.
+    tools = policy.tools_for(config) if policy.needs_tools(message, config) else []
+    if tools:
+        system_for_call += policy.prompt_section(config)
 
     # RAG retrieval: find document chunks relevant to this specific message.
     # retrieve() now takes config so it queries the right business collection.
@@ -793,8 +795,9 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     messages.append({"role": "user", "content": message})
 
     try:
-        call = dict(max_tokens=200, system=effective_system,
-                    messages=messages, tools=policy.tools_for(config))
+        call = dict(max_tokens=200, system=effective_system, messages=messages)
+        if tools:
+            call["tools"] = tools
         if temperature is not None:
             call["temperature"] = temperature
         reply = _reply_using_tools(call, config, now)
