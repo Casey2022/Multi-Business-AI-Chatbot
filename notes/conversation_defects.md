@@ -669,3 +669,26 @@ was checked by anything.
 Watch: the Sunrise gluten-free Wednesday row. Its FAQ had been rewritten
 to repeat "batch days don't change the muffin rule"; the document says the
 same, but the prompt no longer repeats it.
+
+### After the fold: two rows that fail every time (2026-09-30)
+
+Crosstown went 11/11 twice and gluten-free Wednesday passed twice once the
+documents said what the FAQ had been repeating. Two Sunrise rows failed
+three runs out of three, though:
+
+- **"Do you make cookies"** got "We do!" then a phone number. Every other
+  decline row passes; cookies is the one item a bakery plausibly makes.
+  The prompt already said "only state facts explicitly listed", and the
+  model didn't take "we're a bakery" as needing a listing. New answering
+  rule: being the kind of business that might make something is not
+  evidence that we do.
+- **Deposit, cancelled 3 days before** gave the wedding customer back
+  "anything above 25%". The under-7-days line ended "for a wedding cake
+  that includes anything paid above 25%" — the refund phrase from the
+  line above, repeated in the line that denies it. Rewritten so every rule
+  names its cake AND its window, and the under-7-days rule says "nothing
+  comes back, however much was paid".
+
+Same two rows broke when the referral rule was briefly a standing rule
+during the defect #6 work. They are the canaries for any standing-prompt change: when
+the prompt moves, run Sunrise twice before the full suite.

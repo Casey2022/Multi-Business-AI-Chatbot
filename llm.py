@@ -422,6 +422,11 @@ Answering rules that apply whatever the persona says:
   particular item is in, and one item's notice period is not another's.
 - "Usually can't" is an answer. If the documents say something usually
   isn't possible, say so first, then offer to check.
+- Being the kind of business that might make something is not evidence
+  that we do. If the customer asks whether we make, sell or offer something
+  and neither the services list nor the excerpts name it, don't say yes:
+  say it isn't something you can confirm we offer, and give the phone
+  number.
 
 Behavioral rules: {guardrails_text}"""
 

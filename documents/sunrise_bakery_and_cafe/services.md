@@ -54,13 +54,14 @@ before ordering.
 ## Deposits and Cancellation
 Deposits: custom cakes 50% at ordering; wedding cakes at least 25% of
 the order price.
-More than 7 days before the order date: a custom cake deposit comes
-back in full. Wedding cakes are different: 25% of the order price is
-kept, and only anything paid above that 25% is refunded.
-Less than 7 days before: the whole deposit is forfeited, for any cake;
-for a wedding cake that includes anything paid above 25%.
-Less than 48 hours before: the full order price is charged, for any
-cake.
+Custom cake cancelled more than 7 days before the order date: the
+deposit comes back in full.
+Wedding cake cancelled more than 7 days before: 25% of the order price
+is kept, and anything paid above that 25% is refunded.
+Any cake cancelled less than 7 days before, wedding cakes included: the
+whole deposit is forfeited. Nothing comes back, however much was paid.
+Any cake cancelled less than 48 hours before: the full order price is
+charged.
 
 ## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
 We bake a rotating daily selection of muffins, scones, croissants, and
