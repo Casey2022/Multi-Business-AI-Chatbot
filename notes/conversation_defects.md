@@ -79,7 +79,7 @@ the "treat the whole message as this slot's answer" fallback was added, the
 newer risk is the opposite: the question gets stored AS the answer. Both
 are wrong; confirm which happens now before designing the fix.
 
-## 6. Every miss becomes a phone number  (FIX IN — `3e07f51`; awaiting qa_eval on the real model)
+## 6. Every miss becomes a phone number  (FIXED — `3e07f51` + `204b77a` + `ab4ceab`)
 
 Four consecutive bakery answers ended with "give us a call". Individually
 correct, cumulatively a brush-off. Worth a rule about not repeating the
@@ -103,6 +103,23 @@ Fix, two layers (a prompt rule alone has been ignored before):
 `referral_test.py` covers the guard; `qa_eval.py` runs five-question
 conversations against the real model (number once, no back-to-back
 referrals, every reply says something).
+
+**How it went (2026-09-29), three rounds:**
+- `3e07f51`: the number stopped repeating, but qa_eval showed a second reply
+  still ending "Give us a call to set up a tasting!", a referral without
+  digits.
+- `204b77a`: a repeated "go call us" sentence is dropped too.
+- The first version put the rule in the standing prompt. rag_eval, which
+  asks single questions, dropped from 48/50 to 45/50: "do you make cookies"
+  became "We sure do! ... give us a call for details", and both
+  wedding-deposit rows regressed. The rule's advice for unknowns ("say it's
+  a detail the team would confirm") read as "claim it, defer the details".
+  `ab4ceab` adds the rule only once the conversation has referred, so the
+  standing prompt is byte-identical to before; Belmont went back to 10/10.
+- Final: qa_eval 3/3 scenarios clean x3; Sunrise 12/12 core.
+
+Lesson: a prompt rule meant for one situation belongs in the prompt only in
+that situation. Everywhere else it is noise the model will find a use for.
 
 ## 7. A question that looks like an answer is stored, not answered  (FIXED — `eda674e` + `ea17e59`)
 
