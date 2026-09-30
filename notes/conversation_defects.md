@@ -711,3 +711,18 @@ replies weren't:
 The conversation is now a qa_eval scenario, with a new per-reply check
 (`reply_must` / `reply_must_not`): no "yes" to cookies, no "can't take
 orders", and it has to say how to order.
+
+### The word "only" (2026-09-30)
+
+After `2b54445`: conversations 12/12 and qa_eval 4/4 (the live bakery
+conversation included), gluten-free Wednesday and the 3-day deposit passing
+every run. But "wedding cake a month out" failed three runs in three with
+"if your deposit was 25% or less, you'd get it all back" — the arithmetic
+inverted. The `8fdca25` rewrite had turned "only anything paid above that
+25% is refunded" into "anything paid above that 25% is refunded". One word.
+Restored, and the minimum case is now a sentence of its own: a customer who
+paid just the 25% minimum gets nothing back.
+
+Lesson, again: a rewrite that fixes one row can break its neighbour. Diff
+the old and new wording word by word and ask what each dropped word was
+doing.

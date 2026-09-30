@@ -28,8 +28,13 @@ WEDDING_CANCEL_MONTH_OUT = Rubric(
     # Reworded 2026-09-29: "a custom cake deposit is refunded in full; for a
     # wedding cake, ..." had the model promise a full wedding refund in four
     # runs out of four. The exception now opens its own sentence.
+    # 2026-09-30: the 8fdca25 rewrite dropped "only" ("only anything paid
+    # above that 25%"), and the model inverted it three runs in three: "if
+    # your deposit was 25% or less, you'd get it all back". The minimum
+    # case is now stated outright.
     quote=("Wedding cake cancelled more than 7 days before: 25% of the order "
-           "price is kept, and anything paid above that 25% is refunded."),
+           "price is kept, and only what was paid above that 25% is refunded. "
+           "A customer who paid just the 25% minimum gets nothing back."),
     criteria="""Says a month out is more than 7 days, so anything the customer
     paid above 25% of the order price is refunded and the 25% is kept. Adding
     "if you only paid the 25% minimum, there's nothing to refund" is fine.

@@ -57,7 +57,8 @@ the order price.
 Custom cake cancelled more than 7 days before the order date: the
 deposit comes back in full.
 Wedding cake cancelled more than 7 days before: 25% of the order price
-is kept, and anything paid above that 25% is refunded.
+is kept, and only what was paid above that 25% is refunded. A customer
+who paid just the 25% minimum gets nothing back.
 Any cake cancelled less than 7 days before, wedding cakes included: the
 whole deposit is forfeited. Nothing comes back, however much was paid.
 Any cake cancelled less than 48 hours before: the full order price is
