@@ -880,3 +880,26 @@ description now says it isn't for cancelling or moving.
   number), it's a question whatever the classifier says
   (`llm.answers_previous_question`). The costs are lopsided: wrongly to Q&A
   is one extra message, wrongly to booking traps the customer.
+
+## Order cutoffs: check_notice learns "order by 4pm on Fridays" (2026-10-03)
+
+Crosstown's "Friday at five, food for twenty" row failed 3 of 6 runs,
+sometimes offering a party tray tonight. The rule has two parts: three
+hours' notice, AND on Friday and Saturday nights the order by 4pm. The
+notice tool knew only the first.
+
+`check_notice` now takes `order_by` (HH:MM) and `order_by_days`. The cutoff
+applies on the day the order is FOR, only on the listed days (none: every
+day), and only if it's earlier than the time needed. The order-by time it
+reports is whichever comes first, notice or cutoff. Like notice_hours, the
+cutoff stays in the document (still one copy) and the model passes it in;
+code does the weekday logic and the comparison. Extending the existing tool
+rather than adding a third keeps the prompt the same size for every other
+question.
+
+The row was graded by keywords ("4pm" or "three hours"), which a reply
+offering a tray tonight could pass by mentioning either. Now a rubric
+(PARTY_TRAY_FRIDAY_FIVE): fails if it offers or implies a tray tonight.
+
+Not covered yet: business days (Ridgeline's quotes and estimate visits)
+and opening hours.

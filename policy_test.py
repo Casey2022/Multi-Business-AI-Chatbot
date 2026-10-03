@@ -90,6 +90,54 @@ def main():
     r = policy.check_notice("2026-09-23T18:00", 24, "muffins", now=TUE_6PM)
     check("exactly the notice is enough", r["enough_notice"] is True)
 
+    heading("order-by times: Crosstown's Friday trays")
+    FRI_5PM = datetime(2026, 9, 25, 17, 0)
+    trays = dict(order_by="16:00", order_by_days=["friday", "saturday"])
+    r = policy.check_notice("2026-09-25T17:00", 3, "party trays", now=FRI_5PM, **trays)
+    check("Friday 5pm, wanted now: not in time", r["enough_notice"] is False)
+    check("says the 4pm cutoff has passed",
+          "ordered by 4pm, and it's past 4pm now" in r["say"], r["say"])
+    check("and can't be promised", "can't be promised" in r["say"])
+    check("no 'earliest ready' time when a cutoff is involved (it could be "
+          "after the cutoff)", "earliest it can be ready" not in r["say"])
+    r = policy.check_notice("2026-09-25T20:00", 3, "party trays", now=FRI_5PM, **trays)
+    check("Friday 5pm for 8pm: notice met, cutoff passed: still no",
+          r["enough_notice"] is False and "which is met" in r["say"], r["say"])
+    r = policy.check_notice("2026-09-25T19:00", 3, "party trays",
+                            now=datetime(2026, 9, 25, 13, 0), **trays)
+    check("Friday 1pm for 7pm: fine, and the cutoff sets the order-by time",
+          r["enough_notice"] and r["order_by"] == "Friday, September 25 at 4:00 PM",
+          r)
+    r = policy.check_notice("2026-09-24T21:00", 3, "party trays",
+                            now=datetime(2026, 9, 24, 17, 0), **trays)
+    check("Thursday: the Friday/Saturday cutoff doesn't apply",
+          r["enough_notice"] and "cutoff" not in r, r)
+    check("plural day names are understood",
+          policy.check_notice("2026-09-25T17:00", 3, "trays", now=FRI_5PM,
+                              order_by="16:00", order_by_days=["Fridays"])
+          ["enough_notice"] is False)
+    check("a cutoff later than the time needed doesn't bind",
+          policy.check_notice("2026-09-25T15:00", 1, "trays",
+                              now=datetime(2026, 9, 25, 12, 0), **trays)
+          ["enough_notice"] is True)
+    check("no days listed: every day",
+          policy.check_notice("2026-09-24T21:00", 1, "an order", now=datetime(
+              2026, 9, 24, 20, 0), order_by="19:00")["enough_notice"] is False)
+    check("a bad order_by is an error result",
+          "error" in policy.run_tool("check_notice", {"needed_by": "2026-09-25T17:00",
+                                     "notice_hours": 3, "what": "x",
+                                     "order_by": "4pm"}, {}))
+    check("a bad weekday is an error result",
+          "error" in policy.run_tool("check_notice", {"needed_by": "2026-09-25T17:00",
+                                     "notice_hours": 3, "what": "x",
+                                     "order_by": "16:00", "order_by_days": ["fryday"]}, {}))
+    check("cutoff times are said the short way", policy.clock_time(
+        datetime(2026, 9, 25, 21, 45)) == "9:45pm" and policy.clock_time(
+        datetime(2026, 9, 25, 16, 0)) == "4pm")
+    check("without a cutoff, wording is unchanged (comma and all)",
+          ", so there is enough time" in policy.check_notice(
+              "2026-09-26T09:00", 72, "a custom cake", now=TUE_6PM)["say"])
+
     heading("cancellation windows: Sunrise's real rules")
     cfg = yaml_config("sunrise_bakery_and_cafe")
     out = lambda **k: policy.cancellation_outcome(cfg, **k)

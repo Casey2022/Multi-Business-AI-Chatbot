@@ -127,3 +127,16 @@ REPAIR_50_MILES = Rubric(
     ("close to home", "close to the shop", "outside our normal range" all
     pass). Fails if it agrees to do the job, or implies 50 miles is within
     range.""")
+
+
+PARTY_TRAY_FRIDAY_FIVE = Rubric(
+    # 2026-10-03: was the keywords ("4pm", "three hours"), which a reply
+    # offering a tray tonight could still pass by mentioning either.
+    quote=("Trays need at least three hours' notice, and on Friday and "
+           "Saturday nights we ask for the order by 4pm"),
+    criteria="""It's 5pm on Friday. Makes clear a party tray can't be ordered
+    for tonight, because the Friday order-by time of 4pm has passed (three
+    hours' notice also can't be met for anything wanted now). Suggesting
+    regular pizzas, wings or subs to feed the group instead is fine, and so
+    is offering a tray for another day. Fails if it offers or implies a party
+    tray for tonight, or never mentions the cutoff or the notice.""")

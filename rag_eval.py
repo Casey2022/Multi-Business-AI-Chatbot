@@ -435,7 +435,7 @@ HARD = {
         ("I'm about eight miles out, can you bring it to me",
                                                   "Delivery",          ("6 miles", "pickup", "can't", "cannot")),
         ("it's Friday at five and I need food for twenty people",
-                                                  "Party Trays",       ("4pm", "three hours")),
+                                                  "Party Trays",       rubrics.PARTY_TRAY_FRIDAY_FIVE),
         ("my daughter has celiac, is the gluten free crust safe for her",
                                                   "Allergens",         ("cannot", "shared", "call")),
         ("what time do you shut on a Sunday",     "Hours",             ("10pm", "9:45")),

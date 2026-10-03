@@ -78,12 +78,53 @@ def _parse_local(text):
     return moment.replace(tzinfo=None)
 
 
-def check_notice(needed_by, notice_hours, what, config=None, now=None):
-    """How much time there is before `needed_by`, against the notice needed.
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday",
+             "saturday", "sunday"]
+
+
+def clock_time(moment):
+    """ "4pm", "9:45pm": the way a cutoff is said."""
+    text = moment.strftime("%I:%M%p").lstrip("0").lower()
+    return text.replace(":00", "")
+
+
+def _cutoff_on(needed, order_by, order_by_days):
+    """The order-by moment that applies to an order needed at `needed`, or None.
+
+    "On Friday and Saturday nights we ask for the order by 4pm": the cutoff
+    is on the day the order is FOR, and only on the days listed (none listed:
+    every day). A cutoff later than the time it's needed doesn't bind.
+    """
+    if not order_by:
+        return None
+    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", str(order_by))
+    if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+        raise ValueError(f"order_by should be HH:MM (24-hour), not {order_by!r}")
+    days = [str(d).strip().lower() for d in (order_by_days or [])]
+    unknown = [d for d in days if d not in _WEEKDAYS and d.rstrip("s") not in _WEEKDAYS]
+    if unknown:
+        raise ValueError(f"order_by_days should be weekday names, not {unknown}")
+    days = [d if d in _WEEKDAYS else d.rstrip("s") for d in days]
+    if days and _WEEKDAYS[needed.weekday()] not in days:
+        return None
+    cutoff = needed.replace(hour=int(m.group(1)), minute=int(m.group(2)),
+                            second=0, microsecond=0)
+    return cutoff if cutoff <= needed else None
+
+
+def check_notice(needed_by, notice_hours, what, config=None, now=None,
+                 order_by=None, order_by_days=None):
+    """How much time there is before `needed_by`, against the notice needed,
+    and against an order-by time if the facts give one.
 
     Deliberately says nothing about opening hours: whether the shop is open
     at the moment the order would have to be placed is a separate question,
     and folding it in here would make this answer wrong in a new way.
+
+    order_by / order_by_days (2026-10-03): Crosstown's trays need three
+    hours' notice AND, on Friday and Saturday nights, ordering by 4pm. At
+    5pm on a Friday the bot offered a tray, 3 runs in 6. The cutoff stays in
+    the document (one copy); the model passes it in like notice_hours.
     """
     now = clock.business_now(config, now)
     needed = _parse_local(needed_by)
@@ -93,36 +134,60 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None):
     available = (needed - now).total_seconds() / 3600
     latest = needed - timedelta(hours=notice)
     earliest = now + timedelta(hours=notice)
+    cutoff = _cutoff_on(needed, order_by, order_by_days)
+    if cutoff is not None and cutoff < latest:
+        latest = cutoff
     what = (what or "this").strip()
+    in_time = available >= notice and (cutoff is None or now <= cutoff)
     result = {
         "now": when(now),
         "needed_by": when(needed),
         "hours_available": round(max(available, 0), 1),
         "notice_needed_hours": notice,
-        "enough_notice": available >= notice,
+        "enough_notice": in_time,
         "order_by": when(latest),
         "earliest_ready_if_ordered_now": when(earliest),
     }
+    cut = ""
+    if cutoff is not None:
+        result["cutoff"] = when(cutoff)
+        result["cutoff_passed"] = now > cutoff
+        day = _WEEKDAYS[needed.weekday()].capitalize()
+        cut = (f" For {day}, {what} must also be ordered by "
+               f"{clock_time(cutoff)}"
+               + (f", and it's past {clock_time(cutoff)} now." if now > cutoff
+                  else "."))
     if available < 0:
         result["say"] = (f"{when(needed)} has already passed; it's "
                          f"{when(now)} now.")
-    elif available >= notice:
+    elif in_time:
         result["say"] = (f"From now ({when(now)}) to {when(needed)} is "
                          f"{span(available)}. The notice for {what} is "
-                         f"{span(notice)}, so there is enough time if it's "
-                         f"ordered by {when(latest)}.")
+                         f"{span(notice)}, so there is "
+                         f"enough time if it's ordered by {when(latest)}."
+                         if not cut else
+                         f"From now ({when(now)}) to {when(needed)} is "
+                         f"{span(available)}. The notice for {what} is "
+                         f"{span(notice)}.{cut} So there is enough time if "
+                         f"it's ordered by {when(latest)}.")
     else:
-        result["short_by_hours"] = round(notice - available, 1)
+        if available < notice:
+            result["short_by_hours"] = round(notice - available, 1)
         gap = (f"It's {when(now)} now and it's wanted right away"
                if round(available * 60) <= 0 else
                f"From now ({when(now)}) to {when(needed)} is only "
                f"{span(available)}")
-        result["say"] = (f"{gap}. The notice for {what} is "
-                         f"{span(notice)}, so the notice is missed by "
-                         f"{span(notice - available)}: it can't be promised for "
+        if available < notice:
+            notice_part = (f"The notice for {what} is {span(notice)}, so the "
+                           f"notice is missed by {span(notice - available)}.")
+        else:
+            notice_part = f"The notice for {what} is {span(notice)}, which is met."
+        result["say"] = (f"{gap}. {notice_part}{cut} It can't be promised for "
                          f"{when(needed)}. To have it then, it needed ordering "
-                         f"by {when(latest)}. Ordered now, the earliest it can "
-                         f"be ready is {when(earliest)}.")
+                         f"by {when(latest)}."
+                         + ("" if cutoff is not None else
+                            f" Ordered now, the earliest it can be ready is "
+                            f"{when(earliest)}."))
     return result
 
 
@@ -353,6 +418,18 @@ CHECK_NOTICE_TOOL = {
             "what": {
                 "type": "string",
                 "description": "What it is, as the facts name it."},
+            "order_by": {
+                "type": "string",
+                "description": (
+                    "Only if the facts ALSO give a clock time it must be "
+                    "ordered by (\"order by noon on weekends\"): that time "
+                    "as HH:MM, 24-hour.")},
+            "order_by_days": {
+                "type": "array", "items": {"type": "string"},
+                "description": (
+                    "The weekdays that order-by time applies to, if the "
+                    "facts limit it (e.g. [\"saturday\", \"sunday\"]). "
+                    "Leave out if it applies every day.")},
         },
         "required": ["needed_by", "notice_hours", "what"],
     },
@@ -510,7 +587,8 @@ def prompt_section(config, which=("notice", "cancellation")):
             "facts give a notice period for it, call check_notice and answer "
             "from its result: say plainly whether the notice is met, and if it "
             "isn't, that it can't be promised for that time. Missed notice is "
-            "never \"just under\" or \"right at\" the window. With no time "
+            "never \"just under\" or \"right at\" the window. If the facts "
+            "also give an order-by time for it, pass that too. With no time "
             "named (\"how much notice for a cake?\"), state the notice and "
             "don't call it.")
     policy = cancellation(config)
@@ -538,7 +616,9 @@ def run_tool(name, arguments, config, now=None):
         if name == "check_notice":
             return check_notice(arguments.get("needed_by"),
                                 arguments.get("notice_hours"),
-                                arguments.get("what"), config, now)
+                                arguments.get("what"), config, now,
+                                order_by=arguments.get("order_by"),
+                                order_by_days=arguments.get("order_by_days"))
         if name == "cancellation_outcome" and cancellation(config):
             return cancellation_outcome(
                 config,
