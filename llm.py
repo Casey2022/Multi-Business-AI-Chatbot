@@ -234,6 +234,8 @@ Rules:
 - Include a key ONLY if this message clearly provides or changes that value.
 - Omit keys the message doesn't mention. Do not guess or invent values.
 - For "datetime", copy the customer's own phrasing (e.g. "next Friday at 3pm").
+- "It's <a day or time>" ("it's 5", "it's Friday at 5") is the customer
+  telling you when they're writing, not when they want it: not a datetime.
 - If the message provides nothing, respond with: {{}}
 - If the customer is CORRECTING a value that's already collected, return the
   COMPLETE updated value including any parts they didn't change. Example: if
@@ -528,6 +530,8 @@ Rules:
 - Always include "intent".
 - Include a slot key only if the message clearly provides that value.
 - For "datetime", copy the customer's own phrasing.
+- "It's <a day or time>" ("it's 5", "it's Friday at 5") is the customer
+  telling you when they're writing, not when they want it: not a datetime.
 
 Examples:
 Message: "how much are your cakes?"

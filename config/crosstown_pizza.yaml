@@ -9,10 +9,10 @@
 # Also the fastest clock in the set: 15-minute granularity, six orders in
 # the oven at once, and a "when do you want it" that usually means tonight.
 #
-# Known limitation, deliberately visible: extra questions are asked every
-# time, so this bot takes DELIVERY orders only — it can't skip the address
-# question for a pickup order. Conditional questions are the fix and they
-# don't exist yet; the knowledge base points pickup customers at the phone.
+# Known limitation, deliberately visible: this bot takes DELIVERY orders
+# only — it can't skip the address question for a pickup order. Pickup is
+# by phone (the knowledge base says so), and asking for pickup mid-order
+# leaves the order and answers that (booking.handled_elsewhere).
 
 business:
   name: "Crosstown Pizza Co."
@@ -125,6 +125,20 @@ booking:
   fallback_after_bad_date: "Sorry, I couldn't read that as a time. Try something like 'tonight at 7' or 'Friday at 6:30pm'."
   cancel_reply: "No worries — nothing ordered. Message anytime. 🍕"
   out_of_area_reply: "Ah — that address is outside our 6-mile delivery zone. You're always welcome to pick up at {address}, or call {phone} and we'll see what we can do."
+  # Things this chat can't take. Saying one mid-order leaves the order and
+  # the question is answered from the knowledge base. Live, 2026-10-03:
+  # "can I pick it up?" got "give us a ring" then "Where are we delivering
+  # to?" again.
+  handled_elsewhere:
+    - "pick up"
+    - "pick it up"
+    - "pick them up"
+    - "picking up"
+    - "picking it up"
+    - "pickup"
+    - "pick-up"
+    - "collect"
+    - "collection"
   extra_questions:
     - key: "service_address"
       prompt: "Where are we delivering to?"

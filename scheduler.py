@@ -570,8 +570,27 @@ _NOT_BOOKING = re.compile(
     r"\s+to\s+(?:know|ask)", re.I)
 
 
-def _leaving_booking(message):
-    return bool(_NOT_BOOKING.search(message or ""))
+def _handled_elsewhere(message, config):
+    """A thing this business's chat can't take, named in its config.
+
+    Crosstown's chat takes delivery orders; pickup is by phone. Live,
+    2026-10-03: "can I pick it up?" mid-order got "give us a ring" and then
+    "Where are we delivering to?" again. booking.handled_elsewhere lists the
+    phrases; saying one leaves the order, and the question is answered from
+    the knowledge base (which says how).
+    """
+    phrases = ((config or {}).get("booking") or {}).get("handled_elsewhere") or []
+    text = message or ""
+    for phrase in phrases:
+        pattern = r"\b" + r"\s+".join(map(re.escape, str(phrase).split())) + r"\b"
+        if re.search(pattern, text, re.I):
+            return True
+    return False
+
+
+def _leaving_booking(message, config=None):
+    return bool(_NOT_BOOKING.search(message or "")
+                or _handled_elsewhere(message, config))
 
 
 def _answer_outside_booking(phone, message, config, business_id, channel="sms"):
@@ -1257,7 +1276,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         )
 
     # --- Not an order at all: leave the flow and answer the question ---
-    if state == "collecting" and _leaving_booking(message):
+    if state == "collecting" and _leaving_booking(message, config):
         _save_state(phone, business_id, "idle", pending={})
         noun = BOOKING.get("noun", "appointment")
         answer = _answer_outside_booking(phone, message, config, business_id,

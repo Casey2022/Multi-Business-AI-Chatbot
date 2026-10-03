@@ -921,3 +921,31 @@ Saturation is a warning as much as a win: a 100% suite stops telling you
 anything. The live conversation of 2026-10-03 failed four ways while
 single questions scored 11/11. Next evidence comes from conversations,
 live use, and new hard rows, not from re-running this one.
+
+## Live, Crosstown (2026-10-03): pickup mid-order, and "it's Friday at 5"
+
+  cust  it's Friday at 5, I need food for 20 people
+  BOT   Happy to help — you mentioned Friday at 5. What are you after?
+  cust  pizza and wings / Pizza Paul
+  BOT   Where are we delivering to?
+  cust  can I pick it up?
+  BOT   For pickup, give us a ring at (585) 555-0177 ... Where are we
+        delivering to?
+
+The opening went to booking, not Q&A, which is fair (they want food, and
+pizza and wings aren't a tray). It also shows why rag_eval passed the same
+sentence: rag_eval calls the Q&A path directly and never meets routing.
+
+- **Pickup mid-order** answered correctly, then asked for the delivery
+  address again. Crosstown's chat is delivery-only and pickup is by phone.
+  `booking.handled_elsewhere` lists phrases this business's chat can't take
+  ("pick up", "pickup", "collect"...); saying one mid-order leaves the order
+  and answers from the knowledge base. Sunrise has none, since pickup is
+  normal there.
+- **"it's Friday at 5"** was filed as the delivery time. Both extraction
+  prompts now say "it's <day/time>" is when the customer is writing, not
+  when they want it.
+
+Second live conversation in a day that the single-question eval couldn't
+see. The gap is the full app path (rules → classifier → booking/Q&A); a
+conversation eval through it is now the most valuable test to build.

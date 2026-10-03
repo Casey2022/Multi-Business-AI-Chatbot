@@ -224,6 +224,50 @@ def main():
         (sched._answer_outside_booking, sched._answer_mid_booking,
          sched.extract_booking_slots) = real_s
 
+    heading("Crosstown, live: 'can I pick it up?' mid-order leaves the order")
+    pizza = load_config(str(ROOT / "config" / "crosstown_pizza.yaml"))
+    for text in ("can I pick it up?", "I'll pick up instead", "can I do pickup",
+                 "is pick-up ok?", "I'd rather collect it"):
+        check(f"Crosstown leaves: {text}", sched._leaving_booking(text, pizza))
+    for text in ("pizza and wings", "Pizza Paul", "12 Elm St", "as soon as possible",
+                 "pickles on the side"):
+        check(f"Crosstown stays: {text}", not sched._leaving_booking(text, pizza))
+    check("Sunrise, where pickup is normal, stays: 'can I pick it up?'",
+          not sched._leaving_booking("can I pick it up?", cfg))
+    real_s = (sched._answer_outside_booking, sched.extract_booking_slots)
+    sched._answer_outside_booking = lambda *a, **k: (
+        "For pickup, give us a ring at (585) 555-0177 — usually ready in 20 minutes.")
+    sched.extract_booking_slots = lambda *a, **k: {}
+    try:
+        phone, biz = "web_pizza", 3
+        set_state(phone, biz, "collecting",
+                  pending={"service": "pizza", "customer_name": "Pizza Paul"})
+        got = sched._handle_booking_inner(phone, "can I pick it up?", pizza, biz)
+        check("the order is dropped", get_state(phone, biz)["state"] == "idle")
+        check("it says so, then how pickup works",
+              got.startswith("No problem, I've stopped the order.")
+              and "give us a ring" in got, got)
+        check("and doesn't ask where to deliver", "deliver" not in got.lower(), got)
+    finally:
+        sched._answer_outside_booking, sched.extract_booking_slots = real_s
+
+    heading("'it's Friday at 5' is when they're writing, not when they want it")
+    seen = []
+    real = llm._create
+    llm._create = lambda **call: (seen.append(call["messages"][0]["content"]) or
+                                  types.SimpleNamespace(content=[types.SimpleNamespace(
+                                      type="text", text="{}")], usage=None))
+    try:
+        llm.extract_booking_slots("it's Friday at 5, I need food for 20 people",
+                                  sched.get_slot_definitions(pizza), pizza)
+        llm.classify_and_extract("it's Friday at 5, I need food for 20 people",
+                                 sched.get_slot_definitions(pizza), pizza)
+    finally:
+        llm._create = real
+    rule = "telling you when they're writing, not when they want it"
+    check("the slot extractor is told", rule in " ".join(seen[0].split()))
+    check("the classifier is told", rule in " ".join(seen[1].split()))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")
