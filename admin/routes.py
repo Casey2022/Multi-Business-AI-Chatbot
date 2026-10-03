@@ -380,7 +380,28 @@ def knowledge(business_id):
         "admin/knowledge.html",
         business = business,
         sections = get_documents(business_id),
+        example_title = example_section_title(business),
     )
+
+
+def example_section_title(business):
+    """A section title in this business's own words, for the page's hints.
+
+    The hint said "Drain cleaning", not "Our services" for every business,
+    which reads oddly on a pizza shop or a salon. The business's first
+    listed service is the kind of words a customer would use.
+    """
+    import re
+    try:
+        services = load_config(business["config_path"],
+                               business["id"]).get("services") or []
+    except Exception:
+        services = []
+    for service in services:
+        words = re.sub(r"\s*\(.*?\)", "", str(service)).strip()
+        if words:
+            return words[0].upper() + words[1:]
+    return "Opening hours"
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/add", methods=["POST"])

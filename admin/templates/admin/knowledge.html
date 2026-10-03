@@ -36,7 +36,7 @@
     <div class="field">
       <label for="title-{{ s.id }}">Title</label>
       <input class="section-title" type="text" id="title-{{ s.id }}" name="title" value="{{ s.title }}">
-      <span class="hint">Use the words a customer would — “Drain cleaning”, not “Our services”.</span>
+      <span class="hint">Use the words a customer would — “{{ example_title }}”, not “Our services”.</span>
     </div>
     <div class="field">
       <label for="body-{{ s.id }}">What the assistant should know</label>
@@ -92,7 +92,7 @@
       <div class="field flush">
         <label for="new-title">Title</label>
         <input class="section-title" type="text" id="new-title" name="title"
-               placeholder="Drain cleaning">
+               placeholder="{{ example_title }}">
       </div>
       <div class="field flush no-rule">
         <label for="new-body">What the assistant should know</label>

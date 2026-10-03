@@ -205,6 +205,15 @@ def main():
               f'name="{controller}"' in settings_src,
               "no field by that name on this page, so the rule never fires")
 
+    # The knowledge page's example title comes from the business's own
+    # services, not "Drain cleaning" for a pizza shop.
+    knowledge_src = (ROOT / "admin" / "templates" / "admin" / "knowledge.html").read_text(encoding="utf-8")
+    check("knowledge.html reads example_title", "example_title" in knowledge_src)
+    check("knowledge.html no longer hard-codes Bob's 'Drain cleaning'",
+          "Drain cleaning" not in knowledge_src)
+    check("the knowledge route passes example_title",
+          "example_title = example_section_title(business)" in routes_src)
+
     # The template asks a question only the route can answer.
     for name in ("address_check_ready",):
         check(f"settings.html reads {name}", name in settings_src)
