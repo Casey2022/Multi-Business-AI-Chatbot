@@ -182,8 +182,10 @@ TESTS = {
         ("how long does balayage take",           "Balayage",          ("three hours", "3 hours")),
         ("do I need a patch test",                "Patch Tests",       "48 hours"),
         ("who are your stylists",                 "Stylists",          ("Dana", "Marcus", "Priya")),
-        ("what happens if I cancel late",         "Cancellation",      "50%"),
-        ("is there a deposit for colour",         "Cancellation",      "$30"),
+        # ANSWER_ONLY since 2026-10-03: the cancellation rule is data now
+        # (policies.cancellation in the YAML), not a document section.
+        ("what happens if I cancel late",         "ANSWER_ONLY",       "50%"),
+        ("is there a deposit for colour",         "Deposits",          "$30"),
         ("what time is the last colour appointment", "Payment and Hours", "3pm"),
         ("are you open on Sunday",                "Payment and Hours", "closed"),
         # Was FAQ-only until 2026-09-29.
@@ -395,7 +397,7 @@ HARD = {
         # "cancel by 9am tomorrow to avoid the charge", which is wrong, and
         # failed only because it wrote "24-hour window" instead of "24 hours".
         ("my colour is at 9am tomorrow and it's 10am now, what if I cancel",
-                                                  "Cancellation",      rubrics.CANCEL_23_HOURS),
+                                                  "ANSWER_ONLY",       rubrics.CANCEL_23_HOURS),
         # Clock stated for the same reason as the muffins. 11am + 2.5 hours
         # clears the 3pm colour cut-off, so arithmetic says yes; the
         # document says a same-day cut and colour usually can't be fitted.

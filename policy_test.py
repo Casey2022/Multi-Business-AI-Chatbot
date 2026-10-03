@@ -140,13 +140,43 @@ def main():
     check("an unknown kind gives every kind", r["same_for_every_kind"] and
           "alike" in r["say"], r["say"])
 
+    heading("Belmont: one rule for every appointment, given the appointment time")
+    bel = yaml_config("belmont_hair_studio")
+    r = policy.cancellation_outcome(bel, starts_at="2026-09-23T09:00",
+                                    now=datetime(2026, 9, 22, 10, 0))
+    check("colour at 9am tomorrow, it's 10am: 23 hours, code's sums",
+          r["hours_before"] == 23.0, r["hours_before"])
+    check("23 hours: 50% of the service", "50% of the service is charged" in r["say"],
+          r["say"])
+    check("the rule leads, with 'moving' as well as cancelling",
+          r["say"].startswith("The rule: cancelling or moving less than 24 hours"),
+          r["say"])
+    check("no 'for every appointment (appointment alike)' for a single kind",
+          "alike" not in r["say"] and "for every" not in r["say"], r["say"])
+    check("exactly 24 hours: no charge",
+          "no charge" in policy.cancellation_outcome(bel, hours_before=24)["say"])
+    check("starts_at through run_tool uses the eval's clock",
+          policy.run_tool("cancellation_outcome", {"starts_at": "2026-09-23T09:00"},
+                          bel, now=datetime(2026, 9, 22, 10, 0))["hours_before"] == 23.0)
+    btext = policy.policy_text(bel)
+    check("no Deposits line where there are no deposit rules",
+          "Deposits:" not in btext)
+    check("the no-show note is carried", "no-show" in btext)
+    check("Belmont's tool has no 'kind' to ask about",
+          "kind" not in policy.cancellation_tool(bel)["input_schema"]["properties"])
+    check("and its prompt rule says nothing about kinds",
+          "which kind" not in " ".join(policy.prompt_section(bel).split()))
+
     heading("the text the bot and the judge read")
     text = policy.policy_text(cfg)
     import rubrics, judge
-    for name in ("DEPOSIT_THREE_DAYS", "WEDDING_CANCEL_MONTH_OUT"):
+    for name, rendered in (("DEPOSIT_THREE_DAYS", text),
+                           ("WEDDING_CANCEL_MONTH_OUT", text),
+                           ("CANCEL_23_HOURS",
+                            policy.policy_text(yaml_config("belmont_hair_studio")))):
         rubric = getattr(rubrics, name)
         check(f"{name} quotes the rendered policy",
-              all(judge.flatten(q) in judge.flatten(text) for q in rubric.quotes))
+              all(judge.flatten(q) in judge.flatten(rendered) for q in rubric.quotes))
     check("no business without the data gets policy text",
           policy.policy_text(yaml_config("bobs_plumbing")) == "")
 
@@ -156,8 +186,9 @@ def main():
           all("check_notice" in names(s) for s in
               ("bobs_plumbing", "belmont_hair_studio", "ridgeline_contracting",
                "crosstown_pizza", "sunrise_bakery_and_cafe")))
-    check("only Sunrise gets cancellation_outcome",
+    check("Sunrise and Belmont get cancellation_outcome, Bob's doesn't",
           names("sunrise_bakery_and_cafe") == ["check_notice", "cancellation_outcome"]
+          and names("belmont_hair_studio") == ["check_notice", "cancellation_outcome"]
           and names("bobs_plumbing") == ["check_notice"])
     tool = policy.cancellation_tool(cfg)
     check("kind is an enum of the policy's kinds",

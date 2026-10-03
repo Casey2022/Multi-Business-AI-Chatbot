@@ -93,8 +93,9 @@ GLUTEN_FREE_MUFFIN_WEDNESDAY = Rubric(
     96 hours (such as the regular muffins' 24 hours) for gluten-free muffins.""")
 
 CANCEL_23_HOURS = Rubric(
-    quote="Please give 24 hours' notice to cancel or move an appointment. Under "
-          "24 hours, or a no-show, is charged at 50% of the service.",
+    # 2026-10-03: rendered from Belmont's policies.cancellation (policy.py).
+    quote="Cancelled or moved less than 24 hours before the appointment: 50% of "
+          "the service is charged.",
     criteria="""Works out that 10am today to 9am tomorrow is 23 hours, which
     is under the 24 hours' notice required, so cancelling now is charged at
     50% of the service. Fails if it says the charge can still be avoided

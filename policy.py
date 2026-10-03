@@ -135,7 +135,17 @@ def cancellation(config):
 
 
 def _kinds(policy):
-    return list((policy.get("deposits") or {}).keys())
+    """Kinds of order the rules distinguish (Sunrise: custom and wedding
+    cakes). A business with one rule for everything has one kind."""
+    kinds = list((policy.get("deposits") or {}).keys())
+    return kinds or [policy.get("what", "order")]
+
+
+def _words(policy):
+    """(cancelled, cancelling, price) as this business says them."""
+    return (policy.get("action", "cancelled"),
+            policy.get("acting", "cancelling"),
+            policy.get("price", "the order price"))
 
 
 def _windows(policy):
@@ -164,15 +174,20 @@ def _outcome_for(window, kind):
 
 
 def outcome_text(spec, policy, kind):
+    price = _words(policy)[2]
+    if spec == "no_charge":
+        return "there is no charge"
+    if isinstance(spec, dict) and "charge_percent" in spec:
+        return f"{spec['charge_percent']:g}% of {price} is charged"
     if spec == "refund_deposit":
         return "the deposit comes back in full"
     if spec == "forfeit_deposit":
         return "the whole deposit is forfeited and none of it comes back"
     if spec == "charge_full_price":
-        return "the full order price is charged"
+        return f"the full {price.replace('the ', '', 1)} is charged"
     if isinstance(spec, dict) and "keep_percent" in spec:
         p = spec["keep_percent"]
-        text = (f"{p:g}% of the order price is kept, and only what was paid "
+        text = (f"{p:g}% of {price} is kept, and only what was paid "
                 f"above that {p:g}% is refunded")
         minimum = ((policy.get("deposits") or {}).get(kind) or {}).get("min_percent")
         if minimum == p:
@@ -210,14 +225,22 @@ def deposit_text(policy, kind):
 
 
 def cancellation_outcome(config, hours_before=None, days_before=None,
-                         kind=None, amount_paid=None, order_price=None):
+                         kind=None, amount_paid=None, order_price=None,
+                         starts_at=None, now=None):
     policy = cancellation(config)
     if not policy:
         raise ValueError("this business has no cancellation policy on file")
-    if hours_before is None and days_before is None:
-        raise ValueError("say how far ahead: hours_before or days_before")
-    hours = float(hours_before if hours_before is not None
-                  else float(days_before) * 24)
+    if starts_at is not None:
+        # "My colour is at 9am tomorrow and it's 10am now": the model reads
+        # the time, code does the subtraction. Belmont's eval row got "1
+        # hour short... cancel by 9am tomorrow" from the model's own sums.
+        hours = (_parse_local(starts_at)
+                 - clock.business_now(config, now)).total_seconds() / 3600
+    elif hours_before is not None or days_before is not None:
+        hours = float(hours_before if hours_before is not None
+                      else float(days_before) * 24)
+    else:
+        raise ValueError("say when: starts_at, hours_before or days_before")
     kinds = _kinds(policy)
     if kind is not None and kind not in kinds:
         kind = None                         # unknown kind: give every kind
@@ -232,6 +255,7 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     same = len({json.dumps(s, sort_keys=True) for s in
                 (_outcome_for(window, k) for k in kinds)}) == 1
     what = policy.get("what", "order")
+    _, acting, _ = _words(policy)
 
     ahead = (f"after {policy.get('before', 'the order date')}" if hours < 0
              else f"{span(hours)} before {policy.get('before', 'the order date')}")
@@ -239,15 +263,18 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     # ("Cancelling 3 days before falls under ..."), the model kept the
     # outcome and dropped the rule: right answer, no reason (rag_eval
     # 2026-10-02, 3/3).
-    if kind:
+    if kind and len(kinds) > 1:
         rule = f"for a {kind}, {texts[kind]}"
+    elif len(kinds) == 1:
+        rule = texts[kinds[0]]
     elif same:
         rule = (f"{texts[kinds[0]]}, for every {what} "
                 f"({' and '.join(kinds)} alike)")
     else:
         rule = "; ".join(f"for a {k}, {t}" for k, t in texts.items())
-    say = (f"The rule: cancelling {label}, {rule}. Cancelling {ahead} falls "
-           f"in that window, so that is what applies.")
+    say = (f"The rule: {acting} {label}, {rule}. "
+           f"{acting[0].upper() + acting[1:]} {ahead} falls in that window, so "
+           f"that is what applies.")
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):
@@ -271,19 +298,25 @@ def policy_text(config):
     if not policy:
         return ""
     kinds = _kinds(policy)
-    lines = [f"{policy.get('title', 'Deposits and cancellation')}:",
-             "Deposits: " + "; ".join(f"{k}, {deposit_text(policy, k)}"
-                                      for k in kinds) + "."]
+    action = _words(policy)[0]
+    lines = [f"{policy.get('title', 'Deposits and cancellation')}:"]
+    if policy.get("deposits"):
+        lines.append("Deposits: " + "; ".join(f"{k}, {deposit_text(policy, k)}"
+                                              for k in kinds) + ".")
     for i, window in enumerate(_windows(policy)):
         label = window_label(policy, i)
         specs = {k: _outcome_for(window, k) for k in kinds}
         texts = {k: outcome_text(s, policy, k) for k, s in specs.items()}
-        if len({json.dumps(s, sort_keys=True) for s in specs.values()}) == 1:
-            lines.append(f"Cancelled {label}: {texts[kinds[0]]}, for every "
+        head = f"{action[0].upper() + action[1:]} {label}"
+        if len(kinds) == 1:
+            lines.append(f"{head}: {texts[kinds[0]]}.")
+        elif len({json.dumps(s, sort_keys=True) for s in specs.values()}) == 1:
+            lines.append(f"{head}: {texts[kinds[0]]}, for every "
                          f"{policy.get('what', 'order')}.")
         else:
-            lines.append(f"Cancelled {label}: " + "; ".join(
+            lines.append(f"{head}: " + "; ".join(
                 f"{k}, {t}" for k, t in texts.items()) + ".")
+    lines += list(policy.get("notes") or [])
     return "\n".join(lines)
 
 
@@ -297,7 +330,8 @@ CHECK_NOTICE_TOOL = {
         "Work out whether there is enough notice for something the customer "
         "wants by a particular time. Use it whenever the customer names a "
         "time they need something by (tonight, 8am tomorrow, Saturday, "
-        "today) and the facts give a notice period for that thing. It "
+        "today) and the facts give a notice period for that thing. Not "
+        "for cancelling or moving: that is a different rule. It "
         "returns the hours available, whether that is enough, the latest "
         "time it could have been ordered, and a sentence to base the answer "
         "on. Do this arithmetic here, never in your head."),
@@ -328,12 +362,13 @@ CHECK_NOTICE_TOOL = {
 def cancellation_tool(config):
     policy = cancellation(config)
     what = policy.get("what", "order")
-    return {
+    kinds = _kinds(policy)
+    tool = {
         "name": "cancellation_outcome",
         "description": (
-            "Apply this business's deposit and cancellation rules to one "
-            "cancellation. Use it whenever the customer asks what happens if "
-            "they cancel, or whether they get a deposit back, and says or "
+            "Apply this business's cancellation rules to one cancellation "
+            "(or move). Use it whenever the customer asks what happens if "
+            "they cancel or move, or whether they get a deposit back, and says or "
             "implies how far ahead (three days before, a month out, "
             "tomorrow). Call it straight away with the timing they gave: it "
             "needs nothing else, so never ask which kind or how much they "
@@ -342,6 +377,13 @@ def cancellation_tool(config):
         "input_schema": {
             "type": "object",
             "properties": {
+                "starts_at": {
+                    "type": "string",
+                    "description": (
+                        f"When the {what} is, business-local, as "
+                        "YYYY-MM-DDTHH:MM, if the customer said (\"9am "
+                        "tomorrow\"). The hours are worked out for you; give "
+                        "this instead of hours_before when you can.")},
                 "hours_before": {
                     "type": "number",
                     "description": "How long before the order date they "
@@ -364,6 +406,9 @@ def cancellation_tool(config):
             },
         },
     }
+    if len(kinds) < 2:
+        del tool["input_schema"]["properties"]["kind"]
+    return tool
 
 
 # Tools, and the rules for using them, are offered only to a message that
@@ -449,14 +494,16 @@ def prompt_section(config):
     policy = cancellation(config)
     if policy:
         what = policy.get("what", "order")
+        several = len(_kinds(policy)) > 1
         text += _rule(
             "For a question about cancelling, refunds or getting a deposit "
             "back, call cancellation_outcome straight away when they've said "
             "or implied how far ahead, and answer from its result: state the "
-            "rule and what it means for them. Don't ask which kind of "
-            f"{what} or how much they paid before answering. If the result "
-            f"is the same for every {what}, say so. With no timing given, "
-            "state the rules below.")
+            "rule and what it means for them. "
+            + (f"Don't ask which kind of {what} or how much they paid before "
+               f"answering. If the result is the same for every {what}, say "
+               "so. " if several else "")
+            + "With no timing given, state the rules below.")
         text += "\n\n" + policy_text(config)
     return text
 
@@ -473,6 +520,7 @@ def run_tool(name, arguments, config, now=None):
         if name == "cancellation_outcome" and cancellation(config):
             return cancellation_outcome(
                 config,
+                starts_at=arguments.get("starts_at"), now=now,
                 hours_before=arguments.get("hours_before"),
                 days_before=arguments.get("days_before"),
                 kind=arguments.get("kind"),

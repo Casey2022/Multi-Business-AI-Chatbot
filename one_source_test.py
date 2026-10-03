@@ -109,8 +109,9 @@ def main():
         doc_path = ROOT / "documents" / path.stem / "services.md"
         doc = doc_path.read_text().lower() if doc_path.exists() else ""
         check(f"{path.stem}: cancellation rules only in policies:, not the document",
-              "## deposits" not in doc and "forfeit" not in doc
-              and "refunded" not in doc)
+              "## deposits and cancellation" not in doc and "forfeit" not in doc
+              and "refunded" not in doc and "notice to cancel" not in doc
+              and "is charged at" not in doc)
 
     heading("the facts that only lived in an FAQ are in the documents")
     for slug, head, needles in FOLDED:

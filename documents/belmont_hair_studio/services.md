@@ -52,11 +52,9 @@ We use and sell Davines and Olaplex. Colour clients get 10% off any
 take-home product on the day of their appointment. Ask your stylist
 before buying — the wrong shampoo will strip a new colour in a fortnight.
 
-## Cancellation and Lateness (Topics: cancel, late, no show, deposit)
-Please give 24 hours' notice to cancel or move an appointment. Under 24
-hours, or a no-show, is charged at 50% of the service. Colour services
-over $100 take a $30 deposit at booking, which comes off the final
-bill. If you're more than 15 minutes late we may need to shorten or
+## Colour Deposits and Lateness (Topics: deposit, late, running late)
+Colour services over $100 take a $30 deposit at booking, which comes off
+the final bill. If you're more than 15 minutes late we may need to shorten or
 rebook the service, since the next client is already on their way.
 
 ## Payment and Hours (Topics: payment, cards, cash, tipping, hours, walk-in)

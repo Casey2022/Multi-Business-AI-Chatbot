@@ -845,3 +845,22 @@ classifier with the bot's previous message.
 Lesson: a 100% eval of single questions said nothing about a
 four-message conversation. One fix (the clarifying question) set the trap
 for the next layer (the classifier). Test conversations, not just turns.
+
+## 49/50, and Belmont's cancellation becomes data too (2026-10-03)
+
+Full run after `323b8fd`: 89/89 core, **49/50 hard**, retrieval 100%,
+Sunrise 11/11. The one miss, two full runs running: Belmont "my colour is
+at 9am tomorrow and it's 10am now, what if I cancel" got "1 hour short...
+To avoid that charge, cancel by 9am tomorrow". With no cancellation tool at
+Belmont, the model used check_notice (a "can it be ready in time?" tool)
+and reworded its "order by" and "earliest ready" times into nonsense.
+
+Now Belmont has `policies.cancellation` (24 hours or more: no charge; less:
+50% of the service; a no-show counts as less), the document keeps only the
+$30 colour deposit and lateness, and the tool takes `starts_at`, the
+appointment time, so code does the 23-hour subtraction. The message names
+cancelling and a time, so the tool is required. The engine grew to fit:
+one-kind businesses, `no_charge` and `{charge_percent: N}`, the business's
+own words ("cancelled or moved", "the service"), notes lines. Sunrise's
+rendered text is unchanged (its rubric quotes still match). check_notice's
+description now says it isn't for cancelling or moving.

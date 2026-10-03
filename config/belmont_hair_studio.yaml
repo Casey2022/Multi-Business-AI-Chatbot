@@ -24,6 +24,29 @@ services:
   - "balayage"
   - "kids cut"
 
+# Cancelling or moving, as data (2026-10-03): the only copy. The knowledge
+# document's sentences ("24 hours' notice... under 24 hours, or a no-show,
+# is charged at 50%") were removed; policy.py renders the text the bot reads
+# and the cancellation_outcome tool applies it, with the appointment time
+# passed in so code works out the hours. The eval row "colour at 9am
+# tomorrow, it's 10am now" got "1 hour short... cancel by 9am tomorrow" from
+# the model's own subtraction. Exactly 24 hours before counts as 24 or more.
+policies:
+  cancellation:
+    title: "Cancelling or moving an appointment"
+    what: "appointment"
+    action: "cancelled or moved"
+    acting: "cancelling or moving"
+    before: "the appointment"
+    price: "the service"
+    windows:
+      - at_least_hours: 24
+        any: no_charge
+      - at_least_hours: 0
+        any: {charge_percent: 50}
+    notes:
+      - "A no-show is charged the same as cancelling with less than 24 hours' notice."
+
 calendar:
   enabled: true
   provider: "simulated"        # demo template — never a real calendar
