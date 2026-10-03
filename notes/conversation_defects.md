@@ -960,3 +960,28 @@ for twenty were still on. The document never said so, and the tool knows
 only trays. The Party Trays section now says the cutoff is for trays only,
 and PARTY_TRAY_FRIDAY_FIVE fails a reply that leaves the customer without
 food tonight.
+
+## journey_eval.py: whole conversations through the live path (2026-10-03)
+
+Three live conversations in one day failed in ways the evals couldn't see,
+because each eval tests one layer: rag_eval and qa_eval call the Q&A step,
+conversation_eval calls the booking flow. The routing between them
+(booking state → keyword rules → booking-or-question classifier → booking
+or Q&A) was untested, and that's where the live failures were.
+
+`process_message` moved from app.py to `conversation.py`, unchanged, so it
+can run without Flask or the server's startup. `journey_eval.py` sends
+scripted conversations through it, the same function the webchat and SMS
+endpoints call. Faked: a throwaway copy of the database (real businesses and
+documents; nothing written back), every calendar forced to the simulated
+one, the address check, and the clock (pinned per journey). Real: rules,
+classifier, booking flow, retrieval, policy tools, and the model, unpinned
+like the live site.
+
+Six journeys to start, each a live failure or a path that must keep working:
+the four-message bakery deposit, pickup mid-order at Crosstown, Friday at
+five, "can I order here?", Belmont's 23-hour cancellation, and a real Bob's
+booking after a question (guards the routing fixes from over-reaching).
+Each turn checks the booking state after it, patterns that must and mustn't
+appear, and optionally a rubric. A smoke run with a fake model confirmed
+the plumbing: wrong routing fails the state checks, right routing passes.

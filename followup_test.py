@@ -177,8 +177,8 @@ def main():
                                           slots, cfg, previous_reply=offered)
         check("a real order after the bot's offer is still a booking",
               result.get("intent") == "book", result)
-        app_src = (ROOT / "app.py").read_text()
-        check("app.py hands the classifier the bot's previous reply",
+        app_src = (ROOT / "conversation.py").read_text()
+        check("conversation.py hands the classifier the bot's previous reply",
               "previous_reply=previous_reply" in app_src)
     finally:
         llm._create, llm.retrieve = real
