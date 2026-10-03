@@ -133,10 +133,16 @@ PARTY_TRAY_FRIDAY_FIVE = Rubric(
     # 2026-10-03: was the keywords ("4pm", "three hours"), which a reply
     # offering a tray tonight could still pass by mentioning either.
     quote=("Trays need at least three hours' notice, and on Friday and "
-           "Saturday nights we ask for the order by 4pm"),
+           "Saturday nights we ask for the order by 4pm",
+           "The cutoff is for trays only: regular pizzas, wings and subs can be "
+           "ordered for tonight right up until the kitchen stops taking orders"),
+    # 2026-10-03, live: the cutoff was right, then "Could you order for a
+    # different time?" The cutoff is for trays; regular food is still on.
     criteria="""It's 5pm on Friday. Makes clear a party tray can't be ordered
     for tonight, because the Friday order-by time of 4pm has passed (three
-    hours' notice also can't be met for anything wanted now). Suggesting
-    regular pizzas, wings or subs to feed the group instead is fine, and so
-    is offering a tray for another day. Fails if it offers or implies a party
-    tray for tonight, or never mentions the cutoff or the notice.""")
+    hours' notice also can't be met for anything wanted now). Offering a tray
+    for another day is fine. Fails if it offers or implies a party tray for
+    tonight, never mentions the cutoff or the notice, or leaves the customer
+    without food tonight: telling them to order for another time, or implying
+    regular pizzas, wings or subs are cut off too, when they can still be
+    ordered tonight.""")

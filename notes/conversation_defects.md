@@ -949,3 +949,14 @@ sentence: rag_eval calls the Q&A path directly and never meets routing.
 Second live conversation in a day that the single-question eval couldn't
 see. The gap is the full app path (rules → classifier → booking/Q&A); a
 conversation eval through it is now the most valuable test to build.
+
+### Live, Crosstown again: right cutoff, no food (2026-10-03)
+
+After `cb99f37` the same opening went to Q&A (no longer a "Friday at 5"
+booking) and the tool did its job: three hours' notice, the Friday 4pm
+cutoff, "we've passed that cutoff for tonight". Then: "Could you order for
+a different time?" The cutoff is for trays only; regular pizzas and wings
+for twenty were still on. The document never said so, and the tool knows
+only trays. The Party Trays section now says the cutoff is for trays only,
+and PARTY_TRAY_FRIDAY_FIVE fails a reply that leaves the customer without
+food tonight.
