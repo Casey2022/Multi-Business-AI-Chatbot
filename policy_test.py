@@ -100,6 +100,9 @@ def main():
     check("3 days: forfeited, for wedding cakes too",
           "forfeited" in r["say"] and "wedding cake alike" in r["say"], r["say"])
     check("3 days: no refund language", "refunded" not in r["say"], r["say"])
+    check("3 days: the rule (the 7-day window) comes first, then the case",
+          r["say"].startswith("The rule: cancelling between 48 hours and 7 days")
+          and r["say"].index("7 days") < r["say"].index("3 days"), r["say"])
     r = out(days_before=30)
     check("a month: 7 days or more", r["window"].startswith("7 days or more"))
     check("a month: custom and wedding differ", r["same_for_every_kind"] is False)

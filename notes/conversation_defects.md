@@ -789,3 +789,19 @@ conversations 12/12, Q&A 4/4. What didn't:
 Known gap: a deposit question with none of those words ("what if I change
 my mind about the cake?") doesn't get the policy text, so the bot won't
 know the rules and should say so.
+
+### Gated tools, first full run (2026-10-02): 89/89 core, 48/50 hard
+
+Wedding-a-month-out, 6pm muffins and gluten-free Wednesday passed every
+run; conversations 12/12; a full run back to $0.34. The 3-day deposit row
+now gives the RIGHT outcome ("the whole deposit is forfeited, custom or
+wedding") but no rule, 3/3, and the rubric rightly wants the 7-day window.
+The tool's sentence put the window second; the model kept the outcome and
+trimmed the rest. It now leads with the rule: "The rule: cancelling between
+48 hours and 7 days before the order date, the whole deposit is forfeited...
+Cancelling 3 days before falls in that window."
+
+Also seen once: Belmont "colour at 9am tomorrow, it's 10am now" said "just
+under the 24-hour window" and that notice "by 9am tomorrow" avoids the
+charge. Belmont's cancellation rule is still prose, and the 23 hours is
+still the model's own subtraction. Candidate for the same treatment.

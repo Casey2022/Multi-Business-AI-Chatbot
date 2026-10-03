@@ -235,14 +235,19 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
 
     ahead = (f"after {policy.get('before', 'the order date')}" if hours < 0
              else f"{span(hours)} before {policy.get('before', 'the order date')}")
-    say = f"Cancelling {ahead} falls under \"{label}\"."
+    # The rule first, then what it means for them. With the window second
+    # ("Cancelling 3 days before falls under ..."), the model kept the
+    # outcome and dropped the rule: right answer, no reason (rag_eval
+    # 2026-10-02, 3/3).
     if kind:
-        say += f" For a {kind}: {texts[kind]}."
+        rule = f"for a {kind}, {texts[kind]}"
     elif same:
-        say += (f" This is the same for every {what} ({' and '.join(kinds)} "
-                f"alike): {texts[kinds[0]]}.")
+        rule = (f"{texts[kinds[0]]}, for every {what} "
+                f"({' and '.join(kinds)} alike)")
     else:
-        say += " " + " ".join(f"For a {k}: {t}." for k, t in texts.items())
+        rule = "; ".join(f"for a {k}, {t}" for k, t in texts.items())
+    say = (f"The rule: cancelling {label}, {rule}. Cancelling {ahead} falls "
+           f"in that window, so that is what applies.")
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):
