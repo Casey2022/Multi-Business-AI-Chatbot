@@ -903,3 +903,21 @@ offering a tray tonight could pass by mentioning either. Now a rubric
 
 Not covered yet: business days (Ridgeline's quotes and estimate visits)
 and opening hours.
+
+## First clean sweep (2026-10-03, `3f31aac`)
+
+rag_eval --all: 72/72 retrieval, **89/89 core, 50/50 hard**, $0.34 a run.
+conversation_eval 12/12 x3, qa_eval 4/4 x3, routing 9/9. Belmont and
+Crosstown 100% on their own runs too.
+
+What got it there, in order: one source of truth (the FAQ fold); documents
+written in the shape of the questions; then, when wording stopped helping,
+the arithmetic moved into code (policy.py) and the model only reads and
+phrases. The rows that had failed for weeks (the deposit pair, 6pm muffins,
+gluten-free Wednesday, the 23-hour colour cancellation, Friday party trays)
+are all tool-backed now.
+
+Saturation is a warning as much as a win: a 100% suite stops telling you
+anything. The live conversation of 2026-10-03 failed four ways while
+single questions scored 11/11. Next evidence comes from conversations,
+live use, and new hard rows, not from re-running this one.
