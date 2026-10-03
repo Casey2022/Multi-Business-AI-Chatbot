@@ -805,3 +805,43 @@ Also seen once: Belmont "colour at 9am tomorrow, it's 10am now" said "just
 under the 24-hour window" and that notice "by 9am tomorrow" avoids the
 charge. Belmont's cancellation rule is still prose, and the 23 hours is
 still the model's own subtraction. Candidate for the same treatment.
+
+## Live after the tools deployed (2026-10-03): four failures, one conversation
+
+Sunrise scored 11/11 hard twice locally. Then the live site:
+
+  cust  I cancelled three days before, do I get my deposit back?
+  BOT   I need to know which kind of cake you ordered...
+  cust  custom cake
+  BOT   Happy to help with custom birthday cakes. What name should I put
+        this order under?
+  cust  no, I want to know about a cake I already ordered and cancelled...
+  BOT   ...the whole deposit is forfeited... What name should I put this
+        order under?
+  cust  what about a wedding cake?
+  BOT   I'm not sure what the deposit policy is for wedding cake cancellations.
+
+1. **Asked instead of calling the tool.** The eval pins temperature; the
+   live site doesn't. Now when a message names both cancelling and a time
+   (`policy.must_apply_cancellation`), the first call REQUIRES
+   cancellation_outcome (tool_choice), and only the first.
+2. **"custom cake" started an order.** The booking-or-question classifier
+   saw only the message, never the bot's own question. It now gets the
+   bot's previous reply (`previous_reply`, fenced as data) and a rule plus
+   example: answering the bot's question is a question.
+3. **No way out but "cancel".** Mid-booking, a message saying it isn't an
+   order ("already ordered", "I'm not ordering", "no, I want to know...")
+   now leaves the flow and is answered as a question: "No problem, I've
+   stopped the order. ..." Narrow on purpose; known false positive: "I
+   already ordered one last month and want another".
+4. **The follow-up lost the rules.** The gap flagged on 2026-09-30, hit on
+   the first live try. `needs_tools` now also looks at the customer's last
+   2 messages, so a follow-up keeps the tools and the rendered policy.
+
+`followup_test.py` (35) replays it turn by turn with fakes; removing the
+fixes fails 7 checks. qa_eval gained routing checks that call the real
+classifier with the bot's previous message.
+
+Lesson: a 100% eval of single questions said nothing about a
+four-message conversation. One fix (the clarifying question) set the trap
+for the next layer (the classifier). Test conversations, not just turns.

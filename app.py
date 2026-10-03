@@ -420,8 +420,14 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
             from scheduler import get_slot_definitions
             from llm import classify_and_extract
 
-            slots  = get_slot_definitions(config)
-            result = classify_and_extract(message, slots, config)
+            slots   = get_slot_definitions(config)
+            history = get_recent_messages(sender_id, business_id, limit=10)
+            # The classifier sees what the bot just said, so an answer to
+            # the bot's own question isn't read as a new order.
+            previous_reply = next((m.get("content") for m in reversed(history)
+                                   if m.get("role") == "assistant"), None)
+            result = classify_and_extract(message, slots, config,
+                                          previous_reply=previous_reply)
 
             if result.get("intent") == "book":
                 log.info(f"Booking intent detected (LLM) for {sender_id}")
@@ -432,7 +438,6 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
                 )
                 source = "scheduler"
             else:
-                history    = get_recent_messages(sender_id, business_id, limit=10)
                 reply_text = get_llm_reply(message, history, config, channel=channel)
                 source     = "llm"
 

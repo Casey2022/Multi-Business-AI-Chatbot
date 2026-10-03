@@ -554,6 +554,38 @@ def _what_a_question_really_answers(extracted, pending, missing, slots):
     return real
 
 
+# A customer telling us this isn't an order at all. Live, 2026-10-03: a
+# reply to the bot's own question ("custom cake") started an order, and "no,
+# I want to know about a cake I already ordered and cancelled" was answered
+# and then followed by "What name should I put this order under?" twice.
+# Only "cancel"/"stop" got anyone out. Deliberately narrow: each phrase says
+# they aren't ordering, not merely that they have a question.
+_NOT_BOOKING = re.compile(
+    r"\b(?:don'?t|do not|didn'?t|did not)\s+(?:want|mean|need)\s+to\s+"
+    r"(?:book|order|place|make|start)"
+    r"|\bnot\s+(?:trying|looking|wanting|here)\s+to\s+(?:book|order)"
+    r"|\bi'?m\s+not\s+(?:booking|ordering)"
+    r"|\b(?:already|previously)\s+(?:ordered|booked|placed|paid|cancell?ed)"
+    r"|^\s*no\b[,.!]?\s+i\s+(?:want|wanted|was\s+asking|meant|just\s+want)"
+    r"\s+to\s+(?:know|ask)", re.I)
+
+
+def _leaving_booking(message):
+    return bool(_NOT_BOOKING.search(message or ""))
+
+
+def _answer_outside_booking(phone, message, config, business_id, channel="sms"):
+    """Answer as an ordinary question, the booking flow having been left."""
+    try:
+        from llm import get_llm_reply
+        history = get_recent_messages(phone, business_id, limit=10)
+        return get_llm_reply(message, history=history, config=config,
+                             channel=channel)
+    except Exception as e:
+        log.warning("Couldn't answer after leaving a booking (%s)", e)
+        return None
+
+
 def _answer_mid_booking(phone, message, config, business_id, channel="sms"):
     """Answer a question asked during booking, using the normal Q&A path.
 
@@ -1223,6 +1255,15 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             BOOKING.get("cancel_reply", f"No problem — {noun} cancelled."),
             config
         )
+
+    # --- Not an order at all: leave the flow and answer the question ---
+    if state == "collecting" and _leaving_booking(message):
+        _save_state(phone, business_id, "idle", pending={})
+        noun = BOOKING.get("noun", "appointment")
+        answer = _answer_outside_booking(phone, message, config, business_id,
+                                         channel=channel)
+        lead = f"No problem, I've stopped the {noun}."
+        return f"{lead} {answer}" if answer else f"{lead} What can I help with?"
 
     # --- Opening turn: greet, then extract from the triggering message ---
     # The trigger itself may carry information ("book a drain cleaning").

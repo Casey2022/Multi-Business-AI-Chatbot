@@ -390,11 +390,38 @@ _TIME_NAMED = re.compile(
 _ABOUT_CANCELLING = re.compile(r"\b(?:cancel\w*|refund\w*|deposits?)\b", re.I)
 
 
-def needs_tools(message, config):
-    """Does this message get the policy tools (and the rules for them)?"""
+# A follow-up keeps the tools: "what about a wedding cake?" after a deposit
+# question names neither a time nor cancelling, and on the live site
+# (2026-10-03) it got "I'm not sure what the deposit policy is". The last
+# FOLLOW_UP_TURNS customer messages count as well as this one.
+FOLLOW_UP_TURNS = 2
+
+
+def _wants_tools(text, config):
+    return bool(_TIME_NAMED.search(text or "")
+                or (cancellation(config) and _ABOUT_CANCELLING.search(text or "")))
+
+
+def needs_tools(message, config, history=None):
+    """Does this message (or the customer's last couple) get the policy tools?"""
+    earlier = [m.get("content", "") for m in (history or [])
+               if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
+    return any(_wants_tools(t, config) for t in [message, *earlier])
+
+
+def must_apply_cancellation(message, config):
+    """A cancellation question that says when: the tool is called, not optional.
+
+    Live (2026-10-03), "I cancelled three days before, do I get my deposit
+    back?" got "which kind of cake?" though the answer is the same for every
+    cake, and the customer's reply "custom cake" then started an order.
+    The eval passed the same question with the model pinned; the live site
+    isn't pinned. When the message names both cancelling and a time, the
+    first call requires cancellation_outcome.
+    """
     text = message or ""
-    return bool(_TIME_NAMED.search(text)
-                or (cancellation(config) and _ABOUT_CANCELLING.search(text)))
+    return bool(cancellation(config) and _ABOUT_CANCELLING.search(text)
+                and _TIME_NAMED.search(text))
 
 
 def tools_for(config):

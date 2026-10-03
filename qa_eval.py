@@ -104,6 +104,38 @@ SCENARIOS = [
     },
 ]
 
+# The booking-or-question classifier, given what the bot last said
+# (llm.classify_and_extract's previous_reply). Live, 2026-10-03, "custom
+# cake" in answer to the bot's own "which kind of cake was it?" started an
+# order. (slug, bot's previous message, customer's reply, expected intent)
+ROUTING = [
+    ("sunrise_bakery_and_cafe",
+     "I need to know which kind of cake you ordered to give you the right "
+     "answer — was it a custom cake or a wedding cake?",
+     "custom cake", "question"),
+    ("sunrise_bakery_and_cafe",
+     "We'd love to make it! Text 'order' to get started, or tell me what "
+     "you'd like.",
+     "a custom cake for Saturday please", "book"),
+    ("sunrise_bakery_and_cafe", None, "I'd like to order a wedding cake for June",
+     "book"),
+]
+
+
+def check_routing():
+    from llm import classify_and_extract
+    from scheduler import get_slot_definitions
+    problems = []
+    for slug, previous, message, expected in ROUTING:
+        config = config_for(slug)
+        got = classify_and_extract(message, get_slot_definitions(config), config,
+                                   previous_reply=previous).get("intent")
+        if got != expected:
+            problems.append(f"{message!r} after {str(previous)[:40]!r}: "
+                            f"{got}, expected {expected}")
+    return problems
+
+
 def sends_them_to_call(reply, pattern):
     """The number, or a sentence whose point is "go call us" ("Give us a
     call to set up a tasting!"). The same definition the guard in llm.py
@@ -202,8 +234,16 @@ def main():
                 for name, text in problems:
                     say(f"      ✗ {name}: {text}")
             failed += bool(problems)
+    say(f"\n{'─' * 72}\nbooking-or-question routing ({len(ROUTING)} checks "
+        f"x {repeat}):")
+    routing_failed = 0
+    for _ in range(repeat):
+        for problem in check_routing():
+            routing_failed += 1
+            say(f"      ✗ {problem}")
+    say(f"      {len(ROUTING) * repeat - routing_failed}/{len(ROUTING) * repeat} right")
     say(f"\n{'─' * 72}\n{len(chosen) - failed}/{len(chosen)} scenarios clean")
-    return 1 if failed else 0
+    return 1 if failed or routing_failed else 0
 
 
 if __name__ == "__main__":

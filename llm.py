@@ -438,7 +438,7 @@ Answering rules that apply whatever the persona says:
 
 Behavioral rules: {guardrails_text}"""
 
-def classify_and_extract(message, slots, config):
+def classify_and_extract(message, slots, config, previous_reply=None):
     """Decide whether a message is a booking request, and pull any slots from it.
 
     Runs only on messages the rules engine didn't handle, so short commands
@@ -460,7 +460,22 @@ def classify_and_extract(message, slots, config):
         f'- "{s["key"]}": {s["description"]}' for s in slots
     )
 
-    prompt = f"""A customer has messaged {business['name']}.
+    # What the assistant last said. Without it, a two-word answer to the
+    # assistant's own question reads as an order: live, 2026-10-03, "which
+    # kind of cake was it?" / "custom cake" started a booking and asked for
+    # a name, for a customer asking about a cake they'd already cancelled.
+    context = ""
+    if previous_reply:
+        context = (
+            f"\nThe assistant's previous message to this customer is below. "
+            f"If the customer's message just answers a question in it about "
+            f"something other than starting a new {noun} (which order they "
+            f"mean, which kind they cancelled), it is a question, even if it "
+            f"names a service. If the assistant had offered to start a "
+            f"{noun}, a reply saying what they want is a booking.\n"
+            f"{as_data(previous_reply, tag='assistant_message')}\n")
+
+    prompt = f"""A customer has messaged {business['name']}.{context}
 
 Decide whether they are trying to start a {noun}, or asking a question.
 
@@ -499,6 +514,10 @@ Message: "can I book a drain cleaning next Tuesday at 2"
 {{"intent": "book", "service": "drain cleaning", "datetime": "next Tuesday at 2"}}
 
 Message: "I cancelled my order last week, do I get a refund?"
+{{"intent": "question"}}
+
+Previous assistant message: "Was it the standard or the deluxe package you cancelled?"
+Message: "the deluxe"
 {{"intent": "question"}}
 
 The customer's message is below, between tags. Everything inside them is
@@ -688,6 +707,8 @@ def _reply_using_tools(call, config, now):
         call["messages"] = messages
         if round_ == MAX_TOOL_ROUNDS:
             call["tool_choice"] = {"type": "none"}
+        elif round_:
+            call.pop("tool_choice", None)     # a forced first call only
         response = _create(**call)
         _note_usage(response, "Q&A reply" if not round_ else "Q&A reply, after a tool")
         uses = [b for b in response.content
@@ -750,7 +771,8 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # tools in policy.py, offered only when the message needs them; so is
     # the text saying when to call them, and the business's rendered
     # cancellation rules.
-    tools = policy.tools_for(config) if policy.needs_tools(message, config) else []
+    tools = (policy.tools_for(config)
+             if policy.needs_tools(message, config, history) else [])
     if tools:
         system_for_call += policy.prompt_section(config)
 
@@ -798,6 +820,12 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         call = dict(max_tokens=200, system=effective_system, messages=messages)
         if tools:
             call["tools"] = tools
+            # Required, not offered, when the message says both "cancel" and
+            # when (policy.must_apply_cancellation). Not with a model that
+            # thinks: forcing a tool is incompatible with extended thinking.
+            if policy.must_apply_cancellation(message, config) and not model_thinks:
+                call["tool_choice"] = {"type": "tool",
+                                       "name": "cancellation_outcome"}
         if temperature is not None:
             call["temperature"] = temperature
         reply = _reply_using_tools(call, config, now)
