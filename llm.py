@@ -438,6 +438,35 @@ Answering rules that apply whatever the persona says:
 
 Behavioral rules: {guardrails_text}"""
 
+# Words that mean a reply is starting an order, not answering the bot.
+_BOOKING_CUE = re.compile(
+    r"\b(?:order|book|booking|schedule|reserve|appointment|i want|i'?d like"
+    r"|i would like|i need|can i get|could i get|i'll take|sign me up"
+    r"|today|tonight|tomorrow|next|this (?:week|weekend|morning|afternoon)"
+    r"|(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?)\b"
+    r"|\d", re.I)
+
+
+def answers_previous_question(message, previous_reply):
+    """Is this message just an answer to the question the bot last asked?
+
+    True when the bot's previous message ended with a question and this one
+    carries nothing that starts an order (no "order"/"book"/"I'd like", no
+    day, time or number). Then the message is a question, whatever the
+    classifier thinks. Given the bot's question in its prompt, the
+    classifier still filed "custom cake" (answering "was it a custom cake or
+    a wedding cake?") as an order, 3 runs in 3 (qa_eval, 2026-10-03). The
+    two mistakes don't cost the same: a question wrongly sent to Q&A costs
+    one extra message, an answer wrongly sent to booking traps the customer
+    in a form they never asked for.
+    """
+    if not previous_reply or not message:
+        return False
+    # The last thing said, ignoring trailing emoji and spaces.
+    ending = re.sub(r"[^\w?]+$", "", previous_reply.strip())
+    return ending.endswith("?") and not _BOOKING_CUE.search(message)
+
+
 def classify_and_extract(message, slots, config, previous_reply=None):
     """Decide whether a message is a booking request, and pull any slots from it.
 
@@ -541,6 +570,11 @@ examples, however it is phrased.
 
         intent = result.get("intent")
         if intent not in ("book", "question"):
+            return {"intent": "question"}
+
+        if intent == "book" and answers_previous_question(message, previous_reply):
+            log.info("Classifier said book; it answers the bot's question, so "
+                     "it's a question")
             return {"intent": "question"}
 
         valid_keys = {s["key"] for s in slots}
@@ -771,10 +805,10 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # tools in policy.py, offered only when the message needs them; so is
     # the text saying when to call them, and the business's rendered
     # cancellation rules.
-    tools = (policy.tools_for(config)
-             if policy.needs_tools(message, config, history) else [])
+    wanted = policy.needs_tools(message, config, history)
+    tools = policy.tools_for(config, wanted) if wanted else []
     if tools:
-        system_for_call += policy.prompt_section(config)
+        system_for_call += policy.prompt_section(config, wanted)
 
     # RAG retrieval: find document chunks relevant to this specific message.
     # retrieve() now takes config so it queries the right business collection.

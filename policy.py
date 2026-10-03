@@ -443,15 +443,32 @@ FOLLOW_UP_TURNS = 2
 
 
 def _wants_tools(text, config):
-    return bool(_TIME_NAMED.search(text or "")
-                or (cancellation(config) and _ABOUT_CANCELLING.search(text or "")))
+    """Which tools one message calls for: a set of "notice", "cancellation".
+
+    Separately, not all-or-nothing: once Belmont had cancellation rules,
+    "can I get my colour done at 4pm" (a time, nothing about cancelling)
+    started getting the cancellation tool and rules too, and answered "which
+    day?" instead of "the last colour goes in at 3pm", 3/3 (2026-10-03).
+    """
+    wanted = set()
+    if _TIME_NAMED.search(text or ""):
+        wanted.add("notice")
+    if cancellation(config) and _ABOUT_CANCELLING.search(text or ""):
+        wanted.add("cancellation")
+    return wanted
 
 
 def needs_tools(message, config, history=None):
-    """Does this message (or the customer's last couple) get the policy tools?"""
+    """The tools this message (or the customer's last couple) calls for.
+
+    A set; empty means none, and the prompt is exactly the standing one.
+    """
     earlier = [m.get("content", "") for m in (history or [])
                if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
-    return any(_wants_tools(t, config) for t in [message, *earlier])
+    wanted = set()
+    for text in [message, *earlier]:
+        wanted |= _wants_tools(text, config)
+    return wanted
 
 
 def must_apply_cancellation(message, config):
@@ -469,9 +486,11 @@ def must_apply_cancellation(message, config):
                 and _TIME_NAMED.search(text))
 
 
-def tools_for(config):
-    tools = [CHECK_NOTICE_TOOL]
-    if cancellation(config):
+def tools_for(config, which=("notice", "cancellation")):
+    tools = []
+    if "notice" in which:
+        tools.append(CHECK_NOTICE_TOOL)
+    if "cancellation" in which and cancellation(config):
         tools.append(cancellation_tool(config))
     return tools
 
@@ -482,17 +501,20 @@ def _rule(text):
                                  subsequent_indent="  ")
 
 
-def prompt_section(config):
+def prompt_section(config, which=("notice", "cancellation")):
     """Rules (and rendered policy) added to the prompt with the tools."""
-    text = "\n\nRules for this question, on top of the answering rules:" + _rule(
-        "When the customer names a time they need something by and the facts "
-        "give a notice period for it, call check_notice and answer from its "
-        "result: say plainly whether the notice is met, and if it isn't, that "
-        "it can't be promised for that time. Missed notice is never \"just "
-        "under\" or \"right at\" the window. With no time named (\"how much "
-        "notice for a cake?\"), state the notice and don't call it.")
+    text = "\n\nRules for this question, on top of the answering rules:"
+    if "notice" in which:
+        text += _rule(
+            "When the customer names a time they need something by and the "
+            "facts give a notice period for it, call check_notice and answer "
+            "from its result: say plainly whether the notice is met, and if it "
+            "isn't, that it can't be promised for that time. Missed notice is "
+            "never \"just under\" or \"right at\" the window. With no time "
+            "named (\"how much notice for a cake?\"), state the notice and "
+            "don't call it.")
     policy = cancellation(config)
-    if policy:
+    if policy and "cancellation" in which:
         what = policy.get("what", "order")
         several = len(_kinds(policy)) > 1
         text += _rule(

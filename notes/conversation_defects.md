@@ -864,3 +864,19 @@ one-kind businesses, `no_charge` and `{charge_percent: N}`, the business's
 own words ("cancelled or moved", "the service"), notes lines. Sunrise's
 rendered text is unchanged (its rubric quotes still match). check_notice's
 description now says it isn't for cancelling or moving.
+
+### Two regressions from the last round, fixed (2026-10-03)
+
+- **"can I get my colour done at 4pm" → "which day?"** (3/3, passed every run
+  before). Once Belmont had cancellation rules, any message with a time
+  brought the cancellation tool, its rules and the rendered policy too.
+  `needs_tools` now returns which tools a message calls for: a time brings
+  check_notice, cancelling brings cancellation_outcome and its rules. A
+  4pm question gets exactly what it got when it passed.
+- **Routing: "custom cake" after "which kind of cake?" still → book**, 3/3,
+  even with the bot's question in the classifier's prompt. Now decided in
+  code too: if the bot's last message ended with "?" and the reply carries
+  nothing that starts an order (order/book/I'd like, a day, a time, a
+  number), it's a question whatever the classifier says
+  (`llm.answers_previous_question`). The costs are lopsided: wrongly to Q&A
+  is one extra message, wrongly to booking traps the customer.

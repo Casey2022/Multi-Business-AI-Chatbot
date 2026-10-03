@@ -149,6 +149,34 @@ def main():
         llm.classify_and_extract("a custom cake for Friday", slots, cfg)
         check("no previous message: no context block",
               "<assistant_message>" not in sent[0]["messages"][0]["content"])
+        sent.clear()
+        llm._create = fake([reply(block(type="text", text='{"intent": "book", '
+                                                     '"service": "custom cake"}'))])
+        result = llm.classify_and_extract("custom cake", slots, cfg,
+                                          previous_reply=ASKED)
+        check("the model says book anyway (as it did 3/3): code makes it a question",
+              result == {"intent": "question"}, result)
+        offered = ("We'd love to make it! Text 'order' to get started, or tell "
+                   "me what you'd like.")
+        for message, previous, answering in (
+                ("custom cake", ASKED, True),
+                ("the wedding one", ASKED, True),
+                ("custom cake", ASKED + " 🎂", True),
+                ("a custom cake for Saturday please", offered, False),
+                ("custom cake", offered, False),      # not a question: no "?"
+                ("custom cake", None, False),
+                ("I'd like to order one", ASKED, False),
+                ("2 dozen", ASKED, False)):
+            check(f"answers the bot's question = {answering}: {message!r} after "
+                  f"{(previous or 'nothing')[-25:]!r}",
+                  llm.answers_previous_question(message, previous) is answering)
+        sent.clear()
+        llm._create = fake([reply(block(type="text", text='{"intent": "book", '
+                                                     '"datetime": "Saturday"}'))])
+        result = llm.classify_and_extract("a custom cake for Saturday please",
+                                          slots, cfg, previous_reply=offered)
+        check("a real order after the bot's offer is still a booking",
+              result.get("intent") == "book", result)
         app_src = (ROOT / "app.py").read_text()
         check("app.py hands the classifier the bot's previous reply",
               "previous_reply=previous_reply" in app_src)

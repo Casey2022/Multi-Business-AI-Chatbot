@@ -217,6 +217,17 @@ def main():
               "how soon can you start", "how much notice for a custom cake",
               "are you open Mondays", "do you make cookies"):
         check(f"no tools: {q}", not gets(q))
+    bel_cfg = yaml_config("belmont_hair_studio")
+    check("a time alone brings only the notice tool (Belmont 'colour at 4pm')",
+          policy.needs_tools("can I get my colour done at 4pm", bel_cfg) == {"notice"})
+    check("and only the notice rule: no cancellation rules or policy text",
+          "cancellation_outcome" not in policy.prompt_section(bel_cfg, {"notice"})
+          and "no-show" not in policy.prompt_section(bel_cfg, {"notice"}))
+    check("cancelling with a time brings both",
+          policy.needs_tools("my colour is at 9am tomorrow and it's 10am now, "
+                             "what if I cancel", bel_cfg) == {"notice", "cancellation"})
+    check("cancelling with no time brings only cancellation",
+          policy.needs_tools("what happens if I cancel late", bel_cfg) == {"cancellation"})
     check("'cancel' alone gets tools only where there are cancellation rules",
           gets("can I cancel?") and not gets("can I cancel?", "bobs_plumbing"))
     schema = policy.cancellation_tool(cfg)["input_schema"]["properties"]
