@@ -82,7 +82,9 @@ JOURNEYS = [
         "turns": [
             {"say": "I cancelled three days before, do I get my deposit back?",
              "state": "idle",
-             "must": [r"7 days|seven days", DEPOSIT_GONE],
+             # "7[\s-]days": "the 48-hours-to-7-days window" is a right answer
+             # that "7 days" failed (2026-10-04). Assert the fact, not a spelling.
+             "must": [r"7[\s-]+days?|seven[\s-]+days?|a week", DEPOSIT_GONE],
              "must_not": [r"which (kind|type) of cake", r"custom (cake )?or (a )?wedding( cake)?\?"],
              "rubric": rubrics.DEPOSIT_THREE_DAYS},
             {"say": "custom cake", "state": "idle", "must_not": [NAME_ASK]},

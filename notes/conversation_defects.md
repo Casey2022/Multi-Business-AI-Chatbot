@@ -1015,3 +1015,11 @@ but not required, since this message names cancelling but not when (that
 was two messages back), and Sunrise's guardrail "you cannot look up
 existing orders" won over stating the policy. `must_apply_cancellation`
 now counts timing from the customer's last two messages as well.
+
+### journey_eval, third run: 5/6, and the failure was the test (2026-10-04)
+
+Bakery turn 3 now states the rule every run (the history-aware tool
+requirement held). The one failure: turn 1 said "falls in the
+48-hours-to-7-days window", a right answer the judge passed, and my pattern
+wanted "7 days" with a space. Same lesson as rag_eval's normalise():
+assert the fact, not a spelling.
