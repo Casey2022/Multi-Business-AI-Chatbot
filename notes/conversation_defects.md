@@ -1004,3 +1004,14 @@ were 3/3. It found two things nothing else had:
 
 Unpinned, like the live site: 1-in-3 failures are exactly what a pinned
 eval hides and a customer meets.
+
+### journey_eval, second run: 5/6 (2026-10-04)
+
+Both fixes held ("custom cake" answered, not an order; Friday 3/3), and
+rag_eval --all stayed 50/50. One left: bakery turn 3, "no, I want to know
+about a cake I already ordered and cancelled. Can I get my deposit back?"
+got "I can't look up your existing order, call us". The tool was offered
+but not required, since this message names cancelling but not when (that
+was two messages back), and Sunrise's guardrail "you cannot look up
+existing orders" won over stating the policy. `must_apply_cancellation`
+now counts timing from the customer's last two messages as well.

@@ -888,7 +888,8 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
             # Required, not offered, when the message says both "cancel" and
             # when (policy.must_apply_cancellation). Not with a model that
             # thinks: forcing a tool is incompatible with extended thinking.
-            if policy.must_apply_cancellation(message, config) and not model_thinks:
+            if (policy.must_apply_cancellation(message, config, history)
+                    and not model_thinks):
                 call["tool_choice"] = {"type": "tool",
                                        "name": "cancellation_outcome"}
         if temperature is not None:

@@ -553,7 +553,7 @@ def needs_tools(message, config, history=None):
     return wanted
 
 
-def must_apply_cancellation(message, config):
+def must_apply_cancellation(message, config, history=None):
     """A cancellation question that says when: the tool is called, not optional.
 
     Live (2026-10-03), "I cancelled three days before, do I get my deposit
@@ -562,10 +562,18 @@ def must_apply_cancellation(message, config):
     The eval passed the same question with the model pinned; the live site
     isn't pinned. When the message names both cancelling and a time, the
     first call requires cancellation_outcome.
+
+    The timing can come from the customer's last couple of messages too.
+    journey_eval, 2026-10-04: "no, I want to know about a cake I already
+    ordered and cancelled" (timing given two messages earlier) wasn't forced,
+    and the guardrail "you cannot look up existing orders" won: "call us".
     """
     text = message or ""
-    return bool(cancellation(config) and _ABOUT_CANCELLING.search(text)
-                and _TIME_NAMED.search(text))
+    if not (cancellation(config) and _ABOUT_CANCELLING.search(text)):
+        return False
+    earlier = [m.get("content", "") for m in (history or [])
+               if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
+    return any(_TIME_NAMED.search(t or "") for t in [text, *earlier])
 
 
 def tools_for(config, which=("notice", "cancellation")):

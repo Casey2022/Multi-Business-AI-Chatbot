@@ -70,6 +70,16 @@ def main():
           not policy.must_apply_cancellation("what's your cancellation policy", cfg))
     check("not at a business without cancellation rules",
           not policy.must_apply_cancellation(OPENING, bobs))
+    earlier = [{"role": "user", "content": OPENING},
+               {"role": "assistant", "content": "The whole deposit is forfeited."},
+               {"role": "user", "content": "custom cake"},
+               {"role": "assistant", "content": "Same for custom cakes."}]
+    follow = ("no, I want to know about a cake I already ordered and cancelled. "
+              "Can I get my deposit back?")
+    check("journey_eval turn 3: timing two messages back still requires the tool",
+          policy.must_apply_cancellation(follow, cfg, earlier))
+    check("but not without any timing in this or the last two messages",
+          not policy.must_apply_cancellation(follow, cfg, []))
 
     real = (llm._create, llm.retrieve)
     llm.retrieve = lambda *a, **k: []
