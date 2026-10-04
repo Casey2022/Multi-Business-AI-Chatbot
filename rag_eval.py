@@ -406,6 +406,12 @@ HARD = {
         ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
     ],
     "ridgeline_contracting": [
+        # Business days (2026-10-04): counting them across a weekend is the
+        # sum the model gets wrong; add_business_days does it now.
+        ("the estimator came out yesterday, when should I expect my quote",
+                                                  "How Estimates Work", rubrics.QUOTE_AFTER_THURSDAY),
+        ("if I book an estimate today, how soon could someone come out",
+                                                  "How Estimates Work", rubrics.ESTIMATE_VISIT_FRIDAY),
         ("can you start my roof next week, rain is forecast",
                                                   "Roofing",           ("won't", "will not", "weather")),
         ("my basement gets a bit damp, can you still finish it",
@@ -463,6 +469,14 @@ HARD = {
 from datetime import datetime as _dt
 DEFAULT_CLOCK = _dt(2026, 9, 22, 10, 0)          # a Tuesday, 10am: all five open
 CLOCKS = {
+    # Friday 9 October: "yesterday" is Thursday, so three business days on
+    # is Tuesday the 13th (not Sunday).
+    "the estimator came out yesterday, when should I expect my quote":
+        _dt(2026, 10, 9, 10, 0),
+    # Friday 2 October: two to five business days out is Tuesday the 6th to
+    # Friday the 9th.
+    "if I book an estimate today, how soon could someone come out":
+        _dt(2026, 10, 2, 10, 0),
     "it's 2am and my basement is flooding, what will it cost to get someone out":
         _dt(2026, 9, 22, 2, 0),
     "my kid wants a themed cake for Saturday and it's Friday":

@@ -146,3 +146,28 @@ PARTY_TRAY_FRIDAY_FIVE = Rubric(
     without food tonight: telling them to order for another time, or implying
     regular pizzas, wings or subs are cut off too, when they can still be
     ordered tonight.""")
+
+
+ESTIMATE_VISIT_FRIDAY = Rubric(
+    # 2026-10-04: business days. It's Friday; two to five business days out
+    # skips the weekend.
+    quote=("We book\nestimates two to five business days out, sooner if we have "
+           "a\ncancellation."),
+    criteria="""It's Friday. Says estimate visits are booked two to five
+    business days out, and if it names days, they skip the weekend: the
+    earliest is Tuesday and the latest the following Friday. Saying it can be
+    sooner with a cancellation is fine, and so is offering to book. Fails if
+    it counts Saturday or Sunday as business days (for example, says Sunday
+    or Monday is two business days away), or promises a specific day as
+    certain.""")
+
+
+QUOTE_AFTER_THURSDAY = Rubric(
+    # 2026-10-04: business days. It's Friday; the visit was Thursday.
+    quote="sends a written quote within three business days",
+    criteria="""It's Friday and the estimate visit was yesterday, Thursday.
+    Says the written quote comes within three business days, and if it names
+    a day, it's by Tuesday, because the weekend doesn't count. Fails if it
+    counts Saturday or Sunday (for example, says the quote will come by
+    Sunday or Monday), or drops "business" so that three days lands on the
+    weekend.""")

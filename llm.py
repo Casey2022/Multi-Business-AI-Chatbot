@@ -836,11 +836,6 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # tools in policy.py, offered only when the message needs them; so is
     # the text saying when to call them, and the business's rendered
     # cancellation rules.
-    wanted = policy.needs_tools(message, config, history)
-    tools = policy.tools_for(config, wanted) if wanted else []
-    if tools:
-        system_for_call += policy.prompt_section(config, wanted)
-
     # RAG retrieval: find document chunks relevant to this specific message.
     # retrieve() now takes config so it queries the right business collection.
     try:
@@ -850,6 +845,14 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         # anyway, with no policy text in front of the model, is how a
         # receptionist invents a deposit rule. Say so and point to a human.
         return unavailable_reply(config)
+
+    # Decided after retrieval: the business-days tool is offered only when
+    # the excerpts in front of the model count in business days.
+    wanted = policy.needs_tools(message, config, history,
+                                facts=[c for c, _ in (retrieved_chunks or [])])
+    tools = policy.tools_for(config, wanted) if wanted else []
+    if tools:
+        system_for_call += policy.prompt_section(config, wanted)
 
     if retrieved_chunks:
         context_block = "\n\n".join(

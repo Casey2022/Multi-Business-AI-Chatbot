@@ -1023,3 +1023,21 @@ requirement held). The one failure: turn 1 said "falls in the
 48-hours-to-7-days window", a right answer the judge passed, and my pattern
 wanted "7 days" with a space. Same lesson as rag_eval's normalise():
 assert the fact, not a spelling.
+
+## Business days: add_business_days (2026-10-04)
+
+Ridgeline quotes "within three business days" of the visit and books
+estimates "two to five business days out". Counting that across a weekend is
+the kind of sum the model gets wrong, so it's a tool now:
+`add_business_days(start, business_days, up_to_business_days, what)`.
+Business days are the days the business has hours (its calendar's
+business_hours; Monday to Friday if none), counting from the day after the
+start. Public holidays aren't known, and the result says so.
+
+Offered only when the retrieved excerpts mention business days AND the
+customer asks when (or names a day or time); tools are now decided after
+retrieval for that reason. The business-day figure stays in the document,
+one copy, like notice periods. Two new hard rows with pinned Fridays: the
+quote after Thursday's visit (Tuesday, not Sunday) and how soon a visit can
+be booked (Tuesday to the next Friday), both rubrics, since the right day is
+computed, not written in the document.

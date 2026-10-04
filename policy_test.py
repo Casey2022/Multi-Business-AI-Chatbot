@@ -147,6 +147,48 @@ def main():
                           "notice_hours": 72, "what": "a cake", "order_by": None,
                           "order_by_days": None}, {}, now=TUE_6PM)["enough_notice"] is True)
 
+    heading("business days: Ridgeline's quote and visit windows")
+    ridge = yaml_config("ridgeline_contracting")
+    check("Ridgeline is open Monday to Friday (from its calendar hours)",
+          policy.business_weekdays(ridge) == {0, 1, 2, 3, 4})
+    check("no hours set: Monday to Friday", policy.business_weekdays({}) == {0, 1, 2, 3, 4})
+    check("a Saturday-opening business counts Saturdays",
+          5 in policy.business_weekdays({"calendar": {"scheduling": {"business_hours": {
+              1: ["9", "6"], 5: ["9", "6"]}}}}))
+    r = policy.add_business_days("2026-10-08", 3, what="the quote", config=ridge)
+    check("Thursday + 3 business days = Tuesday (the weekend skipped)",
+          r["date"] == "Tuesday, October 13", r)
+    check("says weekends don't count, and that holidays aren't known",
+          "Saturdays and Sundays don't count" in r["say"] and "holiday" in r["say"], r["say"])
+    r = policy.add_business_days("2026-10-02", 2, up_to=5, config=ridge)
+    check("Friday + 2 to 5 business days = Tuesday to next Friday",
+          r["date"] == "Tuesday, October 6" and r["date_latest"] == "Friday, October 9", r)
+    check("starting on a Saturday, 1 business day is Monday",
+          policy.add_business_days("2026-10-03", 1, config=ridge)["date"] == "Monday, October 5")
+    check("0 business days is the start day",
+          policy.add_business_days("2026-10-08", 0, config=ridge)["date"] == "Thursday, October 8")
+    check("a datetime start is fine (the date is used)",
+          policy.add_business_days("2026-10-08T15:00", 3, config=ridge)["date"]
+          == "Tuesday, October 13")
+    check("negative or backwards ranges are errors",
+          "error" in policy.run_tool("add_business_days", {"start": "2026-10-08",
+                                     "business_days": 5, "up_to_business_days": 2,
+                                     "what": "x"}, ridge))
+    facts = ["## How Estimates Work\n...sends a written quote within three business days."]
+    check("offered when the excerpts count business days and they ask when",
+          policy.needs_tools("the estimator came yesterday, when will I get my quote?",
+                             ridge, facts=facts) == {"business_days"})
+    check("not when the excerpts don't mention business days",
+          "business_days" not in policy.needs_tools("when will I get my quote?", ridge,
+                                                    facts=["## Roofing\n..."]))
+    check("not when they don't ask when",
+          "business_days" not in policy.needs_tools("what does a roof cost", ridge, facts=facts))
+    check("its rule is in the prompt section only when offered",
+          "add_business_days" in policy.prompt_section(ridge, {"business_days"})
+          and "add_business_days" not in policy.prompt_section(ridge, {"notice"}))
+    check("the tool is offered only when wanted",
+          [t["name"] for t in policy.tools_for(ridge, {"business_days"})] == ["add_business_days"])
+
     heading("cancellation windows: Sunrise's real rules")
     cfg = yaml_config("sunrise_bakery_and_cafe")
     out = lambda **k: policy.cancellation_outcome(cfg, **k)

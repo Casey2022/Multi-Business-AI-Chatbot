@@ -192,6 +192,105 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
 
 
 # ---------------------------------------------------------------------------
+# Business days
+# ---------------------------------------------------------------------------
+#
+# Ridgeline quotes "within three business days" of the visit and books
+# estimates "two to five business days out". Counting that from a Thursday
+# means skipping a weekend, which is the kind of sum the model gets wrong.
+# Business days are the days the business has hours (its calendar's
+# business_hours), Monday to Friday if none are set. Public holidays aren't
+# known, and the result says so.
+
+def business_weekdays(config=None):
+    """Weekday numbers (Monday = 0) the business is open."""
+    hours = ((((config or {}).get("calendar") or {}).get("scheduling") or {})
+             .get("business_hours") or {})
+    days = set()
+    for key in hours:
+        try:
+            if hours[key]:
+                days.add(int(key))
+        except (TypeError, ValueError):
+            continue
+    return days or {0, 1, 2, 3, 4}
+
+
+def _date_only(text):
+    text = str(text).strip()
+    return datetime.fromisoformat(text[:10]).date()
+
+
+def _after_business_days(start, n, open_days):
+    day, counted = start, 0
+    while counted < n:
+        day += timedelta(days=1)
+        if day.weekday() in open_days:
+            counted += 1
+    return day
+
+
+def _day(d):
+    return f"{d.strftime('%A, %B')} {d.day}"
+
+
+def add_business_days(start, business_days, up_to=None, what=None, config=None):
+    """The date `business_days` business days after `start` (and, for a
+    range, after `up_to`). Counting starts the day after `start`."""
+    begin = _date_only(start)
+    n = int(business_days)
+    if n < 0 or (up_to is not None and int(up_to) < n):
+        raise ValueError("business days must be 0 or more, and up_to >= business_days")
+    open_days = business_weekdays(config)
+    first = _after_business_days(begin, n, open_days)
+    closed = [_WEEKDAYS[d].capitalize() + "s" for d in range(7) if d not in open_days]
+    result = {"start": _day(begin), "business_days": n, "date": _day(first),
+              "closed_days": closed}
+    label = (what or "it").strip()
+    if up_to is not None and int(up_to) != n:
+        last = _after_business_days(begin, int(up_to), open_days)
+        result.update(up_to_business_days=int(up_to), date_latest=_day(last))
+        say = (f"{n} to {int(up_to)} business days after {_day(begin)} is "
+               f"{_day(first)} to {_day(last)}")
+    else:
+        say = f"{n} business day{'s' if n != 1 else ''} after {_day(begin)} is {_day(first)}"
+    result["say"] = (f"{say}, for {label}. "
+                     + (f"{' and '.join(closed)} don't count. " if closed else "")
+                     + "Public holidays aren't counted, so a holiday in between "
+                       "would push it back a day.")
+    return result
+
+
+ADD_BUSINESS_DAYS_TOOL = {
+    "name": "add_business_days",
+    "description": (
+        "Count business days for the customer: the date that is N business "
+        "days after a start date (skipping the days this business is "
+        "closed), or a range for \"N to M business days\". Use it whenever "
+        "the facts give a time in business days and the customer asks when. "
+        "Don't count the days yourself."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "start": {"type": "string",
+                      "description": "The start date, YYYY-MM-DD, worked out "
+                                     "from today's date in the prompt (e.g. "
+                                     "the day of the visit, or today)."},
+            "business_days": {"type": "integer",
+                              "description": "How many business days, from the facts."},
+            "up_to_business_days": {
+                "type": ["integer", "null"],
+                "description": "For a range (\"2 to 5 business days\"), the "
+                               "upper number; otherwise null."},
+            "what": {"type": "string",
+                     "description": "What happens then, as the facts put it."},
+        },
+        "required": ["start", "business_days", "up_to_business_days", "what"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # Cancellation windows
 # ---------------------------------------------------------------------------
 
@@ -540,16 +639,27 @@ def _wants_tools(text, config):
     return wanted
 
 
-def needs_tools(message, config, history=None):
+_ASKS_WHEN = re.compile(
+    r"\b(?:when|how long|how soon|what day|which day|by what date|turnaround)\b"
+    rf"|\b{_DAYS}\b", re.I)
+_BUSINESS_DAYS = re.compile(r"\bbusiness days?\b", re.I)
+
+
+def needs_tools(message, config, history=None, facts=None):
     """The tools this message (or the customer's last couple) calls for.
 
     A set; empty means none, and the prompt is exactly the standing one.
+    `facts` are the retrieved excerpts: "business_days" is wanted only when
+    they count in business days and the customer is asking when.
     """
     earlier = [m.get("content", "") for m in (history or [])
                if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
     wanted = set()
     for text in [message, *earlier]:
         wanted |= _wants_tools(text, config)
+    if (any(_BUSINESS_DAYS.search(f or "") for f in (facts or []))
+            and (_ASKS_WHEN.search(message or "") or _TIME_NAMED.search(message or ""))):
+        wanted.add("business_days")
     return wanted
 
 
@@ -580,6 +690,8 @@ def tools_for(config, which=("notice", "cancellation")):
     tools = []
     if "notice" in which:
         tools.append(CHECK_NOTICE_TOOL)
+    if "business_days" in which:
+        tools.append(ADD_BUSINESS_DAYS_TOOL)
     if "cancellation" in which and cancellation(config):
         tools.append(cancellation_tool(config))
     return tools
@@ -604,6 +716,12 @@ def prompt_section(config, which=("notice", "cancellation")):
             "also give an order-by time for it, pass that too. With no time "
             "named (\"how much notice for a cake?\"), state the notice and "
             "don't call it.")
+    if "business_days" in which:
+        text += _rule(
+            "When the facts give a time in business days and the customer "
+            "asks when something will happen, call add_business_days and "
+            "answer from its result. Don't count the days yourself: weekends "
+            "and closed days don't count.")
     policy = cancellation(config)
     if policy and "cancellation" in which:
         what = policy.get("what", "order")
@@ -632,6 +750,12 @@ def run_tool(name, arguments, config, now=None):
                                 arguments.get("what"), config, now,
                                 order_by=arguments.get("order_by"),
                                 order_by_days=arguments.get("order_by_days"))
+        if name == "add_business_days":
+            return add_business_days(arguments.get("start"),
+                                     arguments.get("business_days"),
+                                     up_to=arguments.get("up_to_business_days"),
+                                     what=arguments.get("what"),
+                                     config=config)
         if name == "cancellation_outcome" and cancellation(config):
             return cancellation_outcome(
                 config,
