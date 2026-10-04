@@ -985,3 +985,22 @@ booking after a question (guards the routing fixes from over-reaching).
 Each turn checks the booking state after it, patterns that must and mustn't
 appear, and optionally a rubric. A smoke run with a fake model confirmed
 the plumbing: wrong routing fails the state checks, right routing passes.
+
+### journey_eval's first run: 4/6, two real bugs (2026-10-03)
+
+Pickup, "can I order here?", Belmont 23 hours and the Bob's booking guard
+were 3/3. It found two things nothing else had:
+
+- **"custom cake" after a deposit answer started an order, 3/3.** The bot
+  answered without asking which kind (good), so the "answer to the bot's
+  question" override didn't apply, and the classifier read "custom cake" as
+  an order. Now also overridden when either of the customer's last two
+  messages was about cancelling, refunds or deposits and the new one has
+  nothing that starts an order (`llm.about_existing_order`).
+- **Crosstown Friday, 1/3: "You're in! You have until 6pm tonight... which
+  tray you'd like".** check_notice was called without the 4pm cutoff,
+  because order_by was optional. It's now required (nullable): the model
+  has to look and write null if there's none.
+
+Unpinned, like the live site: 1-in-3 failures are exactly what a pinned
+eval hides and a customer meets.

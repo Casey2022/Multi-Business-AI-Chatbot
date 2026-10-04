@@ -469,7 +469,32 @@ def answers_previous_question(message, previous_reply):
     return ending.endswith("?") and not _BOOKING_CUE.search(message)
 
 
-def classify_and_extract(message, slots, config, previous_reply=None):
+# A conversation about an order that already exists: cancelling, refunds,
+# deposits, "I already ordered".
+_EXISTING_ORDER = re.compile(
+    r"\b(?:cancel\w*|refund\w*|deposits?|already\s+(?:ordered|booked|paid))\b",
+    re.I)
+
+
+def about_existing_order(message, history):
+    """Is this a follow-up in a conversation about an existing order?
+
+    journey_eval, 2026-10-03, 3 runs in 3: the deposit question was answered
+    (no question back this time, so answers_previous_question didn't apply),
+    the customer added "custom cake", and the classifier started an order.
+    When either of the customer's last two messages was about cancelling,
+    refunds or deposits, a reply with nothing that starts an order is part
+    of that conversation, not a new one.
+    """
+    if not history or _BOOKING_CUE.search(message or ""):
+        return False
+    earlier = [m.get("content", "") for m in history
+               if m.get("role") == "user"][-2:]
+    return any(_EXISTING_ORDER.search(t or "") for t in earlier)
+
+
+def classify_and_extract(message, slots, config, previous_reply=None,
+                         history=None):
     """Decide whether a message is a booking request, and pull any slots from it.
 
     Runs only on messages the rules engine didn't handle, so short commands
@@ -576,8 +601,10 @@ examples, however it is phrased.
         if intent not in ("book", "question"):
             return {"intent": "question"}
 
-        if intent == "book" and answers_previous_question(message, previous_reply):
-            log.info("Classifier said book; it answers the bot's question, so "
+        if intent == "book" and (answers_previous_question(message, previous_reply)
+                                 or about_existing_order(message, history)):
+            log.info("Classifier said book; it continues the conversation "
+                     "(an answer to the bot, or about an existing order), so "
                      "it's a question")
             return {"intent": "question"}
 

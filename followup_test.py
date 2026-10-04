@@ -183,6 +183,33 @@ def main():
     finally:
         llm._create, llm.retrieve = real
 
+    heading("journey_eval: a follow-up about a cancelled order isn't a new order")
+    told = [{"role": "user", "content": OPENING},
+            {"role": "assistant", "content": "Cancelling between 48 hours and 7 "
+             "days before forfeits the whole deposit."}]
+    check("'custom cake' after a deposit answer (no question back) continues it",
+          llm.about_existing_order("custom cake", told))
+    check("but 'I'd like to order a custom cake for Saturday' is a new order",
+          not llm.about_existing_order("I'd like to order a custom cake for Saturday", told))
+    check("and with no cancel/refund/deposit talk, nothing changes",
+          not llm.about_existing_order("custom cake", [
+              {"role": "user", "content": "do you do custom cakes?"},
+              {"role": "assistant", "content": "We do, from $45."}]))
+    sent.clear()
+    real_c = llm._create
+    llm._create = lambda **call: types.SimpleNamespace(content=[types.SimpleNamespace(
+        type="text", text='{"intent": "book", "service": "custom cake"}')], usage=None)
+    try:
+        result = llm.classify_and_extract("custom cake", sched.get_slot_definitions(cfg),
+                                          cfg, previous_reply=told[-1]["content"],
+                                          history=told)
+    finally:
+        llm._create = real_c
+    check("the classifier says book; with the history, code makes it a question",
+          result == {"intent": "question"}, result)
+    check("conversation.py passes the history to the classifier",
+          "history=history" in (ROOT / "conversation.py").read_text())
+
     heading("(3) saying it isn't an order leaves the booking flow")
     for text in ("no, I want to know about a cake I already ordered and cancelled. "
                  "Can I get my deposit back?",

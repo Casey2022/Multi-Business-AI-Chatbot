@@ -75,7 +75,8 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
             previous_reply = next((m.get("content") for m in reversed(history)
                                    if m.get("role") == "assistant"), None)
             result = classify_and_extract(message, slots, config,
-                                          previous_reply=previous_reply)
+                                          previous_reply=previous_reply,
+                                          history=history)
 
             if result.get("intent") == "book":
                 log.info(f"Booking intent detected (LLM) for {sender_id}")

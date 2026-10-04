@@ -418,20 +418,25 @@ CHECK_NOTICE_TOOL = {
             "what": {
                 "type": "string",
                 "description": "What it is, as the facts name it."},
+            # Required (but nullable) since 2026-10-03: optional, it was left
+            # out 1 run in 3 at Crosstown and the bot promised a tray after
+            # the 4pm cutoff. Required, the model has to look and decide.
             "order_by": {
-                "type": "string",
+                "type": ["string", "null"],
                 "description": (
-                    "Only if the facts ALSO give a clock time it must be "
-                    "ordered by (\"order by noon on weekends\"): that time "
-                    "as HH:MM, 24-hour.")},
+                    "Check the facts for a clock time it must be ordered by "
+                    "(\"order by noon on weekends\"): that time as HH:MM, "
+                    "24-hour. null only if the facts give none for this thing.")},
             "order_by_days": {
-                "type": "array", "items": {"type": "string"},
+                "type": ["array", "null"], "items": {"type": "string"},
                 "description": (
                     "The weekdays that order-by time applies to, if the "
                     "facts limit it (e.g. [\"saturday\", \"sunday\"]). "
-                    "Leave out if it applies every day.")},
+                    "null if it applies every day or there is no order-by "
+                    "time.")},
         },
-        "required": ["needed_by", "notice_hours", "what"],
+        "required": ["needed_by", "notice_hours", "what", "order_by",
+                     "order_by_days"],
     },
 }
 

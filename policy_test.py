@@ -138,6 +138,15 @@ def main():
           ", so there is enough time" in policy.check_notice(
               "2026-09-26T09:00", 72, "a custom cake", now=TUE_6PM)["say"])
 
+    req = policy.CHECK_NOTICE_TOOL["input_schema"]["required"]
+    check("order_by is required (nullable): the model must look for a cutoff",
+          "order_by" in req and "order_by_days" in req and
+          "null" in policy.CHECK_NOTICE_TOOL["input_schema"]["properties"]["order_by"]["type"])
+    check("null order_by / order_by_days from the model work",
+          policy.run_tool("check_notice", {"needed_by": "2026-09-26T09:00",
+                          "notice_hours": 72, "what": "a cake", "order_by": None,
+                          "order_by_days": None}, {}, now=TUE_6PM)["enough_notice"] is True)
+
     heading("cancellation windows: Sunrise's real rules")
     cfg = yaml_config("sunrise_bakery_and_cafe")
     out = lambda **k: policy.cancellation_outcome(cfg, **k)
