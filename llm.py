@@ -895,6 +895,13 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
                     and not model_thinks):
                 call["tool_choice"] = {"type": "tool",
                                        "name": "cancellation_outcome"}
+            # Business days are offered only with a day to count from, and
+            # then required: offered, the model counted for itself and said
+            # "Wednesday or Thursday" for two business days after a Friday,
+            # 3 runs in 3 (2026-10-05).
+            elif "business_days" in wanted and not model_thinks:
+                call["tool_choice"] = {"type": "tool",
+                                       "name": "add_business_days"}
         if temperature is not None:
             call["temperature"] = temperature
         reply = _reply_using_tools(call, config, now)

@@ -183,6 +183,14 @@ def main():
                                                     facts=["## Roofing\n..."]))
     check("not when they don't ask when",
           "business_days" not in policy.needs_tools("what does a roof cost", ridge, facts=facts))
+    check("not without a day to count from ('how long until I get the quote' "
+          "is answered with the figure, not a question back)",
+          "business_days" not in policy.needs_tools("how long until I get the quote",
+                                                    ridge, facts=facts))
+    r = policy.add_business_days("2026-10-08", 3, what="the written quote", config=ridge)
+    check("the result leads with the rule, then the date",
+          r["say"].startswith("The rule: 3 business days, for the written quote.")
+          and r["say"].index("3 business days") < r["say"].index("Tuesday"), r["say"])
     check("its rule is in the prompt section only when offered",
           "add_business_days" in policy.prompt_section(ridge, {"business_days"})
           and "add_business_days" not in policy.prompt_section(ridge, {"notice"}))
@@ -401,6 +409,30 @@ def main():
               sent[1]["messages"][-2]["role"] == "assistant" and
               any(b.get("type") == "tool_use"
                   for b in sent[1]["messages"][-2]["content"]))
+
+        sent.clear()
+        ridge_cfg = load_config(str(ROOT / "config" / "ridgeline_contracting.yaml"))
+        llm.retrieve = lambda *a, **k: [("## How Estimates Work\n... sends a "
+                                         "written quote within three business days.", 0.2)]
+        llm._create = fake([
+            reply(use_block("b1", "add_business_days", {"start": "2026-10-08",
+                  "business_days": 3, "up_to_business_days": None, "what": "the quote"})),
+            reply(text_block("Within three business days: by Tuesday, October 13."))])
+        llm.get_llm_reply("the estimator came out yesterday, when should I expect my quote",
+                          [], ridge_cfg, now=datetime(2026, 10, 9, 10, 0))
+        check("business days with a day to count from: the tool is required",
+              sent[0].get("tool_choice") == {"type": "tool", "name": "add_business_days"},
+              sent[0].get("tool_choice"))
+        check("and the result reaches the model",
+              "Tuesday, October 13" in sent[1]["messages"][-1]["content"][0]["content"])
+        sent.clear()
+        llm._create = fake([reply(text_block("Within three business days of the visit."))])
+        llm.get_llm_reply("how long until I get the quote", [], ridge_cfg,
+                          now=datetime(2026, 10, 9, 10, 0))
+        check("no day to count from: no business-days tool, nothing forced",
+              "tool_choice" not in sent[0] and
+              "add_business_days" not in [x["name"] for x in sent[0].get("tools", [])])
+        llm.retrieve = lambda *a, **k: []
 
         sent.clear()
         llm._create = fake([reply(text_block("We're open 7am to 3pm."))])

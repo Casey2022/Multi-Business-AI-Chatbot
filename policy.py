@@ -247,14 +247,19 @@ def add_business_days(start, business_days, up_to=None, what=None, config=None):
     result = {"start": _day(begin), "business_days": n, "date": _day(first),
               "closed_days": closed}
     label = (what or "it").strip()
+    # The rule first, then the date: with the date first ("3 business days
+    # after Thursday is Tuesday"), the model said "by Tuesday" and dropped
+    # the rule (rag_eval 2026-10-05), as it did with the deposit tool.
     if up_to is not None and int(up_to) != n:
         last = _after_business_days(begin, int(up_to), open_days)
         result.update(up_to_business_days=int(up_to), date_latest=_day(last))
-        say = (f"{n} to {int(up_to)} business days after {_day(begin)} is "
-               f"{_day(first)} to {_day(last)}")
+        say = (f"The rule: {n} to {int(up_to)} business days, for {label}. "
+               f"Counting from {_day(begin)}, that's {_day(first)} at the "
+               f"earliest and {_day(last)} at the latest")
     else:
-        say = f"{n} business day{'s' if n != 1 else ''} after {_day(begin)} is {_day(first)}"
-    result["say"] = (f"{say}, for {label}. "
+        say = (f"The rule: {n} business day{'s' if n != 1 else ''}, for {label}. "
+               f"Counting from {_day(begin)}, that's {_day(first)}")
+    result["say"] = (f"{say}. "
                      + (f"{' and '.join(closed)} don't count. " if closed else "")
                      + "Public holidays aren't counted, so a holiday in between "
                        "would push it back a day.")
@@ -639,9 +644,13 @@ def _wants_tools(text, config):
     return wanted
 
 
-_ASKS_WHEN = re.compile(
-    r"\b(?:when|how long|how soon|what day|which day|by what date|turnaround)\b"
-    rf"|\b{_DAYS}\b", re.I)
+# A day to count from. Offered on any "when?" (2026-10-04), the tool made
+# the model ask for a start date it didn't have: "how long until I get the
+# quote" got "when is your visit?" instead of "within three business days".
+_DAY_TO_COUNT_FROM = re.compile(
+    r"\b(?:yesterday|today|tonight|tomorrow|last (?:week|" + _DAYS + r")"
+    r"|this (?:week|morning|afternoon)|next (?:week|" + _DAYS + r")|" + _DAYS + r")\b",
+    re.I)
 _BUSINESS_DAYS = re.compile(r"\bbusiness days?\b", re.I)
 
 
@@ -650,7 +659,7 @@ def needs_tools(message, config, history=None, facts=None):
 
     A set; empty means none, and the prompt is exactly the standing one.
     `facts` are the retrieved excerpts: "business_days" is wanted only when
-    they count in business days and the customer is asking when.
+    they count in business days and the customer gives a day to count from.
     """
     earlier = [m.get("content", "") for m in (history or [])
                if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
@@ -658,7 +667,8 @@ def needs_tools(message, config, history=None, facts=None):
     for text in [message, *earlier]:
         wanted |= _wants_tools(text, config)
     if (any(_BUSINESS_DAYS.search(f or "") for f in (facts or []))
-            and (_ASKS_WHEN.search(message or "") or _TIME_NAMED.search(message or ""))):
+            and (_DAY_TO_COUNT_FROM.search(message or "")
+                 or _TIME_NAMED.search(message or ""))):
         wanted.add("business_days")
     return wanted
 
@@ -719,8 +729,9 @@ def prompt_section(config, which=("notice", "cancellation")):
     if "business_days" in which:
         text += _rule(
             "When the facts give a time in business days and the customer "
-            "asks when something will happen, call add_business_days and "
-            "answer from its result. Don't count the days yourself: weekends "
+            "gives a day to count from, call add_business_days and answer "
+            "from its result: say the business-day figure from the facts AND "
+            "the date it comes to. Don't count the days yourself: weekends "
             "and closed days don't count.")
     policy = cancellation(config)
     if policy and "cancellation" in which:

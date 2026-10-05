@@ -1041,3 +1041,22 @@ one copy, like notice periods. Two new hard rows with pinned Fridays: the
 quote after Thursday's visit (Tuesday, not Sunday) and how soon a visit can
 be booked (Tuesday to the next Friday), both rubrics, since the right day is
 computed, not written in the document.
+
+### Business days, first eval: three fixes (2026-10-05)
+
+- **"how long until I get the quote" (core) → "when is your visit?"**, 3/3.
+  The tool was offered on any "when/how long", so the model went looking
+  for a start date it didn't have. Now offered only with a day to count
+  from (yesterday, today, a weekday, next week...).
+- **"came out yesterday" → "by Tuesday, October 13" with no rule** (2 of
+  3), once an invented 2–5 day window. The result now leads with the rule
+  ("The rule: 3 business days, for the written quote. Counting from
+  Thursday, October 8, that's Tuesday, October 13"), the deposit lesson
+  again, and the prompt asks for the figure AND the date.
+- **"book today, how soon?" → "Wednesday or Thursday"**, 3/3: the model
+  counted for itself. Offered only with a day to count from, the tool is
+  now also required on the first call.
+
+Journey: Belmont's "if you cancel before 9am tomorrow ... we'd charge 50%"
+is right, and `cancel (by|before) 9` failed it. The pattern now looks for
+the actual wrong answer: before 9 AND avoiding the charge.

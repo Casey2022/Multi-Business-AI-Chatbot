@@ -145,7 +145,13 @@ JOURNEYS = [
         "turns": [
             {"say": "my colour is at 9am tomorrow and it's 10am now, what if I cancel",
              "state": "idle", "must": [r"50\s?%"],
-             "must_not": [r"just under", r"cancel (by|before) 9"],
+             # The wrong answer is "cancel by 9 to AVOID the charge"; "if you
+             # cancel before 9am tomorrow we'd charge 50%" is right, and the
+             # first pattern failed it (2026-10-05).
+             "must_not": [r"just under",
+                          r"(avoid|no charge|free of charge|without (a |the |any )?charge)"
+                          r"[^.]*\b(by|before) 9|\b(by|before) 9[^.]*"
+                          r"(avoid|no charge|free of charge|without (a |the |any )?charge)"],
              "rubric": rubrics.CANCEL_23_HOURS},
         ],
     },
