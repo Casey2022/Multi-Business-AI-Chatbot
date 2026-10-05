@@ -1060,3 +1060,14 @@ computed, not written in the document.
 Journey: Belmont's "if you cancel before 9am tomorrow ... we'd charge 50%"
 is right, and `cancel (by|before) 9` failed it. The pattern now looks for
 the actual wrong answer: before 9 AND avoiding the charge.
+
+### Business days, done (2026-10-05)
+
+After `a565598`: Ridgeline 17/17 core, 12/12 hard (twice); rag_eval --all
+89/89, **52/52**; journey_eval 6/6 ×3.
+
+The tool pattern, learned three times now (deposits, cutoffs, business
+days): a tool the model may skip gets skipped, and a result that buries the
+rule gets trimmed to the outcome. So a new tool is offered only when its
+trigger is unambiguous, REQUIRED on the first call when offered, and its
+result says the rule first, then the customer's case.
