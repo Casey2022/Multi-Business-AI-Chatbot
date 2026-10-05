@@ -1071,3 +1071,26 @@ days): a tool the model may skip gets skipped, and a result that buries the
 rule gets trimmed to the outcome. So a new tool is offered only when its
 trigger is unambiguous, REQUIRED on the first call when offered, and its
 result says the rule first, then the customer's case.
+
+## Owner answer preview (2026-10-05)
+
+Owner-edit safeguard #2. An owner can write a true sentence the assistant
+reads wrongly ("A 10-inch gluten-free crust is available" → "$3 extra on any
+size"), and until now Publish was the first time anyone saw it, through a
+customer.
+
+"Preview answers" on the Knowledge page builds a throwaway index from the
+unpublished sections (`rag.db_chunks`, the same chunks Publish builds) and
+asks each question twice through `llm.get_llm_reply`: against the live index
+("Now") and the draft ("After you publish"). Same prompt, tools and model;
+only the index differs; answers pinned at temperature 0 so "Changes" means
+the content changed, not the wording. The draft index is per business (a
+demo clone never touches its template's) and deleted afterwards, success or
+failure. With the box empty it suggests up to five questions about the
+sections that changed since the last publish (draft chunks compared with the
+live index's), including one about a removed topic. Five questions at most,
+answered four at a time to stay inside the 60-second worker limit; two
+previews a minute and fifteen an hour per business, since demo visitors can
+edit a knowledge base. `preview_test.py` (34) pins all of it with a fake
+index and model; pointing "After" at the live index, or skipping the
+cleanup, fails it.

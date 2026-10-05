@@ -404,6 +404,62 @@ def example_section_title(business):
     return "Opening hours"
 
 
+@admin_bp.route("/business/<int:business_id>/knowledge/preview", methods=["POST"])
+@login_required
+def knowledge_preview(business_id):
+    """Answer a few questions from the unpublished sections, beside today's
+    answers, so the owner sees what Publish would change before customers
+    do. Renders the page directly with the results (nothing is saved)."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+
+    import ratelimit
+    import preview
+    from db import get_documents
+
+    allowed, wait = ratelimit.knowledge_preview(business_id)
+    if not allowed:
+        flash(f"Previews are limited to a few a minute. Try again in "
+              f"{max(wait, 1)} seconds.", "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+
+    config = load_config(business["config_path"], business_id)
+    questions = preview.parse_questions(request.form.get("questions", ""))
+    suggested = False
+    if not questions:
+        changed, removed = preview.changed_sections(config, business_id)
+        if not changed and not removed:
+            flash("Nothing has changed since you last published. Type a "
+                  "question or two to try.", "error")
+            return redirect(url_for("admin.knowledge", business_id=business_id))
+        questions = preview.suggest_questions(config, changed, removed)
+        suggested = True
+        if not questions:
+            flash("Couldn't suggest questions just now. Type one or two to "
+                  "try.", "error")
+            return redirect(url_for("admin.knowledge", business_id=business_id))
+
+    try:
+        results = preview.run_preview(config, business_id, questions)
+    except Exception as e:
+        log.exception("Preview failed for business %s", business_id)
+        flash(f"Couldn't run the preview: {type(e).__name__}. Nothing was "
+              f"changed.", "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+
+    return render_template(
+        "admin/knowledge.html",
+        business = business,
+        sections = get_documents(business_id),
+        example_title = example_section_title(business),
+        preview_results = results,
+        preview_questions = "\n".join(questions),
+        preview_suggested = suggested,
+    )
+
+
 @admin_bp.route("/business/<int:business_id>/knowledge/add", methods=["POST"])
 @login_required
 def knowledge_add(business_id):

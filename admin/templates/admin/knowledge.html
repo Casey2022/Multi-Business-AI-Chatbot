@@ -29,6 +29,59 @@
 </div>
 {% endif %}
 
+{% if sections %}
+<div class="card" id="preview">
+  <div class="card-title">Preview answers</div>
+  <div class="card-pad">
+    <div class="guidance">
+      See how the assistant would answer with your edits, before any customer
+      does. Each question is answered twice: as it is now, and as it will be
+      after you publish. Leave the box empty to get questions about the
+      sections you've changed.
+    </div>
+    <form method="POST" action="{{ url_for('admin.knowledge_preview', business_id=business.id) }}"
+          class="mt-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="field flush no-rule">
+        <label for="preview-questions">Questions to try (one per line, up to 5)</label>
+        <textarea id="preview-questions" name="questions" rows="3"
+                  placeholder="How much does it cost?">{{ preview_questions or '' }}</textarea>
+      </div>
+      <button class="btn" type="submit">Preview answers</button>
+    </form>
+
+    {% if preview_results %}
+    <div class="tablewrap mt-4">
+      <table>
+        <thead>
+          <tr><th>Question</th><th>Now</th><th>After you publish</th></tr>
+        </thead>
+        <tbody>
+          {% for r in preview_results %}
+          <tr>
+            <td class="cell-strong">{{ r.question }}</td>
+            <td>{{ r.now }}</td>
+            <td>{{ r.after }}
+              <div class="mt-4">
+                {% if r.changed %}<span class="chip chip-pending">Changes</span>
+                {% else %}<span class="chip chip-quiet">Same</span>{% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="guidance mt-4">
+      {% if preview_suggested %}These questions were suggested from the
+      sections you changed. {% endif %}Not what you meant? Edit the section
+      and preview again. Nothing changes for customers until you publish.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 {% for s in sections %}
 <div class="card">
   <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}">

@@ -149,6 +149,20 @@ def demo_start(ip):
     ])
 
 
+PREVIEW_PER_MINUTE = _limit("PREVIEW_PER_MINUTE", 2)
+PREVIEW_PER_HOUR   = _limit("PREVIEW_PER_HOUR", 15)
+
+
+def knowledge_preview(business_id):
+    """Limits for one owner preview: up to ten model calls and an index
+    build. Demo visitors can edit a knowledge base, so this is a public
+    way to spend tokens and needs a ceiling like the chat has."""
+    return check_all([
+        (f"preview:{business_id}", PREVIEW_PER_MINUTE, 60),
+        (f"preview:{business_id}", PREVIEW_PER_HOUR, 3600),
+    ])
+
+
 def login_attempt(ip, email):
     """Limits for one admin login attempt."""
     return check_all([

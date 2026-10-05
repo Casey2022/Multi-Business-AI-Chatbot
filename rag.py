@@ -307,6 +307,22 @@ def collection_for(config):
             or _slugify(business.get("name", "")))
 
 
+def db_chunks(business_id):
+    """(chunks, ids, metadatas) for a business's sections in the database.
+
+    One section, one chunk, "## title" first. Shared by Publish
+    (ingest_documents) and the owner's preview (preview.py), so the preview
+    searches exactly what Publish would build.
+    """
+    from db import get_documents
+    chunks, ids, metas = [], [], []
+    for s in get_documents(business_id):
+        chunks.append(f"## {s['title']}\n{s['body']}")
+        ids.append(f"section_{s['id']}")
+        metas.append({"source": "db", "section_id": s["id"], "title": s["title"]})
+    return chunks, ids, metas
+
+
 def ingest_documents(config, business_id=None):
     """Rebuild a business's vector collection from its document sections.
 
@@ -326,14 +342,8 @@ def ingest_documents(config, business_id=None):
     metas  = []
 
     if business_id is not None:
-        from db import get_documents
-        sections = get_documents(business_id)
-        log.info(f"Ingesting {len(sections)} section(s) from database")
-        for s in sections:
-            chunks.append(f"## {s['title']}\n{s['body']}")
-            ids.append(f"section_{s['id']}")
-            metas.append({"source": "db", "section_id": s["id"],
-                          "title": s["title"]})
+        chunks, ids, metas = db_chunks(business_id)
+        log.info(f"Ingesting {len(chunks)} section(s) from database")
     else:
         docs_path = Path("documents") / slug
         log.info(f"Ingesting documents from {docs_path}...")
