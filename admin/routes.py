@@ -375,12 +375,13 @@ def knowledge(business_id):
     if not business:
         abort(404)
 
-    from db import get_documents, unpublished_changes
+    from db import get_documents, unpublished_changes, get_upload_proposal
     return render_template(
         "admin/knowledge.html",
         business = business,
         sections = get_documents(business_id),
         changes = unpublished_changes(business),
+        pending_upload = get_upload_proposal(business_id),
         example_title = example_section_title(business),
     )
 
@@ -424,7 +425,7 @@ def knowledge_preview(business_id):
 
     import ratelimit
     import preview
-    from db import get_documents, unpublished_changes
+    from db import get_documents, unpublished_changes, get_upload_proposal
 
     allowed, wait = ratelimit.knowledge_preview(business_id)
     if not allowed:
@@ -461,11 +462,143 @@ def knowledge_preview(business_id):
         business = business,
         sections = get_documents(business_id),
         changes = unpublished_changes(business),
+        pending_upload = get_upload_proposal(business_id),
         example_title = example_section_title(business),
         preview_results = results,
         preview_questions = "\n".join(questions),
         preview_suggested = suggested,
     )
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/upload", methods=["POST"])
+@login_required
+def knowledge_upload(business_id):
+    """Read an owner's photo of a menu or price list and propose the section
+    changes it implies. Nothing is saved to the knowledge base here: the
+    proposals wait on the review page for the owner to accept or skip."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+
+    import ratelimit
+    import photo_import
+    from db import get_documents, save_upload_proposal
+    from admin.auth import current_user
+
+    back = redirect(url_for("admin.knowledge", business_id=business_id) + "#photo")
+    upload = request.files.get("photo")
+    data = upload.read(photo_import.MAX_IMAGE_BYTES + 1) if upload else b""
+    try:
+        media_type = photo_import.check_upload(data)
+    except photo_import.UploadProblem as e:
+        flash(str(e), "error")
+        return back
+
+    allowed, wait = ratelimit.knowledge_upload(business_id)
+    if not allowed:
+        flash(f"Photo uploads are limited to a few a minute. Try again in "
+              f"{max(wait, 1)} seconds.", "error")
+        return back
+
+    config = load_config(business["config_path"], business_id)
+    try:
+        result = photo_import.build_proposal(config, data, media_type,
+                                             get_documents(business_id))
+    except photo_import.UploadProblem as e:
+        flash(str(e), "error")
+        return back
+    except Exception as e:
+        log.exception("Photo import failed for business %s", business_id)
+        flash(f"Couldn't read that photo just now: {type(e).__name__}. "
+              f"Nothing was changed.", "error")
+        return back
+
+    save_upload_proposal(business_id, result["transcription"], result["changes"],
+                         created_by=current_user()["email"])
+    return redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/upload/review")
+@login_required
+def knowledge_upload_review(business_id):
+    """The changes proposed from a photo, each with its old and new wording
+    side by side, for the owner to accept, edit or skip."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+
+    import photo_import
+    from db import get_upload_proposal
+    proposal = get_upload_proposal(business_id)
+    if proposal is None:
+        flash("There are no photo changes waiting. Upload a photo to start.", "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+    for c in proposal["changes"]:
+        c["old_segments"], c["new_segments"] = photo_import.word_diff(
+            c["old_body"], c["body"])
+    return render_template("admin/knowledge_upload.html",
+                           business=business, proposal=proposal)
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/upload/apply", methods=["POST"])
+@login_required
+def knowledge_upload_apply(business_id):
+    """Save the changes the owner ticked, as ordinary edits (History keeps
+    the old wording; Discard and Publish work as usual)."""
+    require_business_access(business_id)
+    from db import get_upload_proposal, delete_upload_proposal
+    from admin.auth import current_user
+
+    proposal = get_upload_proposal(business_id)
+    if proposal is None:
+        flash("Those photo changes are no longer waiting.", "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+
+    import photo_import
+    choices = {}
+    for i in range(len(proposal["changes"])):
+        if request.form.get(f"apply_{i}") == "yes":
+            choices[i] = (clean_section_text(request.form.get(f"title_{i}")),
+                          clean_section_text(request.form.get(f"body_{i}")))
+    applied, skipped_stale = photo_import.apply_changes(
+        business_id, proposal["changes"], choices,
+        updated_by=f"{current_user()['email']} (from a photo)")
+
+    delete_upload_proposal(business_id)
+    if skipped_stale:
+        flash("Not applied, because the section changed after the photo was "
+              "read: " + ", ".join(skipped_stale) + ".", "error")
+    if applied:
+        flash(f"{applied} change{'' if applied == 1 else 's'} from your photo "
+              f"saved. Preview the answers, then publish.", "success")
+    elif not skipped_stale:
+        flash("No changes were applied.", "success")
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/upload/cancel", methods=["POST"])
+@login_required
+def knowledge_upload_cancel(business_id):
+    require_business_access(business_id)
+    from db import delete_upload_proposal
+    delete_upload_proposal(business_id)
+    flash("Photo changes discarded. Nothing was changed.", "success")
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.errorhandler(413)
+def upload_too_large(e):
+    """A request over MAX_CONTENT_LENGTH: in practice, a photo the browser
+    didn't shrink."""
+    flash("That file is too large. Upload a photo under 5MB.", "error")
+    # Not request.referrer: a redirect target the request supplies is an
+    # open redirect.
+    business_id = (request.view_args or {}).get("business_id")
+    if business_id:
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+    return redirect(url_for("admin.dashboard"))
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/discard", methods=["POST"])

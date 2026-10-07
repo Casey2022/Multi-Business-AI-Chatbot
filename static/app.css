@@ -857,3 +857,11 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .section-status { display: flex; flex-wrap: wrap; gap: var(--s2); padding: var(--s3) var(--s4) 0; }
 .section-status:not(:has(.chip:not([hidden]))) { display: none; }
 .section-status [hidden] { display: none; }
+
+/* Changes proposed from an owner's photo: old and new wording side by side
+   (stacked on a phone), removed words struck through, added ones marked. */
+.proposal-diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+@media (max-width: 640px) { .proposal-diff { grid-template-columns: 1fr; } }
+.proposal-diff .prose { white-space: pre-wrap; }
+.word-removed { color: var(--refused); text-decoration: line-through; background: var(--refused-wash); }
+.proposal details summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-soft); }

@@ -101,7 +101,7 @@ def main():
           'flash("Nothing changed in that section.", "info")' in routes
           and "same_text(title, current[\"title\"]) and same_text(body, current[\"body\"])" in routes)
     check("submitted text is stored with plain newlines",
-          routes.count("clean_section_text(request.form.get(") == 4
+          routes.count("clean_section_text(request.form.get(") >= 4
           and 'replace("\\r\\n", "\\n")' in routes)
 
     heading("the page")

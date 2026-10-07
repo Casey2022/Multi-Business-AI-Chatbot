@@ -1,0 +1,102 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Changes from your photo — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
+  <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">{{ business.name }}</a> ›
+  Changes from your photo
+</div>
+
+<div class="page-header">
+  <h1>Changes from your photo</h1>
+  <div class="subtitle">
+    {% if proposal.changes %}
+    The assistant read your photo and suggests {{ proposal.changes | length }}
+    change{{ '' if proposal.changes | length == 1 else 's' }}. Tick the ones to keep;
+    you can edit the wording first. Saved changes still need publishing.
+    {% else %}
+    The assistant read your photo and found nothing that differs from your
+    knowledge base.
+    {% endif %}
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('admin.knowledge_upload_apply', business_id=business.id) }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+  {% for c in proposal.changes %}
+  {% set i = loop.index0 %}
+  <div class="card proposal">
+    <div class="card-title">
+      {% if c.section_id %}Change “{{ c.old_title }}”{% else %}New section{% endif %}
+      {% if c.flagged %}<span class="chip chip-refused">Check this</span>
+      {% elif c.section_id %}<span class="chip chip-pending">Edit</span>
+      {% else %}<span class="chip chip-booked">New</span>{% endif %}
+    </div>
+    <div class="card-pad">
+      {% if c.summary %}<p class="cell-strong">{{ c.summary }}</p>{% endif %}
+      {% if c.unsupported %}
+      <p class="hint-blocked mt-3">Not in your photo or the current section:
+        {{ c.unsupported | join(", ") }}. Check these before saving.</p>
+      {% endif %}
+      {% if c.dropped %}
+      <p class="hint-blocked mt-3">This change removes {{ c.dropped | join(", ") }},
+        which your photo doesn't mention. A menu leaving something out doesn't
+        always mean it changed.</p>
+      {% endif %}
+
+      <div class="proposal-diff mt-3">
+        {% if c.section_id %}
+        <div>
+          <div class="cell-sub">Now</div>
+          <div class="prose">{% for piece, marked in c.old_segments %}{% if marked %}<del class="word-removed">{{ piece }}</del>{% else %}{{ piece }}{% endif %}{% endfor %}</div>
+        </div>
+        {% endif %}
+        <div>
+          <div class="cell-sub">{% if c.section_id %}Suggested{% else %}Suggested new section{% endif %}</div>
+          <div class="prose">{% for piece, marked in c.new_segments %}{% if marked %}<mark class="fact-change">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</div>
+        </div>
+      </div>
+
+      <details class="mt-3">
+        <summary>Edit the wording before saving</summary>
+        <div class="field flush">
+          <label for="title-{{ i }}">Title</label>
+          <input class="section-title" type="text" id="title-{{ i }}" name="title_{{ i }}" value="{{ c.title }}">
+        </div>
+        <div class="field flush no-rule">
+          <label for="body-{{ i }}">What the assistant should know</label>
+          <textarea id="body-{{ i }}" name="body_{{ i }}" rows="6">{{ c.body }}</textarea>
+        </div>
+      </details>
+
+      <label class="chip-check mt-3">
+        <input type="checkbox" name="apply_{{ i }}" value="yes" {% if not c.flagged %}checked{% endif %}>
+        Keep this change
+      </label>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="banner-actions mt-4">
+    {% if proposal.changes %}
+    <button class="btn btn-primary" type="submit">Save ticked changes</button>
+    {% endif %}
+    <button class="btn" type="submit" form="cancel-photo">
+      {% if proposal.changes %}Discard all{% else %}Done{% endif %}</button>
+  </div>
+</form>
+<form id="cancel-photo" method="POST"
+      action="{{ url_for('admin.knowledge_upload_cancel', business_id=business.id) }}">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<div class="card mt-4">
+  <details class="card-pad">
+    <summary>What the assistant read from your photo</summary>
+    <div class="prose mt-3">{{ proposal.transcription }}</div>
+  </details>
+</div>
+{% endblock %}

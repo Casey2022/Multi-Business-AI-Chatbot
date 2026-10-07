@@ -1175,3 +1175,15 @@ Checked in Chromium against the real script and stylesheet (12 checks: grey
 on load, edit enables, revert greys, blank title, add form, three
 beforeunload cases). `knowledge_page_test.py`: 22, proven to fail with the
 whitespace normalisation removed.
+
+### Update the knowledge base from a photo (2026-10-07, phase 1)
+
+An owner photographs a menu or price sheet; the assistant reads it and
+proposes section changes; the owner ticks, edits or skips each; kept ones
+are ordinary edits that still need Publish. Design, checks and the plan for
+PDFs, web pages and keeping originals: `notes/photo_import.md`.
+`photo_import_test.py` 49 (fake model; the stale-section guard proven to
+fail when removed); `upload_eval.py` for the real model (a menu with one
+changed price and a new item; a flyer carrying instructions). Review page
+checked in Chromium at desktop and phone width; the browser resize turns a
+3000x4000 photo into a 2000px JPEG before upload.

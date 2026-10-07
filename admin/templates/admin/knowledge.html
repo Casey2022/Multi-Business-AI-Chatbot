@@ -104,6 +104,36 @@
 </div>
 {% endif %}
 
+<div class="card" id="photo">
+  <div class="card-title">Update from a photo</div>
+  <div class="card-pad">
+    {% if pending_upload %}
+    <div class="guidance">
+      Changes read from your last photo are waiting for you to review.
+      <a href="{{ url_for('admin.knowledge_upload_review', business_id=business.id) }}">Review
+      {{ pending_upload.changes | length }} proposed change{{ '' if pending_upload.changes | length == 1 else 's' }}</a>.
+    </div>
+    {% endif %}
+    <div class="guidance{% if pending_upload %} mt-3{% endif %}">
+      Take a photo of your menu, price list or flyer. The assistant reads it
+      and suggests changes to the sections below; you check each one before
+      anything is saved, and nothing reaches customers until you publish.
+      The photo itself isn't kept.
+    </div>
+    <form method="POST" action="{{ url_for('admin.knowledge_upload', business_id=business.id) }}"
+          enctype="multipart/form-data" class="mt-4" data-photo-upload>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="field flush no-rule">
+        <label for="photo-file">Photo (JPEG, PNG or WebP, up to 5MB)</label>
+        <input type="file" id="photo-file" name="photo" required
+               accept="image/jpeg,image/png,image/webp,image/gif">
+        <span class="hint" data-photo-status></span>
+      </div>
+      <button class="btn" type="submit" data-busy-label="Reading the photo…">Read photo</button>
+    </form>
+  </div>
+</div>
+
 {% for s in sections %}
 <div class="card" id="section-{{ s.id }}">
   <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}"

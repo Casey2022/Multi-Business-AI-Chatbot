@@ -238,6 +238,8 @@ def main():
         demo.MAX_LIVE = ceiling
 
     heading("Teardown")
+    # A photo's proposed changes, waiting for review, belong to the demo too.
+    db.save_upload_proposal(clone["id"], "Large 18\" $25", [])
     before = row_counts(clone["id"])
     check("the clone had rows worth deleting", all(before.values()), before)
 

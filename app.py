@@ -248,6 +248,9 @@ app.config.update(
     # signed in on a shared machine stayed signed in until it rebooted.
     PERMANENT_SESSION_LIFETIME=timedelta(
         hours=int(os.environ.get("SESSION_HOURS", "24"))),
+    # The biggest thing anyone sends is an owner's photo (5MB, shrunk in the
+    # browser first). Without a cap, Flask reads a request of any size.
+    MAX_CONTENT_LENGTH=8 * 1024 * 1024,
 )
 
 # Secure-by-default is right for the deployed site and a trap for local

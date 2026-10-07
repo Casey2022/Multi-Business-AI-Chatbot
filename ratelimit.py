@@ -163,6 +163,19 @@ def knowledge_preview(business_id):
     ])
 
 
+UPLOAD_PER_MINUTE = _limit("UPLOAD_PER_MINUTE", 2)
+UPLOAD_PER_HOUR   = _limit("UPLOAD_PER_HOUR", 10)
+
+
+def knowledge_upload(business_id):
+    """Limits for reading an owner's photo: two model calls, one of them
+    an image. Demo visitors can upload, so it needs a ceiling."""
+    return check_all([
+        (f"upload:{business_id}", UPLOAD_PER_MINUTE, 60),
+        (f"upload:{business_id}", UPLOAD_PER_HOUR, 3600),
+    ])
+
+
 def login_attempt(ip, email):
     """Limits for one admin login attempt."""
     return check_all([

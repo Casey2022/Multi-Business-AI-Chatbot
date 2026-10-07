@@ -215,6 +215,20 @@ def init_db():
         )
     """)
 
+    # upload_proposals — changes proposed from an owner's photo, waiting for
+    # them to review. One pending set per business (a new upload replaces
+    # it), deleted once applied or cancelled. The photo isn't stored; only
+    # what was read from it.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS upload_proposals (
+            business_id    INTEGER PRIMARY KEY,
+            created_at     TEXT    NOT NULL,
+            created_by     TEXT,
+            transcription  TEXT    NOT NULL,
+            changes        TEXT    NOT NULL
+        )
+    """)
+
     # geocode_cache — addresses already resolved, so a repeat booking to the
     # same street doesn't pay for a second lookup. Keyed by the query plus
     # its viewport bias, because the same string biased differently is a
@@ -595,6 +609,7 @@ _TENANT_TABLES = (
     ("conversation_state", "business_id"),
     ("config_overrides",   "business_id"),
     ("published_snapshot", "business_id"),
+    ("upload_proposals",   "business_id"),
     ("users",              "business_id"),
 )
 
@@ -1163,6 +1178,44 @@ def unpublished_changes(business):
         return {"edited": set(), "new": set(), "deleted": []}
     return compare_to_snapshot(get_documents(business["id"]),
                                get_published_snapshot(business["id"]))
+
+
+def save_upload_proposal(business_id, transcription, changes, created_by=None):
+    """Keep a photo's proposed changes for review, replacing any earlier set."""
+    import json as _json
+    from datetime import datetime as _dt
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO upload_proposals (business_id, created_at, created_by, "
+        "transcription, changes) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(business_id) DO UPDATE SET created_at = excluded.created_at, "
+        "created_by = excluded.created_by, transcription = excluded.transcription, "
+        "changes = excluded.changes",
+        (business_id, _dt.now().isoformat(), created_by, transcription,
+         _json.dumps(changes)))
+    conn.commit()
+    conn.close()
+
+
+def get_upload_proposal(business_id):
+    """{"transcription", "changes", "created_at", "created_by"} or None."""
+    import json as _json
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM upload_proposals WHERE business_id = ?",
+                       (business_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {"transcription": row["transcription"],
+            "changes": _json.loads(row["changes"]),
+            "created_at": row["created_at"], "created_by": row["created_by"]}
+
+
+def delete_upload_proposal(business_id):
+    conn = get_connection()
+    conn.execute("DELETE FROM upload_proposals WHERE business_id = ?", (business_id,))
+    conn.commit()
+    conn.close()
 
 
 def discard_document_changes(business_id, updated_by=None):
