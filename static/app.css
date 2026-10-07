@@ -650,6 +650,16 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 }
 .banner .btn-primary { background: var(--pending); border-color: var(--pending); }
 .banner .btn-primary:hover { background: #8F5309; }
+/* Preview: the phrases in "After you publish" that carry a changed fact. */
+.fact-change {
+  background: var(--pending-wash); color: inherit;
+  border-bottom: 2px solid var(--pending); padding: 0 2px; border-radius: 2px;
+}
+.fact-changes {
+  margin: var(--s2) 0 0 18px; font-size: var(--text-sm); color: var(--ink-soft);
+  display: flex; flex-direction: column; gap: 3px;
+}
+
 /* Discard beside Publish; side by side, wrapping under the text on a phone. */
 .banner-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
 

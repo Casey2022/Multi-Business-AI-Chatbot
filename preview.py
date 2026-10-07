@@ -144,6 +144,103 @@ def drop_draft(name):
         log.warning("Couldn't delete preview index %s: %s", name, e)
 
 
+# ---------------------------------------------------------------------------
+# Did the FACTS change, or only the wording?
+# ---------------------------------------------------------------------------
+#
+# The first version marked "Changes" whenever the two replies differed at
+# all, and the model rewords freely, so a row could say "Changes" with
+# every price and condition the same (Casey, 2026-10-07). A word-by-word
+# diff would be worse: it lights up every synonym and buries the one change
+# that matters. So one small model call compares what a customer would act
+# on (prices, sizes, times, days, conditions, yes or no) and quotes the
+# phrases from the "After" reply that carry each change. Those phrases are
+# highlighted only where they appear word for word, so a highlight can never
+# land on the wrong words. If the call fails, it falls back to the exact
+# comparison, which can over-report but never hides a change.
+
+MAX_DIFFERENCES = 3
+MAX_PHRASE = 120
+
+
+def _flat(text):
+    return " ".join((text or "").split())
+
+
+def compare_facts(question, now, after):
+    """{"changed", "differences": [{"topic", "now", "after"}], "method"}.
+
+    method: "identical" (no call), "model", or "exact" (the fallback)."""
+    if _flat(now) == _flat(after):
+        return {"changed": False, "differences": [], "method": "identical"}
+    import json
+    from llm import _create, as_data, text_of, _note_usage
+    prompt = (
+        "Two replies from a business's assistant answer the same customer "
+        "question, before and after the owner edited the business's "
+        "information. Decide whether anything a customer would act on "
+        "changed: prices, sizes, quantities, times, days, dates, notice "
+        "periods, conditions, what is or isn't offered, yes or no. Different "
+        "wording, order, greetings or emoji with the same facts is NOT a "
+        "change.\n\n"
+        "Respond with ONLY a JSON object, no preamble:\n"
+        '{"facts_changed": true or false, "differences": [{"topic": "...", '
+        '"now": "...", "after": "..."}]}\n'
+        f"At most {MAX_DIFFERENCES} differences, each a few words. \"now\" "
+        "and \"after\" must be short phrases copied word for word from each "
+        "reply (\"\" if that reply doesn't mention it). Empty list if no facts "
+        "changed.\n\n"
+        + as_data(question, tag="question") + "\n"
+        + as_data(now, tag="reply_now") + "\n"
+        + as_data(after, tag="reply_after"))
+    try:
+        response = _create(max_tokens=400, temperature=0,
+                           messages=[{"role": "user", "content": prompt}])
+        _note_usage(response, "preview fact check")
+        raw = text_of(response).replace("```json", "").replace("```", "").strip()
+        data = json.loads(raw)
+        if not isinstance(data, dict) or not isinstance(data.get("facts_changed"), bool):
+            raise ValueError("unexpected shape")
+        differences = []
+        if data["facts_changed"]:
+            for d in (data.get("differences") or [])[:MAX_DIFFERENCES]:
+                if not isinstance(d, dict):
+                    continue
+                differences.append({k: str(d.get(k) or "")[:MAX_PHRASE].strip()
+                                    for k in ("topic", "now", "after")})
+        return {"changed": data["facts_changed"], "differences": differences,
+                "method": "model"}
+    except Exception as e:
+        log.warning("Preview fact check failed, comparing text instead: %s", e)
+        return {"changed": True, "differences": [], "method": "exact"}
+
+
+def highlight_segments(text, phrases):
+    """[(piece, highlighted)] covering `text`, with each phrase that appears
+    in it word for word (any case) highlighted. A phrase that doesn't appear
+    exactly is ignored rather than guessed at."""
+    text = text or ""
+    spans = []
+    lowered = text.lower()
+    for phrase in sorted({p.strip() for p in phrases if p and p.strip()},
+                         key=len, reverse=True):
+        start = lowered.find(phrase.lower())
+        while start != -1:
+            end = start + len(phrase)
+            if not any(s < end and start < e for s, e in spans):
+                spans.append((start, end))
+            start = lowered.find(phrase.lower(), end)
+    segments, at = [], 0
+    for s, e in sorted(spans):
+        if s > at:
+            segments.append((text[at:s], False))
+        segments.append((text[s:e], True))
+        at = e
+    if at < len(text) or not segments:
+        segments.append((text[at:], False))
+    return segments
+
+
 def _answer(question, config):
     """One reply, pinned (temperature 0) like the evals: unpinned, "Now" and
     "After" would differ in wording when nothing that matters changed."""
@@ -168,11 +265,20 @@ def run_preview(config, business_id, questions):
         with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
             now = [pool.submit(_answer, q, config) for q in questions]
             after = [pool.submit(_answer, q, draft_config) for q in questions]
+            answers = [(q, n.result(), a.result())
+                       for q, n, a in zip(questions, now, after)]
+            checks = [pool.submit(compare_facts, q, n, a) for q, n, a in answers]
             results = []
-            for q, n, a in zip(questions, now, after):
-                n, a = n.result(), a.result()
-                results.append({"question": q, "now": n, "after": a,
-                                "changed": " ".join(n.split()) != " ".join(a.split())})
+            for (q, n, a), c in zip(answers, checks):
+                facts = c.result()
+                results.append({
+                    "question": q, "now": n, "after": a,
+                    "changed": facts["changed"],
+                    "differences": facts["differences"],
+                    "compared_by": facts["method"],
+                    "after_segments": highlight_segments(
+                        a, [d["after"] for d in facts["differences"]]),
+                })
         return results
     finally:
         drop_draft(draft)

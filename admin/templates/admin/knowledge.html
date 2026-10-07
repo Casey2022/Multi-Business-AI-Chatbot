@@ -67,11 +67,21 @@
           <tr>
             <td class="cell-strong">{{ r.question }}</td>
             <td>{{ r.now }}</td>
-            <td>{{ r.after }}
+            <td>{% for piece, marked in r.after_segments %}{% if marked %}<mark class="fact-change">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}
               <div class="mt-4">
-                {% if r.changed %}<span class="chip chip-pending">Changes</span>
-                {% else %}<span class="chip chip-quiet">Same</span>{% endif %}
+                {% if r.changed %}<span class="chip chip-pending">Facts change</span>
+                {% else %}<span class="chip chip-quiet">Same facts</span>{% endif %}
               </div>
+              {% if r.differences %}
+              <ul class="fact-changes">
+                {% for d in r.differences %}
+                <li><span class="cell-strong">{{ d.topic }}:</span>
+                  {{ d.now or "not mentioned" }} → {{ d.after or "not mentioned" }}</li>
+                {% endfor %}
+              </ul>
+              {% elif r.changed and r.compared_by == "exact" %}
+              <div class="cell-sub">Couldn't compare the facts just now; the wording differs.</div>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -80,7 +90,9 @@
     </div>
     <div class="guidance mt-4">
       {% if preview_suggested %}These questions were suggested from the
-      sections you changed. {% endif %}Not what you meant? Edit the section
+      sections you changed. {% endif %}"Facts change" means a price, time,
+      condition or yes/no differs, and the new wording is highlighted; a
+      reworded reply with the same facts is "Same facts". Not what you meant? Edit the section
       and preview again, or use <strong>Discard changes</strong> at the top to
       go back to the published wording. Nothing changes for customers until
       you publish.

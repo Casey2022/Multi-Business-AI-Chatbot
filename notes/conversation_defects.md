@@ -1115,3 +1115,17 @@ Discard refuses rather than guess.
 Found on the way: importing the seed documents left every business
 "unpublished", though the live index is built from the same files, so a
 fresh deploy showed the banner everywhere. Import now marks it clean.
+
+### Preview: facts, not wording (2026-10-07)
+
+Casey, trying the preview: some rows marked "Changes" had the same facts in
+different words, and could the changes be highlighted? A word-by-word diff
+would make both worse (every synonym lights up). Instead one small, pinned
+model call per question compares what a customer would act on (prices,
+sizes, times, days, notice, conditions, offered or not, yes or no) and
+returns the changes as short phrases copied from each reply. The row says
+"Facts change" or "Same facts", lists "topic: before → after", and
+highlights the "after" phrases only where they appear word for word.
+Identical replies skip the call; an unreadable or failed call falls back to
+the exact comparison, which can over-report but never hides a change.
+`preview_test.py` 68; labelling by wording alone fails it.

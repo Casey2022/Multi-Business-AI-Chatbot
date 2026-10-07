@@ -143,23 +143,46 @@ def main():
                    mid_booking=False, temperature=None, now=None):
         coll = config["business"]["collection"]
         asked.append((message, coll, temperature, list(history or [])))
+        if "deliver" in message:          # same facts, reworded
+            return ("Delivery covers up to 6 miles." if coll.endswith("__preview_7")
+                    else "We deliver within 6 miles!")
         if coll.endswith("__preview_7"):
             searched = fake.get_collection(coll).docs
             return ("Only the 10-inch, $3 extra." if any("10-inch" in d for d in searched)
                     else "No idea.")
         return "Yes, $3 extra on any size."
-    real_reply = llm.get_llm_reply
-    llm.get_llm_reply = fake_reply
+    import json as _json
+    fact_calls = []
+    def fake_facts(**call):
+        content = call["messages"][0]["content"]
+        fact_calls.append(call)
+        if "any size" in content and "10-inch" in content:
+            data = {"facts_changed": True, "differences": [
+                {"topic": "gluten-free sizes", "now": "on any size",
+                 "after": "Only the 10-inch"}]}
+        else:
+            data = {"facts_changed": False, "differences": []}
+        return types.SimpleNamespace(usage=None, content=[types.SimpleNamespace(
+            type="text", text=_json.dumps(data))])
+    real_reply, real_create = llm.get_llm_reply, llm._create
+    llm.get_llm_reply, llm._create = fake_reply, fake_facts
     try:
         results = preview.run_preview(config, biz, ["gluten free on a large?", "do you deliver?"])
     finally:
-        llm.get_llm_reply = real_reply
+        llm.get_llm_reply, llm._create = real_reply, real_create
     by_q = {r["question"]: r for r in results}
     r = by_q["gluten free on a large?"]
     check("Now is today's answer (live index)", r["now"] == "Yes, $3 extra on any size.", r)
     check("After is the draft's answer, which really searched the draft",
           r["after"] == "Only the 10-inch, $3 extra.", r)
-    check("a different answer is marked changed", r["changed"] is True)
+    check("a changed fact is marked changed", r["changed"] is True)
+    check("with what changed", r["differences"] == [{"topic": "gluten-free sizes",
+          "now": "on any size", "after": "Only the 10-inch"}], r["differences"])
+    check("and the phrase highlighted in the After reply",
+          ("Only the 10-inch", True) in r["after_segments"], r["after_segments"])
+    d = by_q["do you deliver?"]
+    check("a reworded reply with the same facts is the same",
+          d["changed"] is False and d["differences"] == [], d)
     colls = {c for _, c, _, _ in asked}
     check("both indexes were used, nothing else",
           colls == {"test_pizza", "test_pizza__preview_7"}, colls)
@@ -203,6 +226,72 @@ def main():
     check(f"{ratelimit.PREVIEW_PER_MINUTE} a minute, then refused",
           first and second and not third, (first, second, third))
     check("another business has its own allowance", ratelimit.knowledge_preview(98)[0])
+
+    heading("facts, not wording")
+    calls = []
+    def facts_reply(text):
+        def _c(**call):
+            calls.append(call)
+            return types.SimpleNamespace(usage=None, content=[types.SimpleNamespace(
+                type="text", text=text)])
+        return _c
+    real_create = llm._create
+    try:
+        calls.clear()
+        r = preview.compare_facts("q", "We deliver within 6 miles.",
+                                  "  We deliver   within 6 miles. ")
+        check("identical (but for spacing): same, and no model call",
+              r == {"changed": False, "differences": [], "method": "identical"}
+              and not calls, (r, len(calls)))
+        llm._create = facts_reply('{"facts_changed": false, "differences": []}')
+        r = preview.compare_facts("do you deliver?", "We deliver within 6 miles! 🍕",
+                                  "Delivery covers up to 6 miles.")
+        check("reworded, same facts: Same", r["changed"] is False and r["method"] == "model")
+        prompt = calls[-1]["messages"][0]["content"]
+        check("both replies and the question are fenced as data",
+              "<reply_now>" in prompt and "<reply_after>" in prompt and "<question>" in prompt)
+        check("the comparison is pinned", calls[-1].get("temperature") == 0)
+        llm._create = facts_reply('```json\n{"facts_changed": true, "differences": ['
+                                  '{"topic": "fee", "now": "$3", "after": "$5"},'
+                                  '{"topic": "a", "now": "", "after": "x"},'
+                                  '{"topic": "b", "now": "", "after": "y"},'
+                                  '{"topic": "c", "now": "", "after": "z"}]}\n```')
+        r = preview.compare_facts("fee?", "The fee is $3.", "The fee is $5.")
+        check("a changed fact: Changes, fenced JSON accepted",
+              r["changed"] is True and r["differences"][0] == {"topic": "fee", "now": "$3", "after": "$5"})
+        check(f"at most {preview.MAX_DIFFERENCES} differences listed",
+              len(r["differences"]) == preview.MAX_DIFFERENCES)
+        llm._create = facts_reply('{"facts_changed": false, "differences": [{"topic": "x", "now": "a", "after": "b"}]}')
+        check("'not changed' wins over a stray difference",
+              preview.compare_facts("q", "a", "b")["differences"] == [])
+        for bad in ("not json", '{"differences": []}', '["x"]'):
+            llm._create = facts_reply(bad)
+            r = preview.compare_facts("q", "old", "new")
+            check(f"unreadable answer ({bad[:12]!r}) falls back to the exact comparison",
+                  r == {"changed": True, "differences": [], "method": "exact"}, r)
+        llm._create = lambda **c: (_ for _ in ()).throw(RuntimeError("down"))
+        check("a failed call falls back too (never hides a change)",
+              preview.compare_facts("q", "old", "new")["method"] == "exact")
+    finally:
+        llm._create = real_create
+
+    seg = preview.highlight_segments("Only the 10-inch, $3 extra.", ["only the 10-inch", "$3"])
+    check("phrases are highlighted where they appear (any case)",
+          seg == [("Only the 10-inch", True), (", ", False), ("$3", True), (" extra.", False)], seg)
+    check("the pieces join back to exactly the reply",
+          "".join(p for p, _ in seg) == "Only the 10-inch, $3 extra.")
+    check("a phrase that isn't there word for word isn't highlighted",
+          preview.highlight_segments("Only the 10-inch.", ["just the ten inch"])
+          == [("Only the 10-inch.", False)])
+    check("overlapping phrases don't double-mark",
+          sum(1 for _, m in preview.highlight_segments("the 10-inch crust", ["10-inch crust", "10-inch"]) if m) == 1)
+    check("no phrases: the whole reply, unmarked",
+          preview.highlight_segments("Hi.", []) == [("Hi.", False)]
+          and preview.highlight_segments("", ["x"]) == [("", False)])
+    page = (ROOT / "admin" / "templates" / "admin" / "knowledge.html").read_text()
+    check("highlights are rendered escaped (no |safe), inside <mark>",
+          '<mark class="fact-change">{{ piece }}</mark>' in page and "|safe" not in page
+          and "| safe" not in page)
 
     heading("Discard changes: back to the published wording")
     bid = db.add_business("Discard Test", "discard_test", "config/crosstown_pizza.yaml")
