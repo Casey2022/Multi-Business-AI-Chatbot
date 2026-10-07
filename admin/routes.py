@@ -375,13 +375,20 @@ def knowledge(business_id):
     if not business:
         abort(404)
 
-    from db import get_documents
+    from db import get_documents, unpublished_changes
     return render_template(
         "admin/knowledge.html",
         business = business,
         sections = get_documents(business_id),
+        changes = unpublished_changes(business),
         example_title = example_section_title(business),
     )
+
+
+def clean_section_text(value):
+    """A submitted title or body as stored: plain newlines, no surrounding
+    whitespace. Browsers send textareas with CRLF line endings."""
+    return (value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 def example_section_title(business):
@@ -417,7 +424,7 @@ def knowledge_preview(business_id):
 
     import ratelimit
     import preview
-    from db import get_documents
+    from db import get_documents, unpublished_changes
 
     allowed, wait = ratelimit.knowledge_preview(business_id)
     if not allowed:
@@ -453,6 +460,7 @@ def knowledge_preview(business_id):
         "admin/knowledge.html",
         business = business,
         sections = get_documents(business_id),
+        changes = unpublished_changes(business),
         example_title = example_section_title(business),
         preview_results = results,
         preview_questions = "\n".join(questions),
@@ -490,8 +498,8 @@ def knowledge_add(business_id):
     from db import add_document_section
     from admin.auth import current_user
 
-    title = (request.form.get("title") or "").strip()
-    body  = (request.form.get("body")  or "").strip()
+    title = clean_section_text(request.form.get("title"))
+    body  = clean_section_text(request.form.get("body"))
 
     if not title or not body:
         flash("A section needs both a title and content.", "error")
@@ -506,23 +514,28 @@ def knowledge_add(business_id):
 @admin_bp.route("/knowledge/<int:document_id>/update", methods=["POST"])
 @login_required
 def knowledge_update(document_id):
-    from db import get_connection, update_document_section
+    from db import get_connection, update_document_section, same_text
     from admin.auth import current_user
 
     # Derive the business from the section rather than trusting the URL.
     conn = get_connection()
-    row  = conn.execute("SELECT business_id FROM documents WHERE id = ?",
+    row  = conn.execute("SELECT business_id, title, body FROM documents WHERE id = ?",
                         (document_id,)).fetchone()
+    current = row
     conn.close()
     if not row:
         abort(404)
     require_business_access(row["business_id"])
 
-    title = (request.form.get("title") or "").strip()
-    body  = (request.form.get("body")  or "").strip()
+    title = clean_section_text(request.form.get("title"))
+    body  = clean_section_text(request.form.get("body"))
 
     if not title or not body:
         flash("A section needs both a title and content.", "error")
+    elif same_text(title, current["title"]) and same_text(body, current["body"]):
+        # Saving untouched text would still file a version and mark the
+        # knowledge unpublished, sending the owner to Publish for nothing.
+        flash("Nothing changed in that section.", "info")
     else:
         update_document_section(document_id, title, body,
                                 updated_by=current_user()["email"])

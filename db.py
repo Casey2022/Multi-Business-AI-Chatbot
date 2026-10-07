@@ -1123,6 +1123,48 @@ def get_published_snapshot(business_id):
     return _json.loads(row["sections"]) if row else None
 
 
+def compare_to_snapshot(sections, snapshot):
+    """What differs between the sections now and the published snapshot.
+
+    Returns {"edited": ids whose title or body changed, "new": ids added
+    since, "deleted": titles of published sections no longer here}. With no
+    snapshot there's nothing to compare against, so nothing is reported
+    rather than every section being called new.
+    """
+    result = {"edited": set(), "new": set(), "deleted": []}
+    if snapshot is None:
+        return result
+    published = {s["id"]: s for s in snapshot}
+    for s in sections:
+        old = published.get(s["id"])
+        if old is None:
+            result["new"].add(s["id"])
+        elif (same_text(old["title"], s["title"]) and
+              same_text(old["body"], s["body"])):
+            continue
+        else:
+            result["edited"].add(s["id"])
+    here = {s["id"] for s in sections}
+    result["deleted"] = [s["title"] for s in snapshot if s["id"] not in here]
+    return result
+
+
+def same_text(a, b):
+    """Equal once line endings and surrounding whitespace are ignored: a
+    browser sends a textarea with CRLF line endings, and the save strips."""
+    def norm(t):
+        return (t or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    return norm(a) == norm(b)
+
+
+def unpublished_changes(business):
+    """compare_to_snapshot for a business row; nothing when it's clean."""
+    if not business or not business["documents_dirty"]:
+        return {"edited": set(), "new": set(), "deleted": []}
+    return compare_to_snapshot(get_documents(business["id"]),
+                               get_published_snapshot(business["id"]))
+
+
 def discard_document_changes(business_id, updated_by=None):
     """Put the sections back as they were last published. Returns False if
     there's no published version to go back to.

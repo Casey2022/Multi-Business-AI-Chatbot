@@ -21,7 +21,9 @@
 {% if business.documents_dirty %}
 <div class="banner">
   <div><strong>Unpublished changes.</strong> Customers are still being answered
-    from the previous version.</div>
+    from the previous version.
+    {% if changes.deleted %}<div class="cell-sub">Deleted since publishing:
+      {{ changes.deleted | join(", ") }}.</div>{% endif %}</div>
   <div class="banner-actions">
     <form method="POST" action="{{ url_for('admin.knowledge_discard', business_id=business.id) }}">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -103,9 +105,15 @@
 {% endif %}
 
 {% for s in sections %}
-<div class="card">
-  <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}">
+<div class="card" id="section-{{ s.id }}">
+  <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}"
+        data-track-edits>
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="section-status">
+      {% if s.id in changes.new %}<span class="chip chip-pending">New since publish</span>
+      {% elif s.id in changes.edited %}<span class="chip chip-pending">Changed since publish</span>{% endif %}
+      <span class="chip chip-quiet" data-unsaved-flag hidden>Unsaved edits</span>
+    </div>
     <div class="field">
       <label for="title-{{ s.id }}">Title</label>
       <input class="section-title" type="text" id="title-{{ s.id }}" name="title" value="{{ s.title }}">
@@ -121,7 +129,7 @@
         · <a href="{{ url_for('admin.knowledge_history', document_id=s.id) }}">History</a>
       </span>
       <span class="toolbar">
-        <button class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-primary" type="submit" data-save-button>Save</button>
       </span>
     </div>
   </form>
@@ -160,7 +168,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('admin.knowledge_add', business_id=business.id) }}"
-          class="mt-4">
+          class="mt-4" data-track-edits>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <div class="field flush">
         <label for="new-title">Title</label>
@@ -172,7 +180,7 @@
         <textarea id="new-body" name="body" rows="6"
                   placeholder="Prices, how long it takes, what's included, what isn't."></textarea>
       </div>
-      <button class="btn btn-primary" type="submit">Add section</button>
+      <button class="btn btn-primary" type="submit" data-save-button>Add section</button>
     </form>
   </div>
 </div>

@@ -851,3 +851,9 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   color: var(--pending);
 }
 .demobar span:last-child { flex: 1; min-width: 220px; }
+
+/* Knowledge sections: "Changed since publish" / "Unsaved edits" chips above
+   the title. Empty (nothing to say) collapses to nothing. */
+.section-status { display: flex; flex-wrap: wrap; gap: var(--s2); padding: var(--s3) var(--s4) 0; }
+.section-status:not(:has(.chip:not([hidden]))) { display: none; }
+.section-status [hidden] { display: none; }

@@ -1150,3 +1150,28 @@ labels right: the 3-topping price row flagged (large $22 → $25, total $30.25
 and Saturday cutoff "Same facts". Read straight from `logs/app.log`.
 Trade-off kept: a detail only one reply has (including one the bot invents)
 isn't flagged; a "not in your documents" check would be the separate fix.
+
+### Knowledge page: Save means something, sections say what changed (2026-10-07)
+
+Casey asked for Save buttons that stay grey until there's something to save,
+so an owner can see which sections they've touched.
+- **Save** (static/unsaved-edits.js) lights up only when the title or body
+  differs from what the server rendered (`defaultValue`) and neither is
+  blank; typing back to the saved wording greys it again. "Add section"
+  needs both fields. An "Unsaved edits" chip shows on a touched section.
+- **Leaving with unsaved typing warns** (beforeunload) — including saving
+  one section while another has unsaved edits, and running Preview, which
+  only sees saved sections.
+- **"Changed since publish" / "New since publish"** chips per section, and
+  deleted sections named in the banner (`db.compare_to_snapshot` against
+  `published_snapshot`).
+- **Server side:** a blank section is still refused; a save that changes
+  nothing (CRLF line endings, trailing spaces — browsers send textareas
+  with CRLF) says "Nothing changed" instead of filing a version and marking
+  the knowledge unpublished. Submitted text is stored with plain newlines.
+- Every render of knowledge.html must pass `changes` (the Preview route
+  renders the page too; the template reads `changes.deleted`).
+Checked in Chromium against the real script and stylesheet (12 checks: grey
+on load, edit enables, revert greys, blank title, add form, three
+beforeunload cases). `knowledge_page_test.py`: 22, proven to fail with the
+whitespace normalisation removed.
