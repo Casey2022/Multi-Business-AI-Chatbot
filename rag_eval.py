@@ -328,6 +328,11 @@ HARD = {
                                                   "Emergency Service", ["$75", "labor"]),
         ("how much to swap my 50 gallon tank for a tankless one",
                                                   "Water Heater",      ["$3,500", "$5,500"]),
+        # --- Added 2026-10-07: prices and totals ---
+        ("it's 11pm and my main line needs hydro jetting, what's that going to run me",
+                                                  "ANSWER_ONLY",       rubrics.HYDRO_JET_AFTER_HOURS),
+        ("you found my leak and quoted $600 to fix it, what do I pay in total",
+                                                  "Leak Repair",       rubrics.LEAK_DETECTION_APPLIED),
     ],
     "sunrise_bakery_and_cafe": [
         ("my kid wants a themed cake for Saturday and it's Friday",
@@ -376,6 +381,11 @@ HARD = {
                           rubrics.MUFFINS_6PM_FOR_8AM),
         ("do you have anything that's nut free",  "Allergens",
                           ["tree nuts", ("cannot guarantee", "can't guarantee")]),
+        # --- Added 2026-10-07: prices and totals ---
+        ("how much for 18 regular cupcakes",      "Cupcake Orders",    rubrics.EIGHTEEN_CUPCAKES),
+        ("what would two dozen muffins cost",     "Muffins",           rubrics.TWO_DOZEN_MUFFINS),
+        ("how much is a 12 inch birthday cake with a unicorn on it",
+                                                  "Custom Birthday",   rubrics.TWELVE_INCH_CHARACTER_CAKE),
     ],
     "belmont_hair_studio": [
         ("my hair is box dyed and I want to go lighter",
@@ -404,6 +414,11 @@ HARD = {
         ("it's 11am, can I get a cut and colour this afternoon",
                                                   "Cut and Colour",    rubrics.CUT_AND_COLOUR_SAME_DAY),
         ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
+        # --- Added 2026-10-07: prices and totals ---
+        ("do I pay anything up front for balayage",
+                                                  "Colour Deposits",   ["$30", ("off the final bill", "comes off")]),
+        ("I had a full cut here two weeks ago, how much to tidy my fringe",
+                                                  "Haircuts",          "free"),
     ],
     "ridgeline_contracting": [
         # Business days (2026-10-04): counting them across a weekend is the
@@ -457,6 +472,15 @@ HARD = {
                                                   "Delivery",          ["45 to 70"]),
         ("can I split the bill across three cards",
                                                   "Payment",           [("two cards", "2 cards")]),
+        # --- Added 2026-10-07: prices and totals. Do sums and the
+        # conditions attached to a price need code, the way notice did?
+        ("how much is a medium with two toppings, delivered",
+                                                  "ANSWER_ONLY",       rubrics.MEDIUM_TWO_TOPPINGS_DELIVERED),
+        ("how much is a gluten free personal with two toppings",
+                                                  "Pizza Sizes",       rubrics.GLUTEN_FREE_PERSONAL_TWO_TOPPINGS),
+        ("how much for 30 wings",                 "Wings",             rubrics.THIRTY_WINGS),
+        ("what does a sicilian with two toppings cost",
+                                                  "Pizza Sizes",       rubrics.SICILIAN_TOPPINGS),
     ],
 }
 
@@ -493,6 +517,8 @@ CLOCKS = {
         _dt(2026, 9, 25, 17, 0),
     "it's Saturday at 7pm, how long will delivery take":
         _dt(2026, 9, 26, 19, 0),
+    "it's 11pm and my main line needs hydro jetting, what's that going to run me":
+        _dt(2026, 9, 22, 23, 0),
 }
 
 

@@ -171,3 +171,86 @@ QUOTE_AFTER_THURSDAY = Rubric(
     counts Saturday or Sunday (for example, says the quote will come by
     Sunday or Monday), or drops "business" so that three days lands on the
     weekend.""")
+
+
+# --- Prices and totals (2026-10-07) -------------------------------------
+# Added to decide whether prices need code (a quote_total tool) the way
+# notice periods did. Plain lookups have always passed; these are the sums,
+# the conditions attached to a price, and prices the documents don't give.
+
+_PIZZA_PRICES = ("Our pizzas come in three sizes: 10-inch personal at $11, "
+                 "14-inch medium at $17, and 18-inch large at $22. Toppings are "
+                 "$1.75 each on a personal, $2.25 on a medium, $2.75 on a large.")
+
+MEDIUM_TWO_TOPPINGS_DELIVERED = Rubric(
+    quote=(_PIZZA_PRICES,
+           "The delivery fee is $3 and the minimum order is $15."),
+    criteria="""Gives the total for a medium with two toppings, delivered:
+    $17 + 2 x $2.25 = $21.50, plus the $3 delivery fee = $24.50 (tax aside).
+    Showing the pieces is fine. Fails if any piece is wrong (for example a
+    large's $2.75 topping price), the delivery fee is left out of a total it
+    calls the total, or the sum is wrong.""")
+
+GLUTEN_FREE_PERSONAL_TWO_TOPPINGS = Rubric(
+    quote=(_PIZZA_PRICES,
+           "Gluten-free crust comes in the 10-inch size only, for $3 extra"),
+    criteria="""Gives the price of a gluten-free personal (10-inch) pizza with
+    two toppings: $11 + $3 gluten-free + 2 x $1.75 = $17.50. Fails if it
+    leaves out the $3, uses a medium or large topping price, or gets the sum
+    wrong.""")
+
+THIRTY_WINGS = Rubric(
+    quote="Wings are $12 for 10, $22 for 20, $40 for 40.",
+    criteria="""There is no 30-wing price. Passes if it says wings come in
+    10, 20 or 40 and either offers a combination (20 + 10 = $34) or the 40
+    for $40, or both. Fails if it states a price for 30 wings as if it were
+    on the menu (for example "30 wings are $33"), or gets a combination's sum
+    wrong.""")
+
+SICILIAN_TOPPINGS = Rubric(
+    quote="Sicilian square pan is 16x16 for $26",
+    criteria="""States the Sicilian is $26. The documents give no topping
+    price for the Sicilian, so the reply must not state one as fact: saying
+    it isn't sure what toppings cost on a Sicilian, or suggesting they call,
+    passes. Fails if it gives a per-topping price for the Sicilian (for
+    example borrowing the large's $2.75) or a total that depends on one.""")
+
+EIGHTEEN_CUPCAKES = Rubric(
+    quote="Standard cupcakes are $3.50 each, sold by the dozen ($42 for 12).",
+    criteria="""Says standard cupcakes are sold by the dozen, so 18 isn't an
+    order size, and offers a dozen ($42) or two dozen ($84). Fails if it
+    quotes 18 at $3.50 each ($63) as an order it can take without
+    mentioning the dozen, or gets a dozen's price wrong.""")
+
+TWO_DOZEN_MUFFINS = Rubric(
+    quote="Muffins are $3.25 each or $35 per dozen.",
+    criteria="""Two dozen muffins at the dozen price is $70. Fails if it
+    charges 24 at $3.25 each ($78) as the price for two dozen, or gets the
+    sum wrong.""")
+
+TWELVE_INCH_CHARACTER_CAKE = Rubric(
+    quote=("Our standard birthday cakes start at $45 for a 6-inch (serves 6-8) "
+           "and range up to $120 for a 12-inch (serves 30-40). Custom designs, "
+           "themes, and characters add $20-$60 depending on complexity."),
+    criteria="""A 12-inch birthday cake with a character design: $120 plus
+    $20 to $60, so about $140 to $180 depending on complexity. Giving the
+    pieces without the total passes too. Fails if it gives one fixed price
+    as if the design cost were known, leaves out the design cost, or gets the
+    range wrong.""")
+
+HYDRO_JET_AFTER_HOURS = Rubric(
+    quote=("There is a $75 after-hours service call fee in addition to "
+           "standard labor rates.",
+           "Hydro-jetting is $400 for a typical home service line."),
+    criteria="""After hours, hydro-jetting a typical home line is $400 plus
+    the $75 after-hours fee: about $475. Giving both pieces without adding
+    them passes. Fails if it leaves out the after-hours fee, or quotes the
+    standard $150 drain cleaning as the price of hydro-jetting.""")
+
+LEAK_DETECTION_APPLIED = Rubric(
+    quote=("We charge $125 for the initial leak detection visit, which is "
+           "applied to the repair cost if you proceed."),
+    criteria="""The customer was quoted $600 for the repair after the $125
+    detection visit. Because the $125 is applied to the repair, they pay $600
+    in total ($125 already paid, $475 more). Fails if it says the total is
+    $725, or that the $125 is charged on top.""")
