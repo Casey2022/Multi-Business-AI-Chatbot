@@ -201,6 +201,20 @@ def init_db():
         )
     """)
 
+    # published_snapshot — the sections as last published, one JSON list per
+    # business. "Discard changes" restores them: an owner who previews an
+    # edit and doesn't like the answers gets the old wording back without
+    # having to remember it. Taken whenever a business is marked clean
+    # (Publish, demo clone, import), and on the first edit of a clean
+    # business that has none yet.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS published_snapshot (
+            business_id  INTEGER PRIMARY KEY,
+            sections     TEXT    NOT NULL,
+            taken_at     TEXT    NOT NULL
+        )
+    """)
+
     # geocode_cache — addresses already resolved, so a repeat booking to the
     # same street doesn't pay for a second lookup. Keyed by the query plus
     # its viewport bias, because the same string biased differently is a
@@ -580,6 +594,7 @@ _TENANT_TABLES = (
     ("appointments",       "business_id"),
     ("conversation_state", "business_id"),
     ("config_overrides",   "business_id"),
+    ("published_snapshot", "business_id"),
     ("users",              "business_id"),
 )
 
@@ -1070,11 +1085,89 @@ def get_documents(business_id):
     return [dict(r) for r in rows]
 
 
+def _save_snapshot(conn, business_id):
+    """Store the business's current sections as its published version."""
+    import json as _json
+    from datetime import datetime as _dt
+    rows = conn.execute(
+        "SELECT id, position, title, body FROM documents WHERE business_id = ? "
+        "ORDER BY position, id", (business_id,)).fetchall()
+    conn.execute(
+        "INSERT INTO published_snapshot (business_id, sections, taken_at) "
+        "VALUES (?, ?, ?) ON CONFLICT(business_id) DO UPDATE SET "
+        "sections = excluded.sections, taken_at = excluded.taken_at",
+        (business_id, _json.dumps([dict(r) for r in rows]),
+         _dt.now().isoformat()))
+
+
+def _snapshot_if_missing(conn, business_id):
+    """Before the first edit of a clean business with no snapshot, keep what
+    it has now: that IS what customers are being answered from."""
+    has = conn.execute("SELECT 1 FROM published_snapshot WHERE business_id = ?",
+                       (business_id,)).fetchone()
+    if has:
+        return
+    row = conn.execute("SELECT documents_dirty FROM businesses WHERE id = ?",
+                       (business_id,)).fetchone()
+    if row is not None and not row["documents_dirty"]:
+        _save_snapshot(conn, business_id)
+
+
+def get_published_snapshot(business_id):
+    """The sections as last published (list of dicts), or None."""
+    import json as _json
+    conn = get_connection()
+    row = conn.execute("SELECT sections FROM published_snapshot WHERE business_id = ?",
+                       (business_id,)).fetchone()
+    conn.close()
+    return _json.loads(row["sections"]) if row else None
+
+
+def discard_document_changes(business_id, updated_by=None):
+    """Put the sections back as they were last published. Returns False if
+    there's no published version to go back to.
+
+    Edits being discarded aren't lost: a changed section is restored through
+    the same path as a save, so its unpublished wording goes into
+    document_versions (the section's History). A section added since is
+    deleted; one deleted since comes back (as a new row).
+    """
+    snapshot = get_published_snapshot(business_id)
+    if snapshot is None:
+        return False
+    current = {s["id"]: s for s in get_documents(business_id)}
+    kept = set()
+    for s in snapshot:
+        now = current.get(s["id"])
+        if now is None:
+            add_document_section(business_id, s["title"], s["body"],
+                                 position=s["position"], updated_by=updated_by)
+            continue
+        kept.add(s["id"])
+        if (now["title"], now["body"]) != (s["title"], s["body"]):
+            update_document_section(s["id"], s["title"], s["body"],
+                                    updated_by=updated_by)
+        if now["position"] != s["position"]:
+            conn = get_connection()
+            conn.execute("UPDATE documents SET position = ? WHERE id = ?",
+                         (s["position"], s["id"]))
+            conn.commit()
+            conn.close()
+    for sid in current:
+        if sid not in kept:
+            delete_document_section(sid)
+    # Back to exactly what customers are answered from: clean, and the
+    # snapshot refreshed so re-added sections carry their new ids.
+    set_documents_clean(business_id)
+    return True
+
+
 def add_document_section(business_id, title, body, position=None,
                          updated_by=None):
     """Add a section. Appends to the end unless a position is given."""
     from datetime import datetime as _dt
     conn = get_connection()
+    _snapshot_if_missing(conn, business_id)
     if position is None:
         row = conn.execute(
             "SELECT COALESCE(MAX(position), -1) + 1 AS p FROM documents "
@@ -1107,6 +1200,7 @@ def update_document_section(document_id, title, body, updated_by=None):
     if not old:
         conn.close()
         return
+    _snapshot_if_missing(conn, old["business_id"])
 
     conn.execute(
         """
@@ -1135,6 +1229,7 @@ def delete_document_section(document_id):
     if not row:
         conn.close()
         return
+    _snapshot_if_missing(conn, row["business_id"])
     conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
     conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?",
                  (row["business_id"],))
@@ -1155,10 +1250,12 @@ def get_document_versions(document_id, limit=10):
 
 
 def set_documents_clean(business_id):
-    """Clear the dirty flag after a successful re-ingest."""
+    """Clear the dirty flag after a successful re-ingest, and keep the
+    sections as the published version ("Discard changes" restores them)."""
     conn = get_connection()
     conn.execute("UPDATE businesses SET documents_dirty = 0 WHERE id = ?",
                  (business_id,))
+    _save_snapshot(conn, business_id)
     conn.commit()
     conn.close()
 

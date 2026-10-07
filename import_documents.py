@@ -69,6 +69,12 @@ def import_for_business(business, config=None):
             add_document_section(business["id"], title, body,
                                  updated_by="import")
             count += 1
+    # The live index is built from these same seed files, so nothing is
+    # unpublished. Left dirty, every fresh deploy showed "Unpublished
+    # changes" on every business, and there was no snapshot for "Discard".
+    if count:
+        from db import set_documents_clean
+        set_documents_clean(business["id"])
     return count
 
 

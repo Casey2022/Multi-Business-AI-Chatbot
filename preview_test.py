@@ -204,6 +204,65 @@ def main():
           first and second and not third, (first, second, third))
     check("another business has its own allowance", ratelimit.knowledge_preview(98)[0])
 
+    heading("Discard changes: back to the published wording")
+    bid = db.add_business("Discard Test", "discard_test", "config/crosstown_pizza.yaml")
+    sid_a = db.add_document_section(bid, "Pizza Sizes", "Gluten-free comes in 10-inch only.")
+    sid_b = db.add_document_section(bid, "Delivery", "Within 6 miles.")
+    sid_c = db.add_document_section(bid, "Party Trays", "Feed 15 to 20.")
+    db.set_documents_clean(bid)                       # published
+    snap = db.get_published_snapshot(bid)
+    check("publishing keeps a snapshot of the sections",
+          [s["title"] for s in snap] == ["Pizza Sizes", "Delivery", "Party Trays"], snap)
+    published = [(s["title"], s["body"]) for s in db.get_documents(bid)]
+    db.update_document_section(sid_a, "Pizza Sizes", "A 10-inch gluten-free crust is available.")
+    db.delete_document_section(sid_c)
+    db.add_document_section(bid, "Catering", "Call us.")
+    dirty = db.get_business_by_id(bid)["documents_dirty"]
+    check("edits mark it unpublished", dirty == 1)
+    check("discard succeeds", db.discard_document_changes(bid, updated_by="owner") is True)
+    back = [(s["title"], s["body"]) for s in db.get_documents(bid)]
+    check("the sections are exactly as published, in order", back == published, back)
+    check("and it's no longer marked unpublished",
+          db.get_business_by_id(bid)["documents_dirty"] == 0)
+    versions = db.get_document_versions(sid_a)
+    check("the discarded wording is kept in the section's History",
+          any("available" in v["body"] for v in versions), versions)
+    check("discarding again changes nothing",
+          db.discard_document_changes(bid) is True and
+          [(s["title"], s["body"]) for s in db.get_documents(bid)] == published)
+
+    bid2 = db.add_business("Lazy Test", "lazy_test", "config/crosstown_pizza.yaml")
+    conn = db.get_connection()
+    conn.execute("INSERT INTO documents (business_id, position, title, body, updated_at) "
+                 "VALUES (?, 0, 'Hours', 'Open 11 to 10.', 'x')", (bid2,))
+    conn.execute("UPDATE businesses SET documents_dirty = 0 WHERE id = ?", (bid2,))
+    conn.commit(); conn.close()
+    sid = db.get_documents(bid2)[0]["id"]
+    db.update_document_section(sid, "Hours", "Open 9 to 5.")
+    check("a clean business with no snapshot gets one on its first edit",
+          db.get_published_snapshot(bid2)[0]["body"] == "Open 11 to 10.")
+    db.discard_document_changes(bid2)
+    check("so the first edit can be discarded too",
+          db.get_documents(bid2)[0]["body"] == "Open 11 to 10.")
+
+    # Your local database today: edited by scripts (dirty), never published
+    # through the portal, so no snapshot. Discard must refuse, not guess.
+    bid3 = db.add_business("No Snapshot", "no_snapshot", "config/crosstown_pizza.yaml")
+    conn = db.get_connection()
+    conn.execute("INSERT INTO documents (business_id, position, title, body, updated_at) "
+                 "VALUES (?, 0, 'Hours', 'Open late.', 'x')", (bid3,))
+    conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?", (bid3,))
+    conn.commit(); conn.close()
+    db.update_document_section(db.get_documents(bid3)[0]["id"], "Hours", "Open late.")
+    check("dirty with no published version: nothing to discard to",
+          db.discard_document_changes(bid3) is False
+          and db.get_documents(bid3)[0]["body"] == "Open late.")
+    imp = (ROOT / "import_documents.py").read_text()
+    check("importing the seed marks it published (and snapshots it)",
+          "set_documents_clean(business[\"id\"])" in imp)
+    check("deleting a demo business deletes its snapshot",
+          ("published_snapshot", "business_id") in db._TENANT_TABLES)
+
     heading("the page is wired up")
     routes = (ROOT / "admin" / "routes.py").read_text()
     page = (ROOT / "admin" / "templates" / "admin" / "knowledge.html").read_text()
@@ -216,6 +275,12 @@ def main():
     check("the page posts to it with a CSRF token",
           "url_for('admin.knowledge_preview'" in page and
           "_csrf_token" in page.split("knowledge_preview")[1][:200])
+    check("Discard has a POST route that checks access",
+          '"/business/<int:business_id>/knowledge/discard", methods=["POST"]' in routes
+          and "require_business_access(business_id)" in routes.split("def knowledge_discard")[1][:300])
+    check("the unpublished banner offers Discard beside Publish, with CSRF",
+          "url_for('admin.knowledge_discard'" in page and
+          "_csrf_token" in page.split("knowledge_discard")[1][:200])
     check("the page shows Now and After for each result",
           "r.now" in page and "r.after" in page and "After you publish" in page)
 

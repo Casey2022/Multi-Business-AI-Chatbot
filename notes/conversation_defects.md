@@ -1094,3 +1094,24 @@ previews a minute and fifteen an hour per business, since demo visitors can
 edit a knowledge base. `preview_test.py` (34) pins all of it with a fake
 index and model; pointing "After" at the live index, or skipping the
 cleanup, fails it.
+
+### Discard changes (2026-10-07)
+
+Casey's request after trying the preview: an owner who edits, previews and
+doesn't like the answers should get the old wording back without having to
+remember it. "Discard changes" now sits beside "Publish changes" in the
+unpublished banner.
+
+`published_snapshot` keeps each business's sections as last published (one
+JSON list), taken whenever it's marked clean (Publish, demo clone, import)
+and, as a fallback, before the first edit of a clean business that has
+none. Discard restores it: changed sections are saved back through
+update_document_section, so the discarded wording lands in the section's
+History; sections added since are deleted, deleted ones come back. The
+search index already holds the published version, so nothing is rebuilt.
+With no snapshot and unsaved edits (a database edited outside the portal),
+Discard refuses rather than guess.
+
+Found on the way: importing the seed documents left every business
+"unpublished", though the live index is built from the same files, so a
+fresh deploy showed the banner everywhere. Import now marks it clean.

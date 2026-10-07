@@ -22,10 +22,16 @@
 <div class="banner">
   <div><strong>Unpublished changes.</strong> Customers are still being answered
     from the previous version.</div>
-  <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    <button class="btn btn-primary" type="submit">Publish changes</button>
-  </form>
+  <div class="banner-actions">
+    <form method="POST" action="{{ url_for('admin.knowledge_discard', business_id=business.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">Discard changes</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary" type="submit">Publish changes</button>
+    </form>
+  </div>
 </div>
 {% endif %}
 
@@ -75,7 +81,9 @@
     <div class="guidance mt-4">
       {% if preview_suggested %}These questions were suggested from the
       sections you changed. {% endif %}Not what you meant? Edit the section
-      and preview again. Nothing changes for customers until you publish.
+      and preview again, or use <strong>Discard changes</strong> at the top to
+      go back to the published wording. Nothing changes for customers until
+      you publish.
     </div>
     {% endif %}
   </div>

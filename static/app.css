@@ -650,6 +650,8 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 }
 .banner .btn-primary { background: var(--pending); border-color: var(--pending); }
 .banner .btn-primary:hover { background: #8F5309; }
+/* Discard beside Publish; side by side, wrapping under the text on a phone. */
+.banner-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
 
 .section-title {
   font-family: var(--display); font-size: var(--text-lg); font-weight: 600;

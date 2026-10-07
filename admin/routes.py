@@ -460,6 +460,28 @@ def knowledge_preview(business_id):
     )
 
 
+@admin_bp.route("/business/<int:business_id>/knowledge/discard", methods=["POST"])
+@login_required
+def knowledge_discard(business_id):
+    """Put the sections back as last published. The search index already
+    holds that version, so nothing is rebuilt."""
+    require_business_access(business_id)
+    if not get_business_by_id(business_id):
+        abort(404)
+
+    from db import discard_document_changes
+    from admin.auth import current_user
+
+    if discard_document_changes(business_id, updated_by=current_user()["email"]):
+        flash("Changes discarded — the sections are back to what customers "
+              "see. Anything you'd written is still in each section's History.",
+              "success")
+    else:
+        flash("There's no published version saved to go back to yet. Publish "
+              "once, and Discard will work from then on.", "error")
+    return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
 @admin_bp.route("/business/<int:business_id>/knowledge/add", methods=["POST"])
 @login_required
 def knowledge_add(business_id):
