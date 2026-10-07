@@ -1129,3 +1129,15 @@ highlights the "after" phrases only where they appear word for word.
 Identical replies skip the call; an unreadable or failed call falls back to
 the exact comparison, which can over-report but never hides a change.
 `preview_test.py` 68; labelling by wording alone fails it.
+
+### Preview fact check too strict (2026-10-07)
+
+First real preview (Crosstown, 5 questions): the gluten-free answers agreed
+(10-inch only), but two rows were flagged because one reply added a detail
+the other left out: an allergy warning, and a "30 minutes total" the live
+reply had invented for the Sicilian pan. Model variation, not the owner's
+edit. A change is now only a fact both replies state with different values,
+a yes/no flip, or one reply answering where the other can't (which still
+catches a deleted section). Each comparison is now logged to logs/app.log
+(the owner's own test questions; no customer data), so a preview can be
+reviewed from the log instead of a screenshot.

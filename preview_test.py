@@ -195,6 +195,9 @@ def main():
           and "test_pizza__preview_7" in fake.deleted)
     check("the live index is untouched", "test_pizza" in fake.collections
           and fake.collections["test_pizza"].docs == live)
+    src = (ROOT / "preview.py").read_text()
+    check("each comparison is logged for review (question, label, replies)",
+          'log.info("Preview %r: %s (%s) %s | now=%r | after=%r"' in src)
     check("the caller's config still points at the live index",
           config["business"]["collection"] == "test_pizza")
 
@@ -251,6 +254,12 @@ def main():
         check("both replies and the question are fenced as data",
               "<reply_now>" in prompt and "<reply_after>" in prompt and "<question>" in prompt)
         check("the comparison is pinned", calls[-1].get("temperature") == 0)
+        flat_prompt = " ".join(prompt.split())
+        check("a detail only one reply mentions is not a change (2026-10-07: "
+              "an allergy tip and a made-up '30 minutes' were flagged)",
+              "a detail one reply mentions and the other simply leaves out" in flat_prompt)
+        check("but one reply answering and the other not still is (a deleted section)",
+              "one answers the question and the other can't" in flat_prompt)
         llm._create = facts_reply('```json\n{"facts_changed": true, "differences": ['
                                   '{"topic": "fee", "now": "$3", "after": "$5"},'
                                   '{"topic": "a", "now": "", "after": "x"},'

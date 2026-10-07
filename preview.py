@@ -178,11 +178,17 @@ def compare_facts(question, now, after):
     prompt = (
         "Two replies from a business's assistant answer the same customer "
         "question, before and after the owner edited the business's "
-        "information. Decide whether anything a customer would act on "
-        "changed: prices, sizes, quantities, times, days, dates, notice "
-        "periods, conditions, what is or isn't offered, yes or no. Different "
-        "wording, order, greetings or emoji with the same facts is NOT a "
-        "change.\n\n"
+        "information. Decide whether a fact a customer would act on changed.\n"
+        "A change is ONLY one of these:\n"
+        "- both replies state the same kind of fact with a different value: "
+        "a different price, size, quantity, time, day, date, notice period or "
+        "condition;\n"
+        "- one says yes (offered, possible, included) where the other says no;\n"
+        "- one answers the question and the other can't (says it doesn't know, "
+        "or only sends them to call).\n"
+        "NOT a change: a detail one reply mentions and the other simply leaves "
+        "out (an extra tip, warning, or suggestion), different wording or "
+        "order, greetings, emoji, or offers to help.\n\n"
         "Respond with ONLY a JSON object, no preamble:\n"
         '{"facts_changed": true or false, "differences": [{"topic": "...", '
         '"now": "...", "after": "..."}]}\n'
@@ -271,6 +277,12 @@ def run_preview(config, business_id, questions):
             results = []
             for (q, n, a), c in zip(answers, checks):
                 facts = c.result()
+                # The owner's own test question and the two replies: no
+                # customer data. Logged so a preview can be reviewed from
+                # logs/app.log without a screenshot.
+                log.info("Preview %r: %s (%s) %s | now=%r | after=%r", q,
+                         "FACTS CHANGE" if facts["changed"] else "same facts",
+                         facts["method"], facts["differences"], n, a)
                 results.append({
                     "question": q, "now": n, "after": a,
                     "changed": facts["changed"],
