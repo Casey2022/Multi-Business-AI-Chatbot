@@ -1141,3 +1141,12 @@ a yes/no flip, or one reply answering where the other can't (which still
 catches a deleted section). Each comparison is now logged to logs/app.log
 (the owner's own test questions; no customer data), so a preview can be
 reviewed from the log instead of a screenshot.
+
+### Live check of the stricter fact compare (2026-10-07, after `5d6aeae`)
+
+Crosstown, large pizza edited $22 → $25, five suggested questions. All five
+labels right: the 3-topping price row flagged (large $22 → $25, total $30.25
+→ $33.25); gluten-free, wings (After adds an extra-crispy tip), party trays
+and Saturday cutoff "Same facts". Read straight from `logs/app.log`.
+Trade-off kept: a detail only one reply has (including one the bot invents)
+isn't flagged; a "not in your documents" check would be the separate fix.
