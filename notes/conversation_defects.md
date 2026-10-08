@@ -1187,3 +1187,24 @@ fail when removed); `upload_eval.py` for the real model (a menu with one
 changed price and a new item; a flyer carrying instructions). Review page
 checked in Chromium at desktop and phone width; the browser resize turns a
 3000x4000 photo into a 2000px JPEG before upload.
+
+### Price rows: the sums were fine, the items weren't (2026-10-08)
+
+First run of the 11 price rows (2026-10-07): 8 passed, including every sum
+(medium + toppings + delivery, gluten-free personal, two dozen muffins at
+the dozen price, a cake range, hydro-jetting after hours). So no
+`quote_total` tool. Three failed on every run (crosstown ×3, bobs ×3):
+- "how much for 30 wings" → "30 wings are $40!" (no 30-wing size)
+- Sicilian + two toppings → "$2.75 per topping … $31.50" (the large's
+  topping price; none is given for the Sicilian)
+- "you found my leak and quoted $600 … total" → "I don't have access to
+  your specific quote … call us" (Bob's "can't look up existing
+  appointments" guardrail read too broadly; the $125-is-credited rule was
+  never applied)
+Both wrong prices are real menu numbers on the wrong item, so a number
+check (like photo_import's) can't catch them. The guardrail "Never apply a
+fact from one item to a different item" was already in the prompt.
+Fix: `llm.PRICE_RULE`, added only when `asks_about_price(message)` (45 of
+156 eval rows; "how much notice/time" excluded). `price_rule_test.py` 28,
+proven to fail when the rule is made standing. If it doesn't hold, the next
+step is a structured menu with a lookup tool for menu businesses.

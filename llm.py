@@ -665,6 +665,45 @@ us. Everything else above still applies: never claim something the facts
 don't say, and if the facts don't cover it, say so plainly."""
 
 
+# Only for a message about a price, so every other prompt is exactly what it
+# was. Added 2026-10-08 after three price rows failed on every run, none of
+# them arithmetic: "30 wings are $40" (no 30-wing size; the 40-wing price),
+# a Sicilian priced with the large's topping price (none is given for it),
+# and a customer's own repair quote sent to "call us" instead of applying
+# the business's rule that the detection fee is credited. The standing
+# guardrail ("never apply a fact from one item to a different item") was
+# already in the prompt and didn't hold: the wrong answers used real prices
+# attached to the wrong thing, which no number check catches either.
+PRICE_RULE = """
+
+PRICES (this message asks about a price or a cost):
+- Give a price only for the exact item, size, quantity or option the excerpts
+  give it for. A price stated for one item, size or quantity is never the
+  price of a different one, even a similar one.
+- If the customer asks for something the excerpts don't price (a quantity
+  that isn't sold, an add-on with no price given for that item), say plainly
+  that it isn't listed, give what is listed (and a combination of listed
+  options that gets them what they want, added up), and offer the phone
+  number for anything else.
+- If the customer tells you a figure of their own (a quote they were given, a
+  bill so far), you can't check that figure, but do apply the business's
+  stated pricing rules to it (for example, whether a fee is credited toward
+  it or added on top) and say what that means for their total.
+- This doesn't apply to anything other than prices; everything above still
+  does."""
+
+_PRICE_QUESTION = re.compile(
+    # "how much notice / time" is about time, not money.
+    r"\b(how much(?!\s+(?:notice|time|longer|lead|warning|earlier|ahead|in advance))|"
+    r"costs?|price[sd]?|pricing|charges?|fees?|total|pay|"
+    r"run me|expensive|cheap(?:er|est)?)\b|\$\s?\d", re.I)
+
+
+def asks_about_price(message):
+    """Does the customer's message ask what something costs?"""
+    return bool(_PRICE_QUESTION.search(message or ""))
+
+
 def referred_recently(history, config):
     """Did one of the bot's recent replies give the number or say "call us"?"""
     pattern = _phone_pattern(((config or {}).get("business") or {}).get("phone"))
@@ -832,6 +871,9 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     # details". It now says only what it's for.
     if referred_recently(history, config):
         system_for_call += REFERRAL_RULE
+    # Likewise only for a price question (see PRICE_RULE).
+    if asks_about_price(message):
+        system_for_call += PRICE_RULE
     # Rule arithmetic (notice periods, cancellation windows) is done by the
     # tools in policy.py, offered only when the message needs them; so is
     # the text saying when to call them, and the business's rendered
