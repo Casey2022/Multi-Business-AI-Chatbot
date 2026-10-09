@@ -1208,3 +1208,11 @@ Fix: `llm.PRICE_RULE`, added only when `asks_about_price(message)` (45 of
 156 eval rows; "how much notice/time" excluded). `price_rule_test.py` 28,
 proven to fail when the rule is made standing. If it doesn't hold, the next
 step is a structured menu with a lookup tool for menu businesses.
+First run with PRICE_RULE (2026-10-09): hard 61/63, no regressions
+(journey 6/6 ×3, qa 4/4 ×3, routing 9/9). The leak quote row passes. Wings
+half-fixed ("30 wings would be $40 for a 40-piece order — our next size
+up"); the Sicilian still borrows $2.75. Second version: find the sentence
+that gives the price before stating it; if none, the first sentence says
+it isn't listed. Last prompt attempt: if the Sicilian still fails, the
+next step is structural (a menu lookup tool), and the document gap itself
+(no Sicilian topping price) is a question for the owner, not the bot.

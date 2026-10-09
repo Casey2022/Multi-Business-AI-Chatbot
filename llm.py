@@ -674,17 +674,22 @@ don't say, and if the facts don't cover it, say so plainly."""
 # guardrail ("never apply a fact from one item to a different item") was
 # already in the prompt and didn't hold: the wrong answers used real prices
 # attached to the wrong thing, which no number check catches either.
+# First version fixed the quote row and half-fixed wings ("30 wings would be
+# $40 for a 40-piece order"); the Sicilian kept the large's topping price.
+# Second version (same day): find the sentence first, say "not listed" first.
 PRICE_RULE = """
 
 PRICES (this message asks about a price or a cost):
-- Give a price only for the exact item, size, quantity or option the excerpts
-  give it for. A price stated for one item, size or quantity is never the
-  price of a different one, even a similar one.
+- Before you state any price, find the sentence in the excerpts that gives
+  that price for that exact item, size, quantity or add-on. If no sentence
+  does, you don't know that price: don't state one, and don't work one out
+  from a different item's price, even a similar size. A price stated for one
+  item, size or quantity is never the price of a different one.
 - If the customer asks for something the excerpts don't price (a quantity
-  that isn't sold, an add-on with no price given for that item), say plainly
-  that it isn't listed, give what is listed (and a combination of listed
-  options that gets them what they want, added up), and offer the phone
-  number for anything else.
+  that isn't sold, an add-on with no price given for that item), your first
+  sentence says plainly that it isn't listed. Then give what is listed (and
+  a combination of listed options that gets them what they want, added up),
+  and offer the phone number for anything else.
 - If the customer tells you a figure of their own (a quote they were given, a
   bill so far), you can't check that figure, but do apply the business's
   stated pricing rules to it (for example, whether a fee is credited toward
