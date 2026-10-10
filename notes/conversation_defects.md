@@ -1219,9 +1219,9 @@ next step is structural (a menu lookup tool), and the document gap itself
 PRICE_RULE v2 run (2026-10-10): identical to v1 (61/63; wings and Sicilian
 unchanged). Prompt route closed. Decision with Casey: (1) the owner fills
 the document gap — Sicilian toppings $3.25 (50 cents more than a large),
-seed now, DB via the one-off fix_sicilian_topping.py (the dev shell's
-SQLite write hit "disk I/O error" on the mounted DB; a copy rolled back
-cleanly, so the hot journal is harmless and the Mac rolls it back on next
-open); the Sicilian row now checks $32.50, and "extra ranch with my wings"
+seed and DB both. (The dev shell's first DB write hit "disk I/O error":
+SQLite deletes its journal on commit, and deleting in the connected folder
+was not permitted. With delete permission re-granted, the hot journal
+rolled back and the update went through; integrity_check ok.) the Sicilian row now checks $32.50, and "extra ranch with my wings"
 (no price given) takes over as the gap check. (2) Next: a structured menu
 with a lookup tool, Crosstown first.

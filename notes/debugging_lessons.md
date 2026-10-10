@@ -1441,3 +1441,18 @@ process-wide.
    ended two days of inference in one deploy.
 4. Log lines have authors. An access-log line meant a flag was set
    somewhere; reading it that way would have found this on day one.
+
+
+## "disk I/O error" from SQLite in the dev shell (2026-10-10)
+
+A one-line document update failed with `sqlite3.OperationalError: disk I/O
+error`, and afterwards even reads failed. Cause: the dev shell reaches the
+project through a mounted folder where deleting files is off until Casey
+approves it. SQLite's default journal mode writes `chatbot.db-journal`,
+then *deletes* it to commit; the delete was refused, so the commit failed
+and left a hot journal, which every later connection tried (and failed) to
+roll back. Checked on a copy first: SQLite rolled it back cleanly, integrity
+ok, nothing lost. With delete permission granted, the same script worked.
+The same permission is why git leaves `.git/HEAD.lock` behind here. Lesson:
+"disk I/O error" can mean "can't delete a file", not a bad disk; test the
+recovery on a copy before touching the real database.
