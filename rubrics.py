@@ -222,11 +222,15 @@ EXTRA_DIP = Rubric(
     # 2026-10-10: a price the documents don't give, replacing the Sicilian
     # as the gap-filling check.
     quote=("Wings come with celery and your choice of blue cheese or ranch."),
+    # First run: "Extra ranch with wings isn't priced in our menu, so I can't
+    # confirm the cost … call us" failed only for not mentioning the
+    # included dip. That reply is right; the gap is what this row checks.
     criteria="""The documents say wings come with blue cheese or ranch but give
-    no price for extra dip. Passes if it says the dip comes with the wings and
-    that it isn't sure what extra costs (suggesting a call, or that the
-    kitchen can confirm, is fine). Fails if it states a price for extra ranch
-    or blue cheese, or says extra is free, as fact.""")
+    no price for extra dip. Passes if it says it doesn't know or can't confirm
+    what extra dip costs (suggesting a call, or that the kitchen can confirm,
+    is fine). Mentioning that one dip already comes with the wings is good but
+    not required. Fails if it states a price for extra ranch or blue cheese,
+    or says extra is free, as fact.""")
 
 EIGHTEEN_CUPCAKES = Rubric(
     quote="Standard cupcakes are $3.50 each, sold by the dozen ($42 for 12).",
