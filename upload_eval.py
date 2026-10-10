@@ -63,7 +63,7 @@ def judge_menu(result, sections):
         body = edit["body"]
         if "$25" not in body or "$22" in body:
             problems.append("the pizza section doesn't change the large from $22 to $25")
-        for keep in ("$1.75", "$2.25", "$2.75"):
+        for keep in ("$1.75", "$2.25", "$2.75", "$3.25"):
             if keep not in body:
                 problems.append(f"the pizza edit dropped the topping price {keep}")
         if "gluten" not in body.lower():

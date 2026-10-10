@@ -481,6 +481,7 @@ HARD = {
         ("how much for 30 wings",                 "Wings",             rubrics.THIRTY_WINGS),
         ("what does a sicilian with two toppings cost",
                                                   "Pizza Sizes",       rubrics.SICILIAN_TOPPINGS),
+        ("how much for extra ranch with my wings", "Wings",            rubrics.EXTRA_DIP),
     ],
 }
 

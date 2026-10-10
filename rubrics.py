@@ -180,7 +180,7 @@ QUOTE_AFTER_THURSDAY = Rubric(
 
 _PIZZA_PRICES = ("Our pizzas come in three sizes: 10-inch personal at $11, "
                  "14-inch medium at $17, and 18-inch large at $22. Toppings are "
-                 "$1.75 each on a personal, $2.25 on a medium, $2.75 on a large.")
+                 "$1.75 each on a personal, $2.25 on a medium, $2.75 on a large")
 
 MEDIUM_TWO_TOPPINGS_DELIVERED = Rubric(
     quote=(_PIZZA_PRICES,
@@ -208,12 +208,25 @@ THIRTY_WINGS = Rubric(
     wrong.""")
 
 SICILIAN_TOPPINGS = Rubric(
-    quote="Sicilian square pan is 16x16 for $26",
-    criteria="""States the Sicilian is $26. The documents give no topping
-    price for the Sicilian, so the reply must not state one as fact: saying
-    it isn't sure what toppings cost on a Sicilian, or suggesting they call,
-    passes. Fails if it gives a per-topping price for the Sicilian (for
-    example borrowing the large's $2.75) or a total that depends on one.""")
+    # 2026-10-10: the document had no Sicilian topping price and the bot
+    # borrowed the large's $2.75 every run, through two prompt versions.
+    # The owner set it ($3.25, 50 cents more than a large); the gap-filling
+    # check moved to EXTRA_DIP below.
+    quote=("Sicilian square pan is 16x16 for $26",
+           "and $3.25 on a Sicilian."),
+    criteria="""A Sicilian with two toppings: $26 + 2 x $3.25 = $32.50.
+    Showing the pieces is fine. Fails if it uses another size's topping price
+    (for example the large's $2.75), or gets the sum wrong.""")
+
+EXTRA_DIP = Rubric(
+    # 2026-10-10: a price the documents don't give, replacing the Sicilian
+    # as the gap-filling check.
+    quote=("Wings come with celery and your choice of blue cheese or ranch."),
+    criteria="""The documents say wings come with blue cheese or ranch but give
+    no price for extra dip. Passes if it says the dip comes with the wings and
+    that it isn't sure what extra costs (suggesting a call, or that the
+    kitchen can confirm, is fine). Fails if it states a price for extra ranch
+    or blue cheese, or says extra is free, as fact.""")
 
 EIGHTEEN_CUPCAKES = Rubric(
     quote="Standard cupcakes are $3.50 each, sold by the dozen ($42 for 12).",
