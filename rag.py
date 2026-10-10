@@ -307,19 +307,24 @@ def collection_for(config):
             or _slugify(business.get("name", "")))
 
 
-def db_chunks(business_id):
+def db_chunks(business_id, config=None):
     """(chunks, ids, metadatas) for a business's sections in the database.
 
     One section, one chunk, "## title" first. Shared by Publish
     (ingest_documents) and the owner's preview (preview.py), so the preview
-    searches exactly what Publish would build.
+    searches exactly what Publish would build. With a config, each section
+    gets its menu price lines (menu.attach_prices): the menu is the only copy
+    of those prices.
     """
     from db import get_documents
+    import menu
     chunks, ids, metas = [], [], []
     for s in get_documents(business_id):
         chunks.append(f"## {s['title']}\n{s['body']}")
         ids.append(f"section_{s['id']}")
         metas.append({"source": "db", "section_id": s["id"], "title": s["title"]})
+    if config is not None:
+        chunks = menu.attach_prices(chunks, config)
     return chunks, ids, metas
 
 
@@ -342,7 +347,7 @@ def ingest_documents(config, business_id=None):
     metas  = []
 
     if business_id is not None:
-        chunks, ids, metas = db_chunks(business_id)
+        chunks, ids, metas = db_chunks(business_id, config)
         log.info(f"Ingesting {len(chunks)} section(s) from database")
     else:
         docs_path = Path("documents") / slug
@@ -358,6 +363,8 @@ def ingest_documents(config, business_id=None):
                 chunks.append(c)
                 ids.append(f"{md_file.stem}_chunk_{i}")
                 metas.append({"source": md_file.name, "chunk_index": i})
+        import menu
+        chunks = menu.attach_prices(chunks, config)
 
     if not chunks:
         log.warning(f"No content to ingest for '{collection_name}'")
@@ -401,7 +408,7 @@ def ingest_documents(config, business_id=None):
     live_metadata = {"hnsw:space": "cosine"}
     docs_path = Path("documents") / slug
     if business_id is None and docs_path.exists():
-        live_metadata["source_digest"] = _source_digest(docs_path)
+        live_metadata["source_digest"] = _source_digest(docs_path, config)
 
     live = client.get_or_create_collection(
         name=collection_name,
@@ -414,7 +421,7 @@ def ingest_documents(config, business_id=None):
     log.info(f"Ingested {len(chunks)} chunks into '{collection_name}'.")
     return live
 
-def _source_digest(docs_path):
+def _source_digest(docs_path, config=None):
     """A fingerprint of the seed documents, for spotting an edited one.
 
     Chunk count was the old freshness test, and it only notices changes that
@@ -432,6 +439,11 @@ def _source_digest(docs_path):
     for md_file in sorted(docs_path.glob("*.md")):
         digest.update(md_file.name.encode("utf-8"))
         digest.update(md_file.read_bytes())
+    # The menu's price lines are part of what gets built: a price edited in
+    # the YAML must rebuild the collection just like an edited document.
+    if config is not None:
+        import menu
+        digest.update(menu.render_menu(config).encode("utf-8"))
     return digest.hexdigest()[:16]
 
 
@@ -450,7 +462,7 @@ def ensure_ingested(config):
     if docs_path.exists():
         for md_file in docs_path.glob("*.md"):
             expected += len(chunk_text(md_file.read_text(encoding="utf-8")))
-        digest = _source_digest(docs_path)
+        digest = _source_digest(docs_path, config)
 
     try:
         collection = get_chroma_client().get_collection(

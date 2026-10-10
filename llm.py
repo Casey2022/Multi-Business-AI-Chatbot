@@ -12,6 +12,7 @@ import os
 import re
 
 import policy
+import menu
 from anthropic import Anthropic
 from config import substitute
 from rag import retrieve, RetrievalUnavailable
@@ -900,6 +901,14 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     tools = policy.tools_for(config, wanted) if wanted else []
     if tools:
         system_for_call += policy.prompt_section(config, wanted)
+    # A price question that names something on the menu gets the menu tool,
+    # and has to use it (see menu.py: the prompt rules alone never stopped
+    # "30 wings are $40").
+    wants_menu = (menu.items(config) and asks_about_price(message)
+                  and menu.mentions_item(message, config))
+    if wants_menu:
+        tools = tools + [menu.tool(config)]
+        system_for_call += "\n\n" + menu.PROMPT_RULE
 
     if retrieved_chunks:
         context_block = "\n\n".join(
@@ -949,6 +958,8 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
             elif "business_days" in wanted and not model_thinks:
                 call["tool_choice"] = {"type": "tool",
                                        "name": "add_business_days"}
+            elif wants_menu and not model_thinks:
+                call["tool_choice"] = {"type": "tool", "name": "menu_price"}
         if temperature is not None:
             call["temperature"] = temperature
         reply = _reply_using_tools(call, config, now)

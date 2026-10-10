@@ -23,7 +23,9 @@
   <div><strong>Unpublished changes.</strong> Customers are still being answered
     from the previous version.
     {% if changes.deleted %}<div class="cell-sub">Deleted since publishing:
-      {{ changes.deleted | join(", ") }}.</div>{% endif %}</div>
+      {{ changes.deleted | join(", ") }}.</div>{% endif %}
+    {% if menu_changes %}<div class="cell-sub">Menu changes waiting:
+      {{ menu_changes | join("; ") }}.</div>{% endif %}</div>
   <div class="banner-actions">
     <form method="POST" action="{{ url_for('admin.knowledge_discard', business_id=business.id) }}">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -152,6 +154,12 @@
     <div class="field">
       <label for="body-{{ s.id }}">What the assistant should know</label>
       <textarea id="body-{{ s.id }}" name="body" rows="7">{{ s.body }}</textarea>
+      {% if price_lines and price_lines.get(s.id) %}
+      <div class="menu-prices">
+        <div class="cell-sub">Prices, from your menu (the assistant reads these with this section):</div>
+        <div>{{ price_lines[s.id] }}</div>
+      </div>
+      {% endif %}
     </div>
     <div class="section-foot">
       <span class="meta">

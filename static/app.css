@@ -865,3 +865,10 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .proposal-diff .prose { white-space: pre-wrap; }
 .word-removed { color: var(--refused); text-decoration: line-through; background: var(--refused-wash); }
 .proposal details summary { cursor: pointer; font-size: var(--text-sm); color: var(--ink-soft); }
+
+/* A section's menu prices: generated from the menu, shown read-only under
+   the text the owner edits. */
+.menu-prices { margin-top: var(--s2); padding: var(--s2) var(--s3);
+               background: var(--surface-sunk); border-radius: var(--radius-sm);
+               font-size: var(--text-sm); }
+.menu-change { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: baseline; }

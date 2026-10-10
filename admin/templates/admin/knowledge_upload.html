@@ -28,6 +28,30 @@
 
   {% for c in proposal.changes %}
   {% set i = loop.index0 %}
+  {% if c.kind == "menu" %}
+  <div class="card proposal">
+    <div class="card-title">
+      Menu: {{ c.item }}
+      {% if c.flagged %}<span class="chip chip-refused">Check this</span>
+      {% elif c.op == "set_price" %}<span class="chip chip-pending">Price change</span>
+      {% else %}<span class="chip chip-booked">New</span>{% endif %}
+    </div>
+    <div class="card-pad">
+      <p class="menu-change">
+        <span class="cell-strong">{% if c.add_on %}{{ c.add_on }}{% if c.option and c.option != "any" %} on {{ c.option }}{% endif %}{% else %}{{ c.option }}{% endif %}</span>
+        {% if c.old_price_text %}<del class="word-removed">{{ c.old_price_text }}</del> →{% else %}new:{% endif %}
+        <mark class="fact-change">{{ c.price_text }}</mark>
+      </p>
+      {% if c.unsupported %}
+      <p class="hint-blocked mt-3">{{ c.unsupported | join(", ") }} isn't in your photo. Check it before saving.</p>
+      {% endif %}
+      <label class="chip-check mt-3">
+        <input type="checkbox" name="apply_{{ i }}" value="yes" {% if not c.flagged %}checked{% endif %}>
+        Keep this change
+      </label>
+    </div>
+  </div>
+  {% else %}
   <div class="card proposal">
     <div class="card-title">
       {% if c.section_id %}Change “{{ c.old_title }}”{% else %}New section{% endif %}
@@ -78,6 +102,7 @@
       </label>
     </div>
   </div>
+  {% endif %}
   {% endfor %}
 
   <div class="banner-actions mt-4">

@@ -1218,6 +1218,17 @@ def delete_upload_proposal(business_id):
     conn.close()
 
 
+def mark_documents_dirty(business_id):
+    """Knowledge-base content changed somewhere other than a section (the
+    menu): show "unpublished changes", keeping a snapshot to discard back to."""
+    conn = get_connection()
+    _snapshot_if_missing(conn, business_id)
+    conn.execute("UPDATE businesses SET documents_dirty = 1 WHERE id = ?",
+                 (business_id,))
+    conn.commit()
+    conn.close()
+
+
 def discard_document_changes(business_id, updated_by=None):
     """Put the sections back as they were last published. Returns False if
     there's no published version to go back to.

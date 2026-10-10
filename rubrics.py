@@ -178,13 +178,16 @@ QUOTE_AFTER_THURSDAY = Rubric(
 # notice periods did. Plain lookups have always passed; these are the sums,
 # the conditions attached to a price, and prices the documents don't give.
 
-_PIZZA_PRICES = ("Our pizzas come in three sizes: 10-inch personal at $11, "
-                 "14-inch medium at $17, and 18-inch large at $22. Toppings are "
-                 "$1.75 each on a personal, $2.25 on a medium, $2.75 on a large")
+# Since 2026-10-10 Crosstown's prices live in its menu (config menu:), and
+# these are the price lines generated from it (menu.render_item).
+_PIZZA_PRICES = ("Pizza prices: 10-inch personal $11, 14-inch medium $17, "
+                 "18-inch large $22, Sicilian 16x16 square pan $26.",
+                 "Topping: $1.75 each on a 10-inch personal, $2.25 each on a "
+                 "14-inch medium, $2.75 each on an 18-inch large, $3.25 each on a "
+                 "Sicilian 16x16 square pan.")
 
 MEDIUM_TWO_TOPPINGS_DELIVERED = Rubric(
-    quote=(_PIZZA_PRICES,
-           "The delivery fee is $3 and the minimum order is $15."),
+    quote=_PIZZA_PRICES + ("The delivery fee is $3 and the minimum order is $15.",),
     criteria="""Gives the total for a medium with two toppings, delivered:
     $17 + 2 x $2.25 = $21.50, plus the $3 delivery fee = $24.50 (tax aside).
     Showing the pieces is fine. Fails if any piece is wrong (for example a
@@ -192,15 +195,14 @@ MEDIUM_TWO_TOPPINGS_DELIVERED = Rubric(
     calls the total, or the sum is wrong.""")
 
 GLUTEN_FREE_PERSONAL_TWO_TOPPINGS = Rubric(
-    quote=(_PIZZA_PRICES,
-           "Gluten-free crust comes in the 10-inch size only, for $3 extra"),
+    quote=_PIZZA_PRICES + ("Gluten-free crust: $3 extra on a 10-inch personal only",),
     criteria="""Gives the price of a gluten-free personal (10-inch) pizza with
     two toppings: $11 + $3 gluten-free + 2 x $1.75 = $17.50. Fails if it
     leaves out the $3, uses a medium or large topping price, or gets the sum
     wrong.""")
 
 THIRTY_WINGS = Rubric(
-    quote="Wings are $12 for 10, $22 for 20, $40 for 40.",
+    quote="Wings prices: 10 wings $12, 20 wings $22, 40 wings $40.",
     criteria="""There is no 30-wing price. Passes if it says wings come in
     10, 20 or 40 and either offers a combination (20 + 10 = $34) or the 40
     for $40, or both. Fails if it states a price for 30 wings as if it were
@@ -212,8 +214,7 @@ SICILIAN_TOPPINGS = Rubric(
     # borrowed the large's $2.75 every run, through two prompt versions.
     # The owner set it ($3.25, 50 cents more than a large); the gap-filling
     # check moved to EXTRA_DIP below.
-    quote=("Sicilian square pan is 16x16 for $26",
-           "and $3.25 on a Sicilian."),
+    quote=_PIZZA_PRICES,
     criteria="""A Sicilian with two toppings: $26 + 2 x $3.25 = $32.50.
     Showing the pieces is fine. Fails if it uses another size's topping price
     (for example the large's $2.75), or gets the sum wrong.""")

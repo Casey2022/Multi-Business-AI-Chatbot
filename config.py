@@ -304,6 +304,12 @@ def load_config(config_path, business_id=None):
         for field, value in get_config_overrides(business_id).items():
             if field in EDITABLE_FIELDS:      # ignore anything stale or unexpected
                 _set_nested(config, field, value)
+            elif field == "menu" and isinstance(value, list):
+                # The published menu, when it has been changed from the YAML
+                # (menu.publish_draft). Not on the Settings form, so not in
+                # EDITABLE_FIELDS; "menu_draft" is deliberately ignored here:
+                # customers see a menu change only once it's published.
+                config["menu"] = value
 
         # Stamp the business's immutable slug onto the config, AFTER the
         # overrides so nothing an owner types can reach it. Anything that

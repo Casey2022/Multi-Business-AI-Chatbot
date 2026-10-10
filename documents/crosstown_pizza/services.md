@@ -1,43 +1,39 @@
 # Crosstown Pizza Co. — Menu & Policies
 
 ## Pizza Sizes and Prices (Topics: pizza, size, small, medium, large, price)
-Our pizzas come in three sizes: 10-inch personal at $11, 14-inch
-medium at $17, and 18-inch large at $22. Toppings are $1.75 each on a
-personal, $2.25 on a medium, $2.75 on a large, and $3.25 on a Sicilian.
-Gluten-free crust comes
-in the 10-inch size only, for $3 extra; we can't make a medium or large
-gluten-free. Sicilian square pan is 16x16 for $26 and takes an extra
-ten minutes in the oven.
+Our pizzas come in a 10-inch personal, a 14-inch medium and an 18-inch
+large, plus a 16x16 Sicilian square pan, which takes an extra ten minutes
+in the oven. Gluten-free crust comes in the 10-inch size only; we can't
+make a medium or large gluten-free.
 
 ## Toppings (Topics: toppings, pepperoni, veggie, meat, cheese)
 Meats: pepperoni, sausage, bacon, ham, meatball, grilled chicken,
 anchovy. Vegetables: mushroom, onion, green pepper, banana pepper,
 black olive, tomato, spinach, roasted garlic, pineapple, jalapeño.
 Cheeses: extra mozzarella, ricotta, feta, blue cheese. Vegan cheese is
-available for $2. We do not have a vegan crust — the standard dough
-contains no dairy or egg, but it is made on shared equipment.
+available. We do not have a vegan crust — the standard dough contains no
+dairy or egg, but it is made on shared equipment.
 
 ## Wings (Topics: wings, bone in, boneless, sauce, heat)
-Wings are $12 for 10, $22 for 20, $40 for 40. Bone-in or boneless,
-same price. Sauces: mild, medium, hot, suicidal, BBQ, honey garlic,
-garlic parm, lemon pepper. Wings come with celery and your choice of
-blue cheese or ranch. Forty-piece orders add about ten minutes.
+Bone-in or boneless, same price. Sauces: mild, medium, hot, suicidal,
+BBQ, honey garlic, garlic parm, lemon pepper. Wings come with celery and
+your choice of blue cheese or ranch. Forty-piece orders add about ten
+minutes.
 
 ## Subs and Salads (Topics: sub, hoagie, sandwich, salad, lunch)
-Subs are $13 and come on a 10-inch roll with lettuce, tomato, onion
-and our house dressing: steak, chicken finger, meatball, Italian,
-turkey, veggie. Salads are $10 for a garden, $13 with grilled chicken,
-$14 for an antipasto. Dressings: ranch, blue cheese, Italian, balsamic,
-Greek.
+Subs come on a 10-inch roll with lettuce, tomato, onion and our house
+dressing: steak, chicken finger, meatball, Italian, turkey, veggie.
+Salads: garden, with grilled chicken, or antipasto. Dressings: ranch,
+blue cheese, Italian, balsamic, Greek.
 
 ## Party Trays (Topics: party tray, catering, large order, office)
-Party trays feed 15 to 20: a half-sheet pizza tray is $45, a 50-wing
-tray is $52, and a sub platter is $60. Trays need at least three hours'
-notice, and on Friday and Saturday nights we ask for the order by 4pm —
-the oven is full after that. The cutoff is for trays only: regular
-pizzas, wings and subs can be ordered for tonight right up until the
-kitchen stops taking orders. Trays tie up the kitchen for about 45
-minutes, which is why they're booked as their own slot.
+Party trays feed 15 to 20: a half-sheet pizza tray, a 50-wing tray, or a
+sub platter. Trays need at least three hours' notice, and on Friday and
+Saturday nights we ask for the order by 4pm — the oven is full after
+that. The cutoff is for trays only: regular pizzas, wings and subs can be
+ordered for tonight right up until the kitchen stops taking orders. Trays
+tie up the kitchen for about 45 minutes, which is why they're booked as
+their own slot.
 
 ## Delivery (Topics: delivery, deliver, how far, fee, minimum)
 We deliver within 6 miles of the Culver Rd shop. The delivery fee is

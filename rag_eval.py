@@ -577,9 +577,16 @@ def validate_tests():
         if config_path.exists():
             import yaml
             import policy
-            rules = policy.policy_text(yaml.safe_load(config_path.read_text()))
+            loaded = yaml.safe_load(config_path.read_text())
+            rules = policy.policy_text(loaded)
             if rules:
                 document += "\n\n" + rules
+            # So are menu prices (menu: in the YAML), which each section's
+            # chunk carries as generated price lines.
+            import menu
+            prices = menu.render_menu(loaded)
+            if prices:
+                document += "\n\n" + prices
         lowered  = document.lower()
         headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", document, re.M)]
 

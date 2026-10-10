@@ -382,8 +382,38 @@ def knowledge(business_id):
         sections = get_documents(business_id),
         changes = unpublished_changes(business),
         pending_upload = get_upload_proposal(business_id),
+        price_lines = section_price_lines(business, get_documents(business_id)),
+        menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
     )
+
+
+def section_price_lines(business, sections):
+    """{section id: the menu price lines that section's chunk carries}. The
+    owner sees them read-only under the section: the menu (config menu:) is
+    the only copy of those prices."""
+    import menu
+    try:
+        config = menu.with_draft(load_config(business["config_path"], business["id"]),
+                                 business["id"])
+    except Exception:
+        return {}
+    if not menu.items(config):
+        return {}
+    return {s["id"]: line for s in sections
+            if (line := menu.price_lines_for(s["title"], config))}
+
+
+def menu_changes_waiting(business):
+    """Lines describing the unpublished menu changes (empty if none)."""
+    import menu
+    try:
+        live = load_config(business["config_path"], business["id"])
+    except Exception:
+        return []
+    if menu.draft_menu(business["id"]) is None:
+        return []
+    return menu.differences(live, menu.with_draft(live, business["id"]))
 
 
 def clean_section_text(value):
@@ -463,6 +493,8 @@ def knowledge_preview(business_id):
         sections = get_documents(business_id),
         changes = unpublished_changes(business),
         pending_upload = get_upload_proposal(business_id),
+        price_lines = section_price_lines(business, get_documents(business_id)),
+        menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
         preview_results = results,
         preview_questions = "\n".join(questions),
@@ -535,7 +567,13 @@ def knowledge_upload_review(business_id):
     if proposal is None:
         flash("There are no photo changes waiting. Upload a photo to start.", "error")
         return redirect(url_for("admin.knowledge", business_id=business_id))
+    import menu
     for c in proposal["changes"]:
+        if c.get("kind") == "menu":
+            c["price_text"] = menu.money(c["price"])
+            c["old_price_text"] = (menu.money(c["old_price"])
+                                   if c.get("old_price") is not None else "")
+            continue
         c["old_segments"], c["new_segments"] = photo_import.word_diff(
             c["old_body"], c["body"])
     return render_template("admin/knowledge_upload.html",
@@ -562,9 +600,11 @@ def knowledge_upload_apply(business_id):
         if request.form.get(f"apply_{i}") == "yes":
             choices[i] = (clean_section_text(request.form.get(f"title_{i}")),
                           clean_section_text(request.form.get(f"body_{i}")))
+    business = get_business_by_id(business_id)
+    config = load_config(business["config_path"], business_id) if business else None
     applied, skipped_stale = photo_import.apply_changes(
         business_id, proposal["changes"], choices,
-        updated_by=f"{current_user()['email']} (from a photo)")
+        updated_by=f"{current_user()['email']} (from a photo)", config=config)
 
     delete_upload_proposal(business_id)
     if skipped_stale:
@@ -613,10 +653,15 @@ def knowledge_discard(business_id):
     from db import discard_document_changes
     from admin.auth import current_user
 
+    import menu
+    had_menu_draft = menu.draft_menu(business_id) is not None
+    menu.discard_draft(business_id)
     if discard_document_changes(business_id, updated_by=current_user()["email"]):
         flash("Changes discarded — the sections are back to what customers "
               "see. Anything you'd written is still in each section's History.",
               "success")
+    elif had_menu_draft:
+        flash("Menu changes discarded.", "success")
     else:
         flash("There's no published version saved to go back to yet. Publish "
               "once, and Discard will work from then on.", "error")
@@ -732,9 +777,14 @@ def knowledge_publish(business_id):
     # writing into pending after set_state. No-op for a real business.
     fork_collection(business_id)
 
+    import menu
     try:
-        ingest_documents(load_config(business["config_path"], business_id),
-                         business_id=business_id)
+        # A menu change from a photo is a draft until now: build with it,
+        # and make it the live menu only once the rebuild has succeeded.
+        config = menu.with_draft(load_config(business["config_path"], business_id),
+                                 business_id)
+        ingest_documents(config, business_id=business_id)
+        menu.publish_draft(business_id)
         set_documents_clean(business_id)
         flash("Published — your assistant is now using the updated content.",
               "success")

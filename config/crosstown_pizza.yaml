@@ -35,6 +35,68 @@ services:
   - "salads"
   - "party tray"
 
+# The menu: the ONLY copy of Crosstown's menu prices (2026-10-10). The
+# knowledge-base sections keep everything else about each item (sauces, the
+# gluten-free rule, timing); each section's price line is generated from
+# here (menu.attach_prices), and price questions are answered by the
+# menu_price tool, which matches what the customer asked for against these
+# options in code. A price that isn't here isn't on the menu: the tool says
+# so instead of the model borrowing the nearest one.
+#   section:  the knowledge-base section this item's price line joins
+#             (matched on the start of its title)
+#   options:  what's sold, and its price
+#   add_ons:  extras, priced per option; "any" means every option. An option
+#             an add-on doesn't list can't have it.
+menu:
+  - item: pizza
+    aliases: [pizzas, pie, pies]
+    section: "Pizza Sizes"
+    options:
+      10-inch personal: 11
+      14-inch medium: 17
+      18-inch large: 22
+      Sicilian 16x16 square pan: 26
+    add_ons:
+      topping:
+        each: true
+        prices:
+          10-inch personal: 1.75
+          14-inch medium: 2.25
+          18-inch large: 2.75
+          Sicilian 16x16 square pan: 3.25
+      gluten-free crust:
+        prices:
+          10-inch personal: 3
+      vegan cheese:
+        prices:
+          any: 2
+  - item: wings
+    aliases: [wing, chicken wings]
+    section: "Wings"
+    options:
+      10 wings: 12
+      20 wings: 22
+      40 wings: 40
+  - item: sub
+    aliases: [subs, hoagie, hoagies, sandwich, sandwiches]
+    section: "Subs and Salads"
+    options:
+      any sub on a 10-inch roll: 13
+  - item: salad
+    aliases: [salads]
+    section: "Subs and Salads"
+    options:
+      garden salad: 10
+      salad with grilled chicken: 13
+      antipasto salad: 14
+  - item: party tray
+    aliases: [party trays, tray, trays, platter, catering]
+    section: "Party Trays"
+    options:
+      half-sheet pizza tray: 45
+      50-wing tray: 52
+      sub platter: 60
+
 calendar:
   enabled: true
   provider: "simulated"

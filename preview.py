@@ -78,7 +78,8 @@ def changed_sections(config, business_id, live=None):
     titles no draft section has. The first publish of a seed-built index
     shows everything as changed, since its chunks were cut differently."""
     import rag
-    chunks, _ids, _metas = rag.db_chunks(business_id)
+    import menu
+    chunks, _ids, _metas = rag.db_chunks(business_id, menu.with_draft(config, business_id))
     live = live_chunks(config) if live is None else live
     live_set = {c.strip() for c in live}
     changed = [c for c in chunks if c.strip() not in live_set]
@@ -118,7 +119,7 @@ def build_draft(config, business_id):
     """Build the throwaway index from the unpublished sections. Returns its
     name, or None if there are no sections."""
     import rag
-    chunks, ids, metas = rag.db_chunks(business_id)
+    chunks, ids, metas = rag.db_chunks(business_id, config)
     if not chunks:
         return None
     name = draft_collection_name(config, business_id)
@@ -263,9 +264,11 @@ def run_preview(config, business_id, questions):
     """[{question, now, after, changed}] for each question."""
     questions = list(questions)[:MAX_QUESTIONS]
     draft = None
+    import menu
     try:
-        draft = build_draft(config, business_id)
-        draft_config = copy.deepcopy(config)
+        # "After" uses the draft menu too: the menu tool and the price lines.
+        draft_config = copy.deepcopy(menu.with_draft(config, business_id))
+        draft = build_draft(draft_config, business_id)
         if draft:
             draft_config.setdefault("business", {})["collection"] = draft
         with ThreadPoolExecutor(max_workers=PARALLEL) as pool:

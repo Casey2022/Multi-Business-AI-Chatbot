@@ -1225,3 +1225,27 @@ was not permitted. With delete permission re-granted, the hot journal
 rolled back and the update went through; integrity_check ok.) the Sicilian row now checks $32.50, and "extra ranch with my wings"
 (no price given) takes over as the gap check. (2) Next: a structured menu
 with a lookup tool, Crosstown first.
+
+### The menu as data (2026-10-10)
+
+Prompt rules closed the quote row but not "30 wings" or Sicilian toppings.
+So, as with notice and cancellation, the facts moved out of the prompt:
+- `menu:` in config/crosstown_pizza.yaml is the only copy of Crosstown's
+  menu prices. The Pizza, Toppings, Wings, Subs and Salads and Party Trays
+  sections (seed and DB) no longer state prices; each section's chunk gets
+  generated price lines (`menu.attach_prices`) at boot, Publish and in the
+  preview. The collection fingerprint includes the menu.
+- `menu_price` (menu.py, run through policy.run_tool): offered and required
+  when a price question names a menu item. Takes the customer's own words
+  ("30 wings") and matches in code: not listed → says so, with the cheapest
+  exact combination (10 + 20 = $34) and the next size up.
+- The owner's page shows each section's prices read-only.
+- Menu changes are drafts (`menu_draft` override) until Publish, which
+  builds with the draft and makes it live only after the rebuild;
+  Discard drops it; the banner lists them; the preview's After uses it.
+- Photo uploads for a menu business propose menu changes (set_price,
+  add_option, new_item) shown as old → new prices; a price the photo
+  doesn't show is flagged. Section text never gets prices.
+`menu_test.py` 70 (the forced tool_choice proven to fail when removed).
+upload_eval now expects the large as a menu change and calzones as a new
+menu item.

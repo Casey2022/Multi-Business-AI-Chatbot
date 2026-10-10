@@ -86,3 +86,16 @@ every deploy anyway). To keep originals:
   step 2. A scheduled re-check ("your website's menu changed — review?")
   is the natural follow-on, and the source table above is where the last
   fetched text would live for comparison.
+
+
+## With a menu (2026-10-10)
+
+For a business with `menu:` (Crosstown), prices aren't in the sections, so
+the proposer gets the menu (fenced as data) and returns `menu_changes`
+beside the section changes: set_price (an existing option or add-on),
+add_option (a new size of an existing item), add_add_on, new_item. Code
+checks each against the real menu (`clean_menu_changes`), drops a price
+equal to the menu's, never removes anything, and flags a price the photo
+doesn't show. Kept ones go into the draft menu (`menu.save_draft`), which
+only goes live at Publish. A new item's price lines join the section whose
+title names it (the proposed new section), else a section titled after it.

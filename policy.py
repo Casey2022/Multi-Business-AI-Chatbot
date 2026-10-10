@@ -776,6 +776,10 @@ def run_tool(name, arguments, config, now=None):
                 kind=arguments.get("kind"),
                 amount_paid=arguments.get("amount_paid"),
                 order_price=arguments.get("order_price"))
+        if name == "menu_price":
+            import menu
+            if menu.items(config):
+                return menu.menu_price(config, arguments.get("order"))
         return {"error": f"no tool called {name!r} here"}
     except Exception as e:
         return {"error": f"couldn't work that out: {e}"}

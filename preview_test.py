@@ -96,7 +96,7 @@ def main():
           chunks[0].startswith("## Pizza Sizes\n") and len(chunks) == 2, chunks)
     src = (ROOT / "rag.py").read_text()
     check("Publish (ingest_documents) builds from the same db_chunks",
-          "chunks, ids, metas = db_chunks(business_id)" in src)
+          "chunks, ids, metas = db_chunks(business_id, config)" in src)
     name = preview.draft_collection_name(config, biz)
     check("the draft index is per business (a demo clone can't touch its template's)",
           name == "test_pizza__preview_7", name)
