@@ -1284,3 +1284,11 @@ code changes, no prompt text:
   it might be; the cutoff is for {what} only: if the facts say other
   things can still be ordered, say what they can order instead."
 policy_test 145 (the scope line proven to fail when changed).
+With check_notice required + scoped (2026-10-11): Friday 5/5, then 2/3 in
+the full run (7 of 8 clean, from 3 of 8). The one miss now says trays are
+out AND that regular pizzas, wings and subs are still on, then lists the
+tray prices anyway ("a half-sheet pizza tray feeds 15–20 for $45 … text
+'order'"): it read Party Trays twice, Hours and Wings, but not the pizza
+section, so the only "feeds 20" prices in front of it were the trays'.
+Left at 1 in 8 for now. Full journeys 5/6 ×3 (Belmont, bakery, pickup,
+can-I-order, Bob's clean); Crosstown rag_eval 16/16.
