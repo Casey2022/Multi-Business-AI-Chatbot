@@ -195,6 +195,44 @@ def prepare(config):
     return config
 
 
+# What the model had in front of it, per turn: the sections retrieved and
+# every tool call with its result. Printed under a failing transcript (and
+# with -v), so a failure says where it came from: the facts it was given,
+# the tool's answer, or the model's phrasing. Added 2026-10-11 when "Friday
+# at five" started failing 3 runs in 8 with nothing in the output to say why.
+TRACE = []
+
+
+def _install_trace():
+    import llm
+    import policy
+    if getattr(llm.retrieve, "_traced", False):
+        return
+    real_retrieve, real_run_tool = llm.retrieve, policy.run_tool
+
+    def retrieve(query, config):
+        found = real_retrieve(query, config)
+        TRACE.append("read: " + ", ".join(
+            (c.lstrip().splitlines()[0].lstrip("#").split("(")[0].strip()
+             if c.strip() else "?") + f" ({1 - d:.2f})" for c, d in (found or []))
+            if found else "read: nothing")
+        return found
+    retrieve._traced = True
+
+    def run_tool(name, arguments, config, now=None):
+        result = real_run_tool(name, arguments, config, now)
+        TRACE.append(f"tool {name}({_short(arguments)}) -> {_short(result)}")
+        return result
+
+    llm.retrieve, policy.run_tool = retrieve, run_tool
+
+
+def _short(value, limit=260):
+    import json
+    text = json.dumps(value, default=str)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
 def run(journey, verbose=False):
     config = prepare(config_for(journey["slug"]))
     business_id = config["business"].get("id")
@@ -211,10 +249,11 @@ def run(journey, verbose=False):
     transcript, problems = [], []
     previous = None
     for n, turn in enumerate(journey["turns"], 1):
+        TRACE.clear()
         reply = process_message(turn["say"], sender, business_id, config,
                                 channel="webchat")
         current = get_state(sender, business_id)
-        transcript.append((turn["say"], reply, current["state"]))
+        transcript.append((turn["say"], reply, current["state"], list(TRACE)))
         where = f"turn {n}"
         if not (reply or "").strip():
             problems.append((where, "empty reply"))
@@ -258,6 +297,7 @@ def main():
         "state": "NY", "customer_can_fix": False,
     }
 
+    _install_trace()
     chosen = [j for j in JOURNEYS
               if not args or any(a.lower() in j["name"].lower() for a in args)]
     if not chosen:
@@ -280,11 +320,14 @@ def main():
             if problems or verbose:
                 if problems:
                     say(f"      why it's here: {journey['why']}")
-                for said, reply, state in transcript:
+                for said, reply, state, trace in transcript:
                     say(f"      cust  {said}")
                     for j, line in enumerate(textwrap.wrap(" ".join(reply.split()), 90)):
                         say(f"      {'BOT ' if j == 0 else '    '}  {line}")
                     say(f"            [{state}]")
+                    for item in trace:
+                        for j, line in enumerate(textwrap.wrap(item, 100)):
+                            say(f"            {'·' if j == 0 else ' '} {line}")
                 for where, text in problems:
                     say(f"      ✗ {where}: {text}")
             failed += bool(problems)

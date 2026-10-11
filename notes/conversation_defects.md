@@ -1257,3 +1257,11 @@ right; 9am today now excluded); the bakery repeated a reply on turn 3 (no
 menu involved); Friday at five offered to "call to see if the kitchen can
 squeeze one in" and didn't say regular food is still on (Crosstown —
 rerun with --repeat=5 to see if it's real).
+Rerun ×5 (2026-10-11): bakery 5/5 (the repeat was chance). Belmont 4/5 —
+a real failure this time, the original defect: "to avoid the charge,
+you'd need to cancel by 9am tomorrow at the latest" (regex and judge both
+caught it). Friday at five 3/5: twice it steered to "tomorrow or later"
+without saying regular food is still on tonight. Since the menu: 3 fails in
+8 runs, against 0 in 12 before, so the menu change is a suspect. journey_eval
+now records what the model had per turn (sections retrieved with scores,
+each tool call and result) and prints it under a failing transcript.
