@@ -958,6 +958,10 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
             elif "business_days" in wanted and not model_thinks:
                 call["tool_choice"] = {"type": "tool",
                                        "name": "add_business_days"}
+            elif ("notice" in wanted and not model_thinks
+                  and policy.must_check_notice(
+                      message, [c for c, _ in (retrieved_chunks or [])])):
+                call["tool_choice"] = {"type": "tool", "name": "check_notice"}
             elif wants_menu and not model_thinks:
                 call["tool_choice"] = {"type": "tool", "name": "menu_price"}
         if temperature is not None:

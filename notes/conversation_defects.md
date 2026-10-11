@@ -1273,3 +1273,14 @@ Fixed: price lines are added to each section before cutting
 (menu.attach_prices_to_markdown), so they land once, at the section's end.
 rag.INDEX_FORMAT joins the collection fingerprint so the old-format index
 is rebuilt at boot. Belmont 5/5 on the same run.
+After the chunking fix, Friday 2/5. The failing run's trace: the tray
+section read twice (expected: it's one section cut in two) and NO tool
+call — check_notice was offered and skipped, and the reply sold a tray
+("call and see if the kitchen can squeeze you in"), no regular food. Two
+code changes, no prompt text:
+- policy.must_check_notice: a named time + the TOP excerpt setting an
+  order-by cutoff ("order by 4pm") → check_notice is required.
+- check_notice's result, past a cutoff: "it isn't possible, don't suggest
+  it might be; the cutoff is for {what} only: if the facts say other
+  things can still be ordered, say what they can order instead."
+policy_test 145 (the scope line proven to fail when changed).

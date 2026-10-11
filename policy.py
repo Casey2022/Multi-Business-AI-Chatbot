@@ -188,6 +188,16 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
                          + ("" if cutoff is not None else
                             f" Ordered now, the earliest it can be ready is "
                             f"{when(earliest)}."))
+        if cutoff is not None and now > cutoff:
+            # Live and in journey_eval (2026-10-03, again 2026-10-11): with
+            # the tray cutoff passed, the bot offered to "see if the kitchen
+            # can squeeze one in", or sent them to another day, and never
+            # said regular food was still on tonight, though the document
+            # says the cutoff is for trays only.
+            result["say"] += (f" Past that cutoff it isn't possible, so don't "
+                              f"suggest it might be. The cutoff is for {what} "
+                              f"only: if the facts say other things can still be "
+                              f"ordered for then, say what they can order instead.")
     return result
 
 
@@ -671,6 +681,21 @@ def needs_tools(message, config, history=None, facts=None):
                  or _TIME_NAMED.search(message or ""))):
         wanted.add("business_days")
     return wanted
+
+
+_ORDER_BY_CUTOFF = re.compile(
+    r"\b(?:order(?:ed|s)?|the order) by \d{1,2}(?::\d{2})?\s*(?:am|pm)", re.I)
+
+
+def must_check_notice(message, facts=None):
+    """A time is named and the closest excerpt sets an order-by cutoff: the
+    first call is check_notice, not optional. Offered, it was skipped (Friday
+    at five, journey_eval 2026-10-11), and the reply then sold a tray for
+    another day. Only the top excerpt counts, so a delivery-time question
+    that happens to pull in the tray section isn't forced."""
+    top = (facts or [None])[0]
+    return bool(top and _ORDER_BY_CUTOFF.search(top)
+                and _TIME_NAMED.search(message or ""))
 
 
 def must_apply_cancellation(message, config, history=None):

@@ -98,6 +98,25 @@ def main():
     check("says the 4pm cutoff has passed",
           "ordered by 4pm, and it's past 4pm now" in r["say"], r["say"])
     check("and can't be promised", "can't be promised" in r["say"])
+    check("past the cutoff: don't suggest it might still be possible",
+          "don't suggest it might be" in r["say"], r["say"])
+    check("…and the cutoff is for that item only: offer what else can be ordered",
+          "The cutoff is for party trays only" in r["say"]
+          and "say what they can order instead" in r["say"], r["say"])
+    check("before the cutoff, no such line",
+          "only:" not in policy.check_notice("2026-09-25T19:00", 3, "party trays",
+                                             now=datetime(2026, 9, 25, 13, 0), **trays)["say"])
+    tray_fact = ("## Party Trays\nTrays need at least three hours' notice, and on "
+                 "Friday and Saturday nights we ask for the order by 4pm.")
+    check("a time named + the top excerpt sets an order-by cutoff: check_notice is required",
+          policy.must_check_notice("it's Friday at 5, I need food for 20 people",
+                                   [tray_fact, "## Hours"]))
+    check("not when the cutoff excerpt isn't the closest one",
+          not policy.must_check_notice("it's Saturday at 7pm, how long will delivery take",
+                                       ["## Delivery\n30 to 45 minutes", tray_fact]))
+    check("not without a time", not policy.must_check_notice("do you do party trays", [tray_fact]))
+    check("get_llm_reply forces it", 'call["tool_choice"] = {"type": "tool", "name": "check_notice"}'
+          in (ROOT / "llm.py").read_text())
     check("no 'earliest ready' time when a cutoff is involved (it could be "
           "after the cutoff)", "earliest it can be ready" not in r["say"])
     r = policy.check_notice("2026-09-25T20:00", 3, "party trays", now=FRI_5PM, **trays)
