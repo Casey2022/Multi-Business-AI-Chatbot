@@ -355,16 +355,16 @@ def ingest_documents(config, business_id=None):
         if not docs_path.exists():
             log.error(f"Documents folder not found: {docs_path}")
             return None
+        import menu
         for md_file in sorted(docs_path.glob("*.md")):
-            text = md_file.read_text(encoding="utf-8")
+            text = menu.attach_prices_to_markdown(
+                md_file.read_text(encoding="utf-8"), config)
             file_chunks = chunk_text(text)
             log.info(f"{md_file.name}: {len(file_chunks)} chunks")
             for i, c in enumerate(file_chunks):
                 chunks.append(c)
                 ids.append(f"{md_file.stem}_chunk_{i}")
                 metas.append({"source": md_file.name, "chunk_index": i})
-        import menu
-        chunks = menu.attach_prices(chunks, config)
 
     if not chunks:
         log.warning(f"No content to ingest for '{collection_name}'")
@@ -444,7 +444,14 @@ def _source_digest(docs_path, config=None):
     if config is not None:
         import menu
         digest.update(menu.render_menu(config).encode("utf-8"))
+    # How chunks are built is part of the fingerprint too: change it (as on
+    # 2026-10-11, price lines added before cutting instead of after) and an
+    # index built the old way, from the same files, must still be rebuilt.
+    digest.update(INDEX_FORMAT.encode("utf-8"))
     return digest.hexdigest()[:16]
+
+
+INDEX_FORMAT = "2026-10-11: menu price lines added to sections before chunking"
 
 
 def ensure_ingested(config):
@@ -460,8 +467,10 @@ def ensure_ingested(config):
     expected = 0
     digest   = None
     if docs_path.exists():
+        import menu
         for md_file in docs_path.glob("*.md"):
-            expected += len(chunk_text(md_file.read_text(encoding="utf-8")))
+            expected += len(chunk_text(menu.attach_prices_to_markdown(
+                md_file.read_text(encoding="utf-8"), config)))
         digest = _source_digest(docs_path, config)
 
     try:

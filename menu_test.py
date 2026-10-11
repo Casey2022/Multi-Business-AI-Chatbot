@@ -86,10 +86,22 @@ def main():
     check("a section with no menu item is untouched", got[1] == chunks[1])
     check("no menu: chunks untouched", menu.attach_prices(chunks, {}) == chunks)
     rag_src = (ROOT / "rag.py").read_text()
-    check("boot and Publish both attach the prices",
-          rag_src.count("menu.attach_prices(chunks, config)") == 2)
+    check("Publish attaches to whole sections, boot before cutting the seed",
+          rag_src.count("menu.attach_prices(chunks, config)") == 1
+          and rag_src.count("menu.attach_prices_to_markdown(") == 2)
+    import rag as _rag
+    cut = _rag.chunk_text(menu.attach_prices_to_markdown(seed, cfg))
+    trays = [c for c in cut if "Party Trays" in c.splitlines()[0]]
+    line = menu.price_lines_for("Party Trays", cfg)
+    check("a section cut in two carries its price line once, at its end",
+          sum(c.count(line) for c in trays) == 1 and trays[-1].rstrip().endswith(line),
+          trays)
+    check("…and the trays-only sentence is never interrupted by it",
+          all("Trays\n" + line not in c for c in trays))
     check("a menu edit changes the collection's fingerprint",
           "digest.update(menu.render_menu(config)" in rag_src)
+    check("so does a change in how chunks are built (INDEX_FORMAT)",
+          "digest.update(INDEX_FORMAT" in rag_src)
     check("rag_eval checks expected answers against the menu too",
           "menu.render_menu(loaded)" in (ROOT / "rag_eval.py").read_text())
 

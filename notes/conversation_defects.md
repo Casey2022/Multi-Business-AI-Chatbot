@@ -1265,3 +1265,11 @@ without saying regular food is still on tonight. Since the menu: 3 fails in
 8 runs, against 0 in 12 before, so the menu change is a suspect. journey_eval
 now records what the model had per turn (sections retrieved with scores,
 each tool call and result) and prints it under a failing transcript.
+The trace (2026-10-11, Friday 1/5): it read "Party Trays" TWICE. Boot cuts
+the seed into chunks, and the price line had been attached to every piece
+afterwards — so it sat straight after a sentence cut in half ("…stops
+taking orders. Trays / Party tray prices: …") and appeared in both pieces.
+Fixed: price lines are added to each section before cutting
+(menu.attach_prices_to_markdown), so they land once, at the section's end.
+rag.INDEX_FORMAT joins the collection fingerprint so the old-format index
+is rebuilt at boot. Belmont 5/5 on the same run.

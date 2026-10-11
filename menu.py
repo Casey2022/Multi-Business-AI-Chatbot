@@ -131,11 +131,33 @@ def price_lines_for(title, config):
                     if it["section"] and lowered.startswith(it["section"].lower()))
 
 
-def attach_prices(chunks, config):
-    """Each section chunk with its menu items' price lines added.
+def attach_prices_to_markdown(text, config):
+    """A seed document with each section's price lines added at the end of
+    the section, BEFORE it's cut into chunks (boot ingestion).
 
-    Used everywhere a knowledge base is built (boot, Publish, the owner's
-    preview), so all three search the same text."""
+    Attaching after chunking (first version, 2026-10-10) put the price line
+    on every piece of a section that chunk_text had split, straight after a
+    sentence cut in half ("…stops taking orders. Trays / Party tray prices:
+    …"), and Friday at five started failing. Added to the section first, it
+    lands once, at the section's end, wherever the cut falls."""
+    if not items(config):
+        return text
+    blocks = re.split(r"(?=^## )", text, flags=re.M)
+    out = []
+    for block in blocks:
+        if block.startswith("## "):
+            lines = price_lines_for(block.splitlines()[0][3:], config)
+            if lines:
+                block = block.rstrip() + "\n" + lines + "\n\n"
+        out.append(block)
+    return "".join(out)
+
+
+def attach_prices(chunks, config):
+    """Each section chunk with its menu items' price lines added: for
+    sections from the database, which are one chunk each (Publish, the
+    owner's preview). Boot cuts the seed into chunks, so it adds the lines
+    before cutting (attach_prices_to_markdown)."""
     if not items(config):
         return list(chunks)
     out = []
