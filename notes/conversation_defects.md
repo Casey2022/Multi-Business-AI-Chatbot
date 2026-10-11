@@ -1312,3 +1312,8 @@ extras so the model can pass the menu's own names.
 Sunrise and Belmont sections (seed and DB) no longer state their menu
 prices; policy amounts (delivery over $50, the $30 colour deposit) stay.
 menu_test 103.
+Evals with the bakery and salon menus (2026-10-11): rag_eval 89/89 core,
+64/64 hard; qa 4/4 ×3, routing 9/9; journey 5/6 ×3 — the one miss was
+Belmont's own regex: "you're just under 24 hours before, so we'd charge
+50%" is right (the tool said 23 hours, 50%, and the judge passed it). The
+"just under" pattern now skips a sentence that names the charge.

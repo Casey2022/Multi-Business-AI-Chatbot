@@ -153,7 +153,11 @@ JOURNEYS = [
              # first pattern failed it (2026-10-05). So is "to cancel with no
              # charge you'd need to call by 9am today — that's passed", which
              # the second failed (2026-10-11): 9am TODAY is excluded.
-             "must_not": [r"just under",
+             # "just under" was the hedge that came with the wrong answer;
+             # "you're just under 24 hours before, so we'd charge 50%" states
+             # the charge and is right (2026-10-11, judge passed it), so a
+             # sentence that names the charge is excluded.
+             "must_not": [r"just under(?![^.]*(50\s?%|charge))",
                           r"(avoid|no charge|free of charge|without (a |the |any )?charge)"
                           r"[^.]*\b(by|before) 9" + _NOT_TODAY + r"|\b(by|before) 9"
                           + _NOT_TODAY + r"[^.]*"
