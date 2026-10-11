@@ -71,6 +71,9 @@ DEPOSIT_GONE = (r"forfeit|won'?t get (it|your deposit|any of it) back|don'?t get
                 r"(it|your deposit) back|doesn'?t come back|no refund|not refunded"
                 r"|none of it|lose (it|the|your)|kept")
 
+# "by 9am today" (already gone) is not the wrong "by 9am tomorrow".
+_NOT_TODAY = r"(?!(?::00)?\s*(?:am|a\.m\.)?\s*today)"
+
 JOURNEYS = [
     {
         "name": "the bakery deposit, four messages (live 2026-10-03)",
@@ -147,10 +150,13 @@ JOURNEYS = [
              "state": "idle", "must": [r"50\s?%"],
              # The wrong answer is "cancel by 9 to AVOID the charge"; "if you
              # cancel before 9am tomorrow we'd charge 50%" is right, and the
-             # first pattern failed it (2026-10-05).
+             # first pattern failed it (2026-10-05). So is "to cancel with no
+             # charge you'd need to call by 9am today — that's passed", which
+             # the second failed (2026-10-11): 9am TODAY is excluded.
              "must_not": [r"just under",
                           r"(avoid|no charge|free of charge|without (a |the |any )?charge)"
-                          r"[^.]*\b(by|before) 9|\b(by|before) 9[^.]*"
+                          r"[^.]*\b(by|before) 9" + _NOT_TODAY + r"|\b(by|before) 9"
+                          + _NOT_TODAY + r"[^.]*"
                           r"(avoid|no charge|free of charge|without (a |the |any )?charge)"],
              "rubric": rubrics.CANCEL_23_HOURS},
         ],

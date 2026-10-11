@@ -1249,3 +1249,11 @@ So, as with notice and cancellation, the facts moved out of the prompt:
 `menu_test.py` 70 (the forced tool_choice proven to fail when removed).
 upload_eval now expects the large as a menu change and calzones as a new
 menu item.
+First runs with the menu (2026-10-11): rag_eval hard 64/64 (30 wings and
+the Sicilian pass), qa 4/4 ×3 + routing 9/9, upload_eval 6/6. journey_eval
+3/6 clean, each failure 1 run in 3: Belmont was the eval's own regex ("to
+cancel with no charge you'd need to call by 9am today — that's passed" is
+right; 9am today now excluded); the bakery repeated a reply on turn 3 (no
+menu involved); Friday at five offered to "call to see if the kitchen can
+squeeze one in" and didn't say regular food is still on (Crosstown —
+rerun with --repeat=5 to see if it's real).
