@@ -24,6 +24,63 @@ services:
   - "balayage"
   - "kids cut"
 
+# The menu: the ONLY copy of this business's prices (2026-10-11). The
+# knowledge-base sections keep everything else (notice, flavours, timing);
+# each section's price line is generated from here, and price questions are
+# answered by the menu_price tool, which matches what was asked in code. See
+# config/crosstown_pizza.yaml for the fields; besides fixed prices:
+#   {from: 110}            a starting price ("from $110")
+#   {from: 20, to: 60}     a range
+#   {quote: "…"}           no figure: said as written
+#   each / sold_by / minimum / packs   for things sold by the piece
+#   notes                  said with the price (and some change it)
+menu:
+  - item: haircut
+    aliases: [haircuts, cut, cuts, trim]
+    section: "Haircuts"
+    options:
+      standard cut with wash and style: 48
+      dry cut: 38
+      kids cut: 25
+      fringe or bang trim: 10
+    notes:
+      kids cut: "age 12 and under"
+      fringe or bang trim: "free within four weeks of a full cut with us"
+  - item: blowout
+    aliases: [blowouts, blow dry, blowdry, styling, updo, updos]
+    section: "Blowouts and Styling"
+    options:
+      wash and blowout: 35
+      special-occasion styling or updo: 75
+      bridal hair: {quote: "quoted after a trial"}
+  - item: colour
+    aliases: [color, hair colour, hair color]
+    section: "Colour"
+    options:
+      root touch-up: 85
+      all-over colour: {from: 110}
+      toner or gloss: 45
+    add_ons:
+      longer or very thick hair:
+        prices:
+          any: {from: 20, to: 60}
+  - item: cut and colour
+    aliases: [cut and color]
+    section: "Cut and Colour Together"
+    options:
+      cut and colour together: 145
+  - item: balayage
+    aliases: [ombre]
+    section: "Balayage and Highlights"
+    options:
+      balayage: {from: 185}
+  - item: highlights
+    aliases: [highlight, foils, foil]
+    section: "Balayage and Highlights"
+    options:
+      full head of foils: 165
+      half head of foils: 120
+
 # Cancelling or moving, as data (2026-10-03): the only copy. The knowledge
 # document's sentences ("24 hours' notice... under 24 hours, or a no-show,
 # is charged at 50%") were removed; policy.py renders the text the bot reads

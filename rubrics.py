@@ -54,10 +54,11 @@ MUFFINS_6PM_FOR_8AM = Rubric(
     the timing 'right at the window'.""")
 
 HALF_GREY = Rubric(
-    quote="Root touch-up is $85 and takes about two hours. All-over colour "
-          "starts at $110 and also takes about two hours. Grey coverage is "
-          "priced as a root touch-up unless the grey is more than half the "
-          "head, in which case it's all-over.",
+    # 2026-10-11: Belmont's prices are its menu now; the first quote is the
+    # generated price line, the second the rule that stayed in the section.
+    quote=("Colour prices: root touch-up $85, all-over colour from $110",
+           "Grey coverage is priced as a root touch-up unless the grey is more "
+           "than half the head, in which case it's all-over."),
     criteria="""Applies the rule that grey coverage is a root touch-up ($85)
     unless the grey is MORE than half the head, when it is all-over
     ($110+). "About half" is not clearly more than half. A passing reply
@@ -234,22 +235,22 @@ EXTRA_DIP = Rubric(
     or says extra is free, as fact.""")
 
 EIGHTEEN_CUPCAKES = Rubric(
-    quote="Standard cupcakes are $3.50 each, sold by the dozen ($42 for 12).",
+    quote="Standard cupcake prices: $3.50 each, sold only in multiples of 12 ($42 for 12).",
     criteria="""Says standard cupcakes are sold by the dozen, so 18 isn't an
     order size, and offers a dozen ($42) or two dozen ($84). Fails if it
     quotes 18 at $3.50 each ($63) as an order it can take without
     mentioning the dozen, or gets a dozen's price wrong.""")
 
 TWO_DOZEN_MUFFINS = Rubric(
-    quote="Muffins are $3.25 each or $35 per dozen.",
+    quote="Muffin prices: $3.25 each or $35 for 12.",
     criteria="""Two dozen muffins at the dozen price is $70. Fails if it
     charges 24 at $3.25 each ($78) as the price for two dozen, or gets the
     sum wrong.""")
 
 TWELVE_INCH_CHARACTER_CAKE = Rubric(
-    quote=("Our standard birthday cakes start at $45 for a 6-inch (serves 6-8) "
-           "and range up to $120 for a 12-inch (serves 30-40). Custom designs, "
-           "themes, and characters add $20-$60 depending on complexity."),
+    quote=("Birthday cake prices: 6-inch $45 (serves 6-8), 12-inch $120 "
+           "(serves 30-40). Custom design, theme or character: $20 to $60 extra "
+           "on any birthday cake."),
     criteria="""A 12-inch birthday cake with a character design: $120 plus
     $20 to $60, so about $140 to $180 depending on complexity. Giving the
     pieces without the total passes too. Fails if it gives one fixed price

@@ -92,7 +92,7 @@ def main():
     import rag as _rag
     cut = _rag.chunk_text(menu.attach_prices_to_markdown(seed, cfg))
     trays = [c for c in cut if "Party Trays" in c.splitlines()[0]]
-    line = menu.price_lines_for("Party Trays", cfg)
+    line = menu.price_lines_for("Party Trays (Topics: party tray)", cfg)
     check("a section cut in two carries its price line once, at its end",
           sum(c.count(line) for c in trays) == 1 and trays[-1].rstrip().endswith(line),
           trays)
@@ -256,6 +256,63 @@ def main():
     review = (ROOT / "admin" / "templates" / "admin" / "knowledge_upload.html").read_text()
     check("the review page shows menu changes as old → new prices",
           'c.kind == "menu"' in review and "old_price_text" in review)
+
+    heading("the bakery and the salon (2026-10-11)")
+    sun = yaml.safe_load((ROOT / "config" / "sunrise_bakery_and_cafe.yaml").read_text())
+    bel = yaml.safe_load((ROOT / "config" / "belmont_hair_studio.yaml").read_text())
+    check("both menus load with no problems", menu.items(sun) and menu.items(bel)
+          and menu.problems(sun) == [] and menu.problems(bel) == [],
+          (menu.problems(sun), menu.problems(bel)))
+    for slug, c in (("sunrise_bakery_and_cafe", sun), ("belmont_hair_studio", bel)):
+        text = (ROOT / "documents" / slug / "services.md").read_text()
+        for it in menu.items(c):
+            block = re.search(r"^## " + re.escape(it["section"]) + r"\b.*?(?=^## |\Z)",
+                              text, re.M | re.S)
+            own = {menu.money(p["low"]) for p in list(it["options"].values())
+                   + list(it["packs"].values()) + ([it["each"]] if it["each"] else [])
+                   if p["low"] is not None}
+            # Its own menu prices, that is: "delivery is free over $50" is a
+            # policy, not a menu price, and stays in the section.
+            check(f"{slug}: '{it['section']}' exists and doesn't repeat its menu prices",
+                  block and not any(re.search(re.escape(m) + r"(?!\d)", block.group(0)) for m in own),
+                  block.group(0)[:100] if block else "missing")
+    check("prices join a section by its whole title: colour's aren't on 'Colour Deposits'",
+          menu.price_lines_for("Colour Deposits and Lateness (Topics: deposit)", bel) == ""
+          and "root touch-up $85" in menu.price_lines_for("Colour (Topics: colour)", bel))
+    def one(c, item, asked, n=1, adds=()):
+        return menu.menu_price(c, [{"item": item, "asked_for": asked, "quantity": n,
+                                    "add_ons": [{"name": a, "count": k} for a, k in adds]}])
+    check("a starting price stays one ('from $185')", one(bel, "balayage", "")["total"] == "from $185")
+    r = one(sun, "birthday cake", "12 inch", adds=[("custom design", 1)])
+    check("12-inch + a custom design is a range, said as one", r["total"] == "$140 to $180"
+          and "ranges" in r["say"], r)
+    check("an 8-inch isn't on the menu (only 6- and 12-inch are priced)",
+          one(sun, "birthday cake", "8 inch").get("not_listed"))
+    r = one(sun, "standard cupcake", "18")
+    check("18 standard cupcakes: sold only by the dozen, 12 or 24 offered",
+          r.get("not_listed") and r.get("options_that_work") == ["12 for $42", "24 for $84"], r)
+    check("6 minis: under the minimum of 12", one(sun, "mini cupcake", "6").get("not_listed"))
+    check("two dozen muffins use the dozen price: $70", one(sun, "muffin", "two dozen")["total"] == "$70"
+          and one(sun, "muffin", "dozen", 2)["total"] == "$70")
+    check("18 muffins: a dozen plus six singles, $54.50", one(sun, "muffin", "18")["total"] == "$54.50")
+    check("a tray for 10 people is the 8-12 one (a number inside a range)",
+          one(sun, "pastry tray", "10 people")["total"] == "$65")
+    r = one(bel, "haircut", "fringe")
+    check("a fringe trim carries its 'free within four weeks' note",
+          r["total"] == "$10" and any("free within four weeks" in n for n in r.get("notes", [])), r)
+    r = one(bel, "blowout", "bridal")
+    check("bridal hair is 'quoted after a trial', no figure", r["total"] == "quoted after a trial"
+          and "no set price" in r["say"], r)
+    r = one(bel, "colour", "")
+    check("'which colour?' lists the long-hair extra too",
+          "colour extra: longer or very thick hair" in r.get("listed", {}), r)
+    check("'extra cheese' isn't vegan cheese (no matching on a shared word)",
+          one(cfg, "pizza", "large", adds=[("extra cheese", 1)]).get("not_listed"))
+    check("'I'm about half grey' doesn't force the tool (the grey rule is prose)",
+          not menu.mentions_item("I'm about half grey, what would it cost to cover it", bel))
+    check("the tool lists each item's extras by name",
+          "birthday cake: custom design, theme or character" in
+          menu.tool(sun)["input_schema"]["properties"]["order"]["items"]["properties"]["add_ons"]["description"])
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1

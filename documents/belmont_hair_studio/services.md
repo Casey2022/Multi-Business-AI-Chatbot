@@ -1,38 +1,36 @@
 # Belmont Hair Studio — Services & Policies
 
 ## Haircuts (Topics: haircut, trim, dry cut, men's cut, women's cut)
-A standard cut with wash and style is $48 and takes about 45 minutes.
-A dry cut with no wash is $38 and takes about 30 minutes. Kids' cuts
-(age 12 and under) are $25 and take about 30 minutes. A fringe or
-bang trim between appointments is $10 and is free within four weeks
-of a full cut with us.
+A standard cut with wash and style takes about 45 minutes. A dry cut
+with no wash takes about 30 minutes. Kids' cuts (age 12 and under) take
+about 30 minutes. We also do fringe and bang trims between
+appointments.
 
 ## Blowouts and Styling (Topics: blowout, blow dry, styling, updo, event hair)
-A wash and blowout is $35 and takes about 30 minutes. Special-occasion
-styling and updos are $75 and take an hour; we ask that you book those
-at least a week ahead, and bring any pins or pieces you want used.
-Bridal hair is quoted after a trial — call the studio to arrange one.
+A wash and blowout takes about 30 minutes. Special-occasion styling and
+updos take an hour; we ask that you book those at least a week ahead,
+and bring any pins or pieces you want used. Bridal hair is quoted after
+a trial — call the studio to arrange one.
 
 ## Colour (Topics: colour, color, roots, all over, grey coverage, toner)
-Root touch-up is $85 and takes about two hours. All-over colour starts
-at $110 and also takes about two hours. Grey coverage is priced as a
-root touch-up unless the grey is more than half the head, in which case
-it's all-over. A toner or gloss on its own is $45 and takes 45 minutes.
-Prices are for shoulder-length hair; longer or very thick hair is
-quoted at consultation and can add $20 to $60.
+A root touch-up takes about two hours, and so does all-over colour.
+Grey coverage is priced as a root touch-up unless the grey is more than
+half the head, in which case it's all-over. A toner or gloss on its own
+takes 45 minutes. Prices are for shoulder-length hair; longer or very
+thick hair is quoted at consultation.
 
 ## Cut and Colour Together (Topics: cut and colour, cut and color, both)
-Booked together, a cut and colour is $145 and takes about two and a
-half hours. Booking them as one appointment rather than two is cheaper
-and means one visit instead of two — but it does hold a chair for most
-of a morning, so we can't usually fit one in on the same day.
+Booked together, a cut and colour takes about two and a half hours.
+Booking them as one appointment rather than two is cheaper and means one
+visit instead of two — but it does hold a chair for most of a morning,
+so we can't usually fit one in on the same day.
 
 ## Balayage and Highlights (Topics: balayage, highlights, foils, ombre)
-Balayage starts at $185 and takes about three hours. A full head of
-foils is $165, half head $120; both take between two and three hours.
-Any lightening service on previously coloured or box-dyed hair needs a
-strand test first — we'll tell you honestly if we can get you where you
-want to be in one sitting, and often it's two.
+Balayage takes about three hours. A full head or a half head of foils
+takes between two and three hours. Any lightening service on previously
+coloured or box-dyed hair needs a strand test first — we'll tell you
+honestly if we can get you where you want to be in one sitting, and
+often it's two.
 
 ## Patch Tests (Topics: patch test, allergy, first time colour)
 Every new colour client needs a patch test at least 48 hours before

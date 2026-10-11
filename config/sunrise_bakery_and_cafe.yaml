@@ -17,6 +17,70 @@ services:
   - "cupcake orders (dozen minimum)"
   - "pastry trays for events"
 
+# The menu: the ONLY copy of this business's prices (2026-10-11). The
+# knowledge-base sections keep everything else (notice, flavours, timing);
+# each section's price line is generated from here, and price questions are
+# answered by the menu_price tool, which matches what was asked in code. See
+# config/crosstown_pizza.yaml for the fields; besides fixed prices:
+#   {from: 110}            a starting price ("from $110")
+#   {from: 20, to: 60}     a range
+#   {quote: "…"}           no figure: said as written
+#   each / sold_by / minimum / packs   for things sold by the piece
+#   notes                  said with the price (and some change it)
+menu:
+  - item: birthday cake
+    aliases: [birthday cakes, custom cake, custom cakes, kids cake, standard cake]
+    section: "Custom Birthday Cakes"
+    options:
+      6-inch: 45
+      12-inch: 120
+    notes:
+      6-inch: "serves 6-8"
+      12-inch: "serves 30-40"
+    add_ons:
+      custom design, theme or character:
+        prices:
+          any: {from: 20, to: 60}
+  - item: wedding cake
+    aliases: [wedding cakes]
+    section: "Wedding Cakes"
+    options:
+      small two-tier: {from: 400}
+      elaborate multi-tier: {from: 1500}
+  - item: standard cupcake
+    aliases: [cupcake, cupcakes, standard cupcakes, regular cupcake, regular cupcakes]
+    section: "Cupcake Orders"
+    each: 3.50
+    sold_by: 12
+  - item: specialty filled cupcake
+    aliases: [filled cupcake, filled cupcakes, specialty cupcake, specialty cupcakes]
+    section: "Cupcake Orders"
+    each: 4.50
+    notes:
+      each: "lemon curd, salted caramel or raspberry jam"
+  - item: mini cupcake
+    aliases: [mini cupcakes, minis]
+    section: "Cupcake Orders"
+    each: 2.25
+    minimum: 12
+  - item: themed cupcake display
+    aliases: [cupcake display, cupcake displays, themed display, themed cupcakes]
+    section: "Cupcake Orders"
+    options:
+      24 cupcakes: {from: 80}
+  - item: pastry tray
+    aliases: [pastry trays, breakfast tray, catering tray]
+    section: "Pastry Trays for Events"
+    options:
+      for 8-12 people: 65
+      for 20-25 people: 140
+  - item: muffin
+    aliases: [muffins]
+    section: "Muffins and Daily Pastries"
+    each: 3.25
+    packs:
+      12: 35
+
 # Deposits and cancellation, as data (2026-09-30). This is the ONLY copy:
 # the knowledge document's "Deposits and Cancellation" section was removed.
 # policy.py renders the text the bot reads from these numbers, and the

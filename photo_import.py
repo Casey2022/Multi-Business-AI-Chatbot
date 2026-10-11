@@ -290,14 +290,22 @@ def clean_menu_changes(data, config):
                  "old_price": None}
         if it is None:
             entry["op"] = "new_item"
+        elif it["each"] is not None and not add_on and _per_piece_target(it, option):
+            # Sold by the piece: the price each, or a pack ("a dozen for $35").
+            target = _per_piece_target(it, option)
+            entry["option"] = target
+            old = it["each"] if target == "each" else it["packs"].get(int(target))
+            entry["old_price"] = old["low"] if old and menu.is_fixed(old) else None
+            entry["op"] = "set_price" if old else "add_option"
         elif add_on:
             spec = menu._find_add_on(it, add_on)
             where = option if option in it["options"] else "any"
             if spec:
                 entry["add_on"] = spec[0]
                 entry["option"] = where
-                entry["old_price"] = spec[1]["prices"].get(where)
-                entry["op"] = "set_price" if entry["old_price"] is not None else "add_add_on"
+                old = spec[1]["prices"].get(where)
+                entry["old_price"] = old["low"] if old and menu.is_fixed(old) else None
+                entry["op"] = "set_price" if old is not None else "add_add_on"
             else:
                 entry["option"] = where
                 entry["op"] = "add_add_on"
@@ -308,7 +316,8 @@ def clean_menu_changes(data, config):
                 exact = matched if why == "matched" else None
             if exact:
                 entry["option"] = exact
-                entry["old_price"] = it["options"][exact]
+                old = it["options"][exact]
+                entry["old_price"] = old["low"] if menu.is_fixed(old) else None
                 entry["op"] = "set_price"
             else:
                 entry["op"] = "add_option"
@@ -317,6 +326,16 @@ def clean_menu_changes(data, config):
         entry["summary"] = _menu_summary(entry)
         out.append(entry)
     return out
+
+
+def _per_piece_target(it, option):
+    """"each" or a pack size ("12") when a menu change names the price of a
+    by-the-piece item, else None."""
+    words = menu._words(option)
+    counts = menu._counts(words)
+    if not counts or words in (["each"], []):
+        return "each" if not counts else None
+    return str(counts[0]) if counts[0] > 1 else "each"
 
 
 def _menu_summary(e):
@@ -344,9 +363,16 @@ def apply_menu_changes(menu_list, changes, section_titles=()):
         if e is None:
             title = next((t for t in section_titles
                           if c["item"].lower() in t.lower()), c["item"].title())
+            title = title.split("(")[0].strip()
             e = {"item": c["item"], "aliases": [], "section": title,
                  "options": {}, "add_ons": {}}
             out.append(e)
+        if c["option"] == "each" and not c["add_on"] and "each" in e:
+            e["each"] = c["price"]
+            continue
+        if (not c["add_on"] and str(c["option"]).isdigit() and "each" in e):
+            e.setdefault("packs", {})[int(c["option"])] = c["price"]
+            continue
         if c["add_on"]:
             add_ons = e.setdefault("add_ons", {})
             spec = add_ons.setdefault(c["add_on"], {"each": True, "prices": {}})

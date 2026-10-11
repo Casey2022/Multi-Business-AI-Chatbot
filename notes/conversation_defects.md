@@ -1292,3 +1292,23 @@ tray prices anyway ("a half-sheet pizza tray feeds 15–20 for $45 … text
 section, so the only "feeds 20" prices in front of it were the trays'.
 Left at 1 in 8 for now. Full journeys 5/6 ×3 (Belmont, bakery, pickup,
 can-I-order, Bob's clean); Crosstown rag_eval 16/16.
+
+### Menus for the bakery and the salon (2026-10-11)
+
+Their prices don't fit fixed numbers, so the menu format grew (menu.py,
+parse_price): starting prices ({from: 110} → "from $110"), ranges
+({from: 20, to: 60}), quotes ({quote: "quoted after a trial"}), things sold
+by the piece (each, sold_by, minimum, packs: "$3.25 each or $35 for 12",
+"only in multiples of 12", "minimum 12"), and notes said with a price
+("free within four weeks of a full cut"). Totals carry ranges through
+($120 + $20–60 → "$140 to $180") and the tool says when a figure is a
+starting price, a range or a quote. A number inside an option's range
+matches it (10 people → "for 8-12 people").
+Two matching fixes found on the way: a section's prices join it by its
+whole title, not a prefix (colour's had landed on "Colour Deposits and
+Lateness"); and an extra is matched by name, never by a shared word
+("extra cheese" was matching "vegan cheese") — the tool lists each item's
+extras so the model can pass the menu's own names.
+Sunrise and Belmont sections (seed and DB) no longer state their menu
+prices; policy amounts (delivery over $50, the $30 colour deposit) stay.
+menu_test 103.

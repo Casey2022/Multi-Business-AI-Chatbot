@@ -43,14 +43,14 @@ services:
 # options in code. A price that isn't here isn't on the menu: the tool says
 # so instead of the model borrowing the nearest one.
 #   section:  the knowledge-base section this item's price line joins
-#             (matched on the start of its title)
+#             (its title, without the "(Topics: …)" part)
 #   options:  what's sold, and its price
 #   add_ons:  extras, priced per option; "any" means every option. An option
 #             an add-on doesn't list can't have it.
 menu:
   - item: pizza
     aliases: [pizzas, pie, pies]
-    section: "Pizza Sizes"
+    section: "Pizza Sizes and Prices"
     options:
       10-inch personal: 11
       14-inch medium: 17

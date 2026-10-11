@@ -1,18 +1,17 @@
 # Sunrise Bakery & Café — Services & Policies
 
 ## Custom Birthday Cakes (Topics: birthday cake, custom cake, kids cake)
-Our standard birthday cakes start at $45 for a 6-inch (serves 6-8) and
-range up to $120 for a 12-inch (serves 30-40). Custom designs, themes,
-and characters add $20-$60 depending on complexity. We need at least
-72 hours' notice for any custom cake order. Same-day pickup is not
-available for custom work.
+Our standard birthday cakes come in sizes from a 6-inch to a 12-inch.
+Custom designs, themes, and characters cost extra depending on complexity.
+We need at least 72 hours' notice for any custom cake order. Same-day
+pickup is not available for custom work.
 
 ## Wedding Cakes (Topics: wedding, large event cake, multi-tier)
-Wedding cakes start at $400 for a small two-tier and scale up to $1,500+
-for elaborate multi-tier designs. All wedding cake orders require an
-in-person tasting consultation, which is free with a deposit. We ask
-for at least 2 weeks' notice for wedding cakes, ideally 4-6 weeks for
-peak season (May-September).
+Wedding cakes range from a small two-tier to elaborate multi-tier
+designs. All wedding cake orders require an in-person tasting
+consultation, which is free with a deposit. We ask for at least 2 weeks'
+notice for wedding cakes, ideally 4-6 weeks for peak season
+(May-September).
 
 ## Flavors and Fillings Available
 Our standard cake flavors are vanilla bean, chocolate fudge, lemon,
@@ -22,19 +21,17 @@ ganache, and fresh fruit. Gluten-free vanilla and chocolate sponge are
 available with 96 hours' notice. We do not currently offer vegan cakes.
 
 ## Cupcake Orders (Topics: cupcakes, dozen, kids party)
-Standard cupcakes are $3.50 each, sold by the dozen ($42 for 12).
-Specialty filled cupcakes (lemon curd, salted caramel, raspberry jam)
-are $4.50 each. Mini cupcakes are $2.25 each, dozen minimum. Custom
-themed cupcake displays — like a number "5" arrangement for a kid's
-birthday — start at $80 for 24 cupcakes. Standard cupcake orders need
-24 hours' notice; custom themed displays need 72 hours' notice, the
-same as custom cakes.
+We make standard cupcakes, specialty filled cupcakes (lemon curd,
+salted caramel, raspberry jam) and mini cupcakes. Custom themed cupcake
+displays — like a number "5" arrangement for a kid's birthday — are made
+with 24 cupcakes. Standard cupcake orders need 24 hours' notice; custom
+themed displays need 72 hours' notice, the same as custom cakes.
 
 ## Pastry Trays for Events (Topics: corporate, breakfast, catering tray)
-Pastry trays for offices, breakfast meetings, and small events feed
-8-12 people for $65, or 20-25 people for $140. Includes an assortment
-of croissants, danishes, scones, and mini muffins. We need 48 hours'
-notice for trays. Delivery is free for orders over $50 within 5 miles.
+Pastry trays for offices, breakfast meetings, and small events come in
+two sizes, for 8-12 people or for 20-25 people, with an assortment of
+croissants, danishes, scones, and mini muffins. We need 48 hours' notice
+for trays. Delivery is free for orders over $50 within 5 miles.
 
 ## Pickup, Delivery, and Hours
 We're open Tuesday through Sunday, 7am to 3pm, closed Mondays. Cake
@@ -54,8 +51,8 @@ before ordering.
 ## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
 We bake a rotating daily selection of muffins, scones, croissants, and
 danishes. Standard muffin flavors are blueberry, banana nut, lemon poppyseed,
-and double chocolate; seasonal flavors change through the year. Muffins are
-$3.25 each or $35 per dozen. Same-day availability depends on what's baked
-that morning — call ahead to confirm a specific flavor, or order a dozen with
-24 hours' notice to guarantee it. Gluten-free muffins are not part of the
-daily selection but can be made to order with 96 hours' notice.
+and double chocolate; seasonal flavors change through the year. Same-day
+availability depends on what's baked that morning — call ahead to confirm a
+specific flavor, or order a dozen with 24 hours' notice to guarantee it.
+Gluten-free muffins are not part of the daily selection but can be made to
+order with 96 hours' notice.
