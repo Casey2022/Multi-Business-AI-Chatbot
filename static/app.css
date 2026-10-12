@@ -317,6 +317,9 @@ tbody tr:hover td { background: var(--surface-sunk); }
    showing an answer the system cannot act on, and no amount of editing on
    this page changes that. */
 .hint-blocked { color: var(--refused); }
+/* A control the page has locked (e.g. "Prices on a menu?" while the menu has
+   items) should look locked, not just ignore clicks. */
+select:disabled { opacity: .6; cursor: not-allowed; background: var(--surface-sunk); }
 
 input[type="text"], input[type="email"], input[type="password"],
 input[type="datetime-local"], input[type="date"], select, textarea {

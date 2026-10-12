@@ -23,6 +23,9 @@ services:
   - "water heater installation"
   - "emergency service (24/7)"
 
+# Quotes per job, so no Menu page (owner Settings: "Prices on a menu?").
+menu_enabled: false
+
 calendar:
   enabled: true
   calendar_id: "dda7cf71a4d53bbb6638fd74ca269e9e9b407179323cc24301f7fe2398c058a7@group.calendar.google.com"

@@ -27,6 +27,8 @@ services:
 #   {quote: "…"}           no figure: said as written
 #   each / sold_by / minimum / packs   for things sold by the piece
 #   notes                  said with the price (and some change it)
+# Prices live on the Menu page (owner Settings: "Prices on a menu?").
+menu_enabled: true
 menu:
   - item: birthday cake
     aliases: [birthday cakes, custom cake, custom cakes, kids cake, standard cake]

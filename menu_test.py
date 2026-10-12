@@ -314,6 +314,73 @@ def main():
           "birthday cake: custom design, theme or character" in
           menu.tool(sun)["input_schema"]["properties"]["order"]["items"]["properties"]["add_ons"]["description"])
 
+    heading("the menu switch (Settings: 'Prices on a menu?')")
+    off = copy.deepcopy(cfg)
+    off["menu_enabled"] = False
+    check("switched off, nothing quotes from the menu",
+          menu.items(off) == [] and menu.render_menu(off) == ""
+          and not menu.mentions_item("how much is a large pizza", off), menu.render_menu(off))
+    check("switched off, no price lines reach the documents",
+          menu.attach_prices_to_markdown("## Pizza\nWe make pizza.", off)
+          == "## Pizza\nWe make pizza.")
+    check("switched off, has_items still sees the items (the Settings lock reads it)",
+          menu.has_items(off) and not menu.enabled(off))
+    unset = copy.deepcopy(cfg)
+    unset.pop("menu_enabled", None)
+    check("never set: on when there's a menu", menu.enabled(unset) and menu.items(unset))
+    check("never set: off when there isn't", not menu.enabled({"business": {}}))
+    check("switched on with no items yet: on, and still nothing to quote",
+          menu.enabled({"menu_enabled": True}) and menu.items({"menu_enabled": True}) == [])
+    # The Settings lock and the nav, run from routes.py's own source (no
+    # Flask here) against this test database.
+    import ast
+    from config import load_config
+    src = (ROOT / "admin" / "routes.py").read_text()
+    wanted = {"menu_switched_on", "_menu_cannot_switch_off"}
+    tree = ast.parse(src)
+    funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in wanted]
+    for n in funcs:
+        n.decorator_list = []
+    ns = {"load_config": load_config, "get_business_by_id": db.get_business_by_id}
+    exec(compile(ast.Module(body=funcs, type_ignores=[]), "routes.py", "exec"), ns)
+    bob = db.add_business("Bob's", "bobs_plumbing", "config/bobs_plumbing.yaml")
+    cross = db.get_business_by_id(7)
+    menu.discard_draft(7)
+    check("Bob's: no Menu tab, and nothing stops the switch",
+          not ns["menu_switched_on"](db.get_business_by_id(bob))
+          and ns["_menu_cannot_switch_off"](db.get_business_by_id(bob)) is None)
+    check("Crosstown: Menu tab, and the switch is locked while it has items",
+          ns["menu_switched_on"](cross)
+          and "can't be switched off" in (ns["_menu_cannot_switch_off"](cross) or ""))
+    menu.save_draft(7, [], updated_by="o@x.com")
+    check("an emptied draft isn't enough: the published menu still has items",
+          ns["_menu_cannot_switch_off"](cross) is not None)
+    menu.discard_draft(7)
+    db.set_config_override(bob, "menu_enabled", True, updated_by="o@x.com")
+    check("Bob's switched on: Menu tab, with nothing in it to quote yet",
+          ns["menu_switched_on"](db.get_business_by_id(bob))
+          and menu.items(load_config("config/bobs_plumbing.yaml", bob)) == [])
+    menu.save_draft(bob, [{"item": "drain clearing", "options": {"standard": 120}}],
+                    updated_by="o@x.com")
+    check("…and once it has a draft item, it's locked on too",
+          ns["_menu_cannot_switch_off"](db.get_business_by_id(bob)) is not None)
+    routes_src = src
+    check("every menu edit route sends a switched-off business to Settings",
+          all(f"def {fn}(" in routes_src and
+              "_menu_switched_off(business)" in routes_src.split(f"def {fn}(")[1].split("\n@")[0]
+              for fn in ("menu_page", "menu_item_save", "menu_item_add", "menu_item_delete")))
+    check("the settings save refuses switching off while locked",
+          'if field == "menu_enabled" and not value:' in routes_src
+          and "reason = _menu_cannot_switch_off(business)" in routes_src)
+
+    for f in sorted((ROOT / "config").glob("*.yaml")):
+        c = yaml.safe_load(f.read_text()) or {}
+        if "business" not in c:
+            continue
+        check(f"{f.stem}: says whether it has a menu, and off means no items",
+              "menu_enabled" in c and (c["menu_enabled"] or not menu.has_items(c)),
+              c.get("menu_enabled"))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1
 

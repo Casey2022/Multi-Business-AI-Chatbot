@@ -47,6 +47,8 @@ services:
 #   options:  what's sold, and its price
 #   add_ons:  extras, priced per option; "any" means every option. An option
 #             an add-on doesn't list can't have it.
+# Prices live on the Menu page (owner Settings: "Prices on a menu?").
+menu_enabled: true
 menu:
   - item: pizza
     aliases: [pizzas, pie, pies]

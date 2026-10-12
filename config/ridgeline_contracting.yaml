@@ -30,6 +30,9 @@ services:
   - "roof or siding estimate"
   - "general repair quote"
 
+# Quotes per job, so no Menu page (owner Settings: "Prices on a menu?").
+menu_enabled: false
+
 calendar:
   enabled: true
   provider: "simulated"

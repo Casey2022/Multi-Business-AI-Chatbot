@@ -41,13 +41,36 @@ def money(amount):
 # The data
 # ---------------------------------------------------------------------------
 
+ENABLED_FIELD = "menu_enabled"
+
+
+def has_items(config):
+    """Whether config carries any menu items at all, switch or no switch."""
+    return any(isinstance(e, dict) and e.get("item")
+               for e in (config or {}).get("menu") or [])
+
+
+def enabled(config):
+    """Whether this business keeps prices on a menu (the Settings switch).
+
+    A plumber or a contractor quotes per job, so a Menu page would only be
+    an empty tab. Never set means: on exactly when there is a menu."""
+    flag = (config or {}).get(ENABLED_FIELD)
+    if flag is None:
+        return has_items(config)
+    return bool(flag)
+
+
 def items(config):
-    """The menu as a list of dicts (empty when the business has none).
+    """The menu as a list of dicts (empty when the business has none, or has
+    the menu switched off — then nothing anywhere quotes from it).
 
     Each item: item, aliases, section, options {name: price}, add_ons
     {name: {"each", "prices": {option or "any": price}}}, notes {option: text},
     and for things sold by the piece: each (price), sold_by (only in multiples
     of), minimum, packs {count: price}. A price is a dict from parse_price."""
+    if not enabled(config):
+        return []
     raw = (config or {}).get("menu") or []
     out = []
     for entry in raw:

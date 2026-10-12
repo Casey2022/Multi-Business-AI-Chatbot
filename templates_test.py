@@ -41,10 +41,11 @@ def main():
         failed.append("_macros.html calls csrf_token(), which isn't a template global")
     else:
         passed += 1
-    if "pending_changes(" in macros and "@admin_bp.app_template_global()\ndef pending_changes" not in routes:
-        failed.append("_macros.html calls pending_changes(), which isn't a template global")
-    else:
-        passed += 1
+    for helper in ("pending_changes", "menu_switched_on"):
+        if f"{helper}(" in macros and f"@admin_bp.app_template_global()\ndef {helper}" not in routes:
+            failed.append(f"_macros.html calls {helper}(), which isn't a template global")
+        else:
+            passed += 1
     for f in failed:
         print(f"  [FAIL] {f}")
     print(f"\n{passed} passed, {len(failed)} failed")

@@ -7,7 +7,9 @@
    the Businesses list, which kept its own copy of the links. Both now read
    PLACES.) #}
 
-{# The places a business is managed from: (key, label, short label, endpoint). #}
+{# The places a business is managed from: (key, label, short label, endpoint).
+   Menu is left out for a business with "Prices on a menu?" switched off
+   (Settings) — a plumber quotes per job, so the tab would only be empty. #}
 {% set PLACES = [
      ('appointments',  'Appointments',   'Appointments',  'admin.appointments'),
      ('conversations', 'Conversations',  'Conversations', 'admin.conversations'),
@@ -20,8 +22,9 @@
   {# `current` names the page you're on, which is shown as plain text rather
      than a link — a button that reloads the page you're already looking at
      is a small lie. #}
+  {% set has_menu = menu_switched_on(business) %}
   <div class="toolbar toolbar-nav">
-    {% for key, label, short, endpoint in PLACES %}
+    {% for key, label, short, endpoint in PLACES if key != 'menu' or has_menu %}
       {% if key == current %}
         <span class="btn btn-here" aria-current="page">{{ label }}</span>
       {% else %}
@@ -33,8 +36,9 @@
 
 {% macro destination_links(business) %}
   {# The same places, small, for a row in the Businesses list. #}
+  {% set has_menu = menu_switched_on(business) %}
   <div class="toolbar">
-    {% for key, label, short, endpoint in PLACES %}
+    {% for key, label, short, endpoint in PLACES if key != 'menu' or has_menu %}
       <a class="btn btn-nav btn-sm" href="{{ url_for(endpoint, business_id=business.id) }}">{{ short }}</a>
     {% endfor %}
   </div>

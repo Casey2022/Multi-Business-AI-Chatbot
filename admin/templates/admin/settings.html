@@ -111,9 +111,36 @@
   </div>
 
   <div class="card">
+    <div class="card-title">Menu</div>
+    <div class="field">
+      <label for="menu-on">{{ fields['menu_enabled'].label }}</label>
+      {# Locked while the menu has items: switching off would make every
+         price disappear from the assistant's answers at once. A disabled
+         select submits nothing, so saving the page leaves it as it is. #}
+      <select id="menu-on" name="menu_enabled" {{ 'disabled' if menu_lock }}>
+        {% for value, caption in fields['menu_enabled'].options.items() %}
+          <option value="{{ value }}"
+            {{ 'selected' if choice_values['menu_enabled'] == value }}>{{ caption }}</option>
+        {% endfor %}
+      </select>
+      {% if menu_lock %}
+        <span class="hint hint-blocked">{{ menu_lock }}</span>
+      {% elif choice_values['menu_enabled'] == 'yes' %}
+        <span class="hint">The <a href="{{ url_for('admin.menu_page', business_id=business.id) }}">Menu</a>
+          page holds your items and prices; the assistant quotes from it exactly.</span>
+      {% else %}
+        <span class="hint">No Menu page. The assistant answers price questions from
+          the Knowledge base, and quotes are up to you. Switch this on if you'd like
+          a menu of items and prices.</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Answers to customer questions</div>
-    <p class="hint">Prices, policies, and anything customers ask about live in
-      one place: the <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge
+    <p class="hint">{{ 'Policies and anything' if choice_values['menu_enabled'] == 'yes'
+         else 'Prices, policies, and anything' }} customers ask about live in one place: the
+      <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge
       base</a>. Add or edit a section there and press Publish.</p>
   </div>
 

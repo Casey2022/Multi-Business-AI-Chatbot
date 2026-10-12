@@ -52,6 +52,20 @@ EDITABLE_FIELDS = {
     },
     "booking.extra_questions": {"label": "Extra booking questions",
                                 "type": "questions"},
+
+    # Whether the business has a Menu page at all. Off for a business that
+    # quotes per job (a plumber, a contractor). The Settings page won't let
+    # it go off while the menu still has items, so prices never vanish by
+    # surprise; see menu.enabled for what "never set" means.
+    "menu_enabled": {
+        "label": "Prices on a menu?",
+        "type": "select",
+        "coerce": "bool",
+        "options": {
+            "yes": "Yes — keep a Menu page of items and prices",
+            "no":  "No — we quote per job (no Menu page)",
+        },
+    },
 }
 
 

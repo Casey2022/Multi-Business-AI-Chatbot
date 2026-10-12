@@ -314,6 +314,12 @@ def settings(business_id):
                     had_error = True
                     continue
                 value = coerce_choice(raw, spec)
+                if field == "menu_enabled" and not value:
+                    reason = _menu_cannot_switch_off(business)
+                    if reason:
+                        flash(reason, "error")
+                        had_error = True
+                        continue
             elif spec["type"] == "choice":
                 if raw not in personas:
                     flash(f"Unknown personality: {raw}", "error")
@@ -363,7 +369,8 @@ def settings(business_id):
             field: choice_value(config, field, spec)
             for field, spec in EDITABLE_FIELDS.items()
             if spec["type"] == "select"
-        },
+        } | {"menu_enabled": "yes" if menu_switched_on(business) else "no"},
+        menu_lock = _menu_cannot_switch_off(business),
     )
 
 @admin_bp.route("/business/<int:business_id>/knowledge")
@@ -398,6 +405,46 @@ _BACK_TO = {"knowledge": "admin.knowledge", "menu": "admin.menu_page",
 def _back_to(business_id):
     endpoint = _BACK_TO.get(request.form.get("back", ""), "admin.knowledge")
     return redirect(url_for(endpoint, business_id=business_id))
+
+
+@admin_bp.app_template_global()
+def menu_switched_on(business):
+    """Whether this business has a Menu page (Settings: "Prices on a menu?").
+    The nav and the Businesses list leave the Menu tab out when it's off."""
+    import menu
+    fresh = get_business_by_id(business["id"]) if business else None
+    if not fresh:
+        return False
+    try:
+        config = load_config(fresh["config_path"], fresh["id"])
+    except Exception:
+        return True          # a broken config shouldn't hide the tab that fixes it
+    if config.get(menu.ENABLED_FIELD) is not None:
+        return bool(config[menu.ENABLED_FIELD])
+    return menu.has_items(config) or menu.has_items(menu.with_draft(config, fresh["id"]))
+
+
+def _menu_cannot_switch_off(business):
+    """Why the menu can't be switched off right now (None when it can).
+
+    Off while items are still there would make prices disappear from every
+    answer at once, with nothing on screen saying why. So the owner empties
+    the menu (live and draft) first, which they can see and undo."""
+    import menu
+    config = load_config(business["config_path"], business["id"])
+    if menu.has_items(config) or menu.has_items(menu.with_draft(config, business["id"])):
+        return ("The menu still has items, so it can't be switched off. Remove them "
+                "on the Menu page and publish first, so no prices vanish by surprise.")
+    return None
+
+
+def _menu_switched_off(business):
+    """A redirect to Settings when this business has the menu switched off."""
+    if menu_switched_on(business):
+        return None
+    flash("This business doesn't keep prices on a menu. To add one, switch "
+          "“Prices on a menu?” on here first.", "error")
+    return redirect(url_for("admin.settings", business_id=business["id"]))
 
 
 @admin_bp.app_template_global()
@@ -580,6 +627,8 @@ def menu_page(business_id):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+    if (off := _menu_switched_off(business)):
+        return off
     return _render_menu(business)
 
 
@@ -599,6 +648,8 @@ def menu_item_save(business_id, index):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+    if (off := _menu_switched_off(business)):
+        return off
     _live, menu_list = _menu_context(business)
     others = [e.get("item", "") for j, e in enumerate(menu_list) if j != index]
     entry, errors = menu_form.parse_item_form(request.form, others)
@@ -622,6 +673,8 @@ def menu_item_add(business_id):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+    if (off := _menu_switched_off(business)):
+        return off
     _live, menu_list = _menu_context(business)
     entry, errors = menu_form.parse_item_form(
         request.form, [e.get("item", "") for e in menu_list])
@@ -640,6 +693,8 @@ def menu_item_delete(business_id, index):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+    if (off := _menu_switched_off(business)):
+        return off
     _live, menu_list = _menu_context(business)
     new_list, stale = menu_form.replace_item(menu_list, index, None,
                                              request.form.get("original", ""))
