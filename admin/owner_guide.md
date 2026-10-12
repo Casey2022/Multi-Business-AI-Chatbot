@@ -62,7 +62,7 @@ A week at a time. **← Previous**, **This week** and **Next →** move
 between weeks. It shows bookings taken through the assistant.
 Appointments added directly in Google Calendar still block availability,
 but don't appear here. Connecting a Google Calendar is set up by your
-operator: ask through Help.
+operator: the assistant on the Help page drafts the message for you.
 
 ## Knowledge base
 
@@ -137,11 +137,13 @@ Changes here take effect as soon as you press **Save settings**.
 - **What you call a booking**: "appointment", "order", "reservation".
 - **Extra booking questions**: up to 5 questions the assistant asks after the service, the address and the date and time. The label is the short name you'll see on the appointment; the question is what the assistant asks. Tick services to ask a question only for those; nothing ticked means every booking. Clear both boxes on a row to drop it.
 - **Prices on a menu?**: whether you have a Menu tab. Choose no if you quote per job. It can't be switched off while the menu still has items: remove them on the Menu page and publish first, so no prices vanish by surprise.
-- Cancellation and deposit rules, if you have them, are shown at the bottom, read-only. The assistant applies them exactly. To change them, ask your operator.
+- Cancellation and deposit rules, if you have them, are shown at the bottom, read-only. The assistant applies them exactly. To change them, ask your operator (the assistant on the Help page drafts the message for you).
 
 ## Things only your operator can change
 
-Ask through Help (**Send to support**) for any of these:
+For any of these, ask the assistant on the Help page: it drafts a message
+to support for you to check and send. Or write one yourself under
+**Send to support**.
 
 - Cancellation and deposit rules.
 - Your texting phone number.

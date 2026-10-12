@@ -390,6 +390,18 @@ def main():
         check("a failure after a change still says what was drafted",
               out["actions"] and "garden salad: $10 → $11" in out["reply"], out)
 
+        script[:] = [response("Cancellation rules are read-only; your operator sets those up. "
+                              "Use Send to support on the Help page.")]
+        llm._create = lambda **call: (calls.append(call), script.pop(0))[1]
+        out = assistant.answer("o@x.com", cross, cfg, "How do I change my cancellation policy?")
+        check("a reply that sends the owner to support gets a hand-off even without the tool "
+              "(eval, 2026-10-12)", out["handoff"] == assistant.BACKSTOP_HANDOFF
+              and assistant.support_draft(db.recent_assistant_turns(
+                  business_id=7, user_email="o@x.com")).startswith(assistant.BACKSTOP_HANDOFF))
+        script[:] = [response("Open “Settings”, change “Hours (as shown to customers)”, "
+                              "then press “Save settings”.")]
+        out = assistant.answer("o@x.com", cross, cfg, "Where are my hours?")
+        check("…but not an ordinary answer", out["handoff"] is None)
         script[:] = [response("Your menu tab is off, so there's no menu to change.")]
         llm._create = lambda **call: (calls.append(call), script.pop(0))[1]
         assistant.answer("b@x.com", bob, bob_cfg, "Raise my drain cleaning price")

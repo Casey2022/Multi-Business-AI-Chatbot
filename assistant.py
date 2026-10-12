@@ -239,6 +239,16 @@ def clean_question(raw):
 
 MAX_ROUNDS = 4             # model calls per question when it's making changes
 
+# The hand-off backstop. Asked to call hand_off_to_support, the model still
+# sometimes just says "your operator sets that up, use Send to support"
+# (cancellation policy: 0 of 3 runs on 2026-10-12, after a prompt fix).
+# When a reply sends the owner to a person and no hand-off was called, code
+# drafts the message anyway. A wrong guess costs a pre-filled text box the
+# owner can ignore; nothing is sent until they press "Send to support".
+_NEEDS_PERSON = re.compile(r"\b(your operator|the operator|send to support|support team|"
+                           r"contact support|ask support)\b", re.I)
+BACKSTOP_HANDOFF = "I need help from the support team with what I asked below."
+
 
 def _as_param(block):
     """A response block as something the next request can carry."""
@@ -318,6 +328,10 @@ def answer(user_email, business, config, question, pending=(), page=None):
             {"role": "user", "content": results}]
 
     reply = texts[-1] if texts else ""
+    if not handoff and not actions and _NEEDS_PERSON.search(reply):
+        handoff = BACKSTOP_HANDOFF
+        log.info("Owner assistant: hand-off added by code (the reply sends the owner "
+                 "to support without calling the tool)")
     if not reply and actions:
         reply = ("Saved as a draft: " + "; ".join(l for a in actions for l in a["lines"])
                  + ". Press “Publish changes” to make it live.")
