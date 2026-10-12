@@ -5,7 +5,7 @@
    nobody notices because each page looks fine on its own. #}
 
 {% macro destinations(business, current='') %}
-  {# The five places a business is managed from. `current` names the page
+  {# The places a business is managed from. `current` names the page
      you're on, which is shown as plain text rather than a link — a button
      that reloads the page you're already looking at is a small lie. #}
   <div class="toolbar toolbar-nav">
@@ -14,6 +14,7 @@
          ('conversations', 'Conversations',  'admin.conversations'),
          ('calendar',      'Calendar',       'admin.calendar_view'),
          ('knowledge',     'Knowledge base', 'admin.knowledge'),
+         ('menu',          'Menu',           'admin.menu_page'),
          ('settings',      'Settings',       'admin.settings')] %}
       {% if key == current %}
         <span class="btn btn-here" aria-current="page">{{ label }}</span>

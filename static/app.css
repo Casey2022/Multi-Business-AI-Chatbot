@@ -872,3 +872,20 @@ table[data-resizable] th { overflow-wrap: anywhere; }
                background: var(--surface-sunk); border-radius: var(--radius-sm);
                font-size: var(--text-sm); }
 .menu-change { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: baseline; }
+
+/* The menu editor: inputs fill their table cells; the by-the-piece fields
+   sit in a row that wraps on a phone. */
+.menu-table input[type=text], .menu-table select { width: 100%; min-width: 4.5rem; }
+.menu-table td, .menu-table th { padding: var(--s1) var(--s2); }
+.menu-piece { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s2); }
+.menu-piece label { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--text-sm); }
+.form-errors { color: var(--refused); padding-left: var(--s4); }
+details.field > summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
+.chip[hidden] { display: none; }
+details.menu-item > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline;
+                              gap: var(--s2); list-style: none; }
+details.menu-item > summary::-webkit-details-marker { display: none; }
+details.menu-item > summary::before { content: "▸"; color: var(--ink-faint); }
+details.menu-item[open] > summary::before { content: "▾"; }
+details.menu-item > summary .menu-reads { flex-basis: 100%; font-weight: 400; font-size: var(--text-sm); color: var(--ink-soft); }
+.menu-remove { justify-content: flex-end; }

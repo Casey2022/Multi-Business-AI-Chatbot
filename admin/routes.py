@@ -7,6 +7,7 @@ from config import load_config
 import calendar_sync
 from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment, notifications_for_appointment)
 
+import copy
 import logging
 log = logging.getLogger("admin")
 log_rec = logging.getLogger("reconcile")
@@ -500,6 +501,139 @@ def knowledge_preview(business_id):
         preview_questions = "\n".join(questions),
         preview_suggested = suggested,
     )
+
+
+# ---------------------------------------------------------------------------
+# The menu (owner-editable prices; see menu.py and menu_form.py)
+# ---------------------------------------------------------------------------
+
+def _menu_context(business):
+    """(live config, the menu list being edited — the draft if there is one)."""
+    import menu
+    live = load_config(business["config_path"], business["id"])
+    return live, copy.deepcopy(menu.with_draft(live, business["id"]).get("menu") or [])
+
+
+def _render_menu(business, errors=None, editing=None, status=200):
+    import menu
+    import menu_form
+    from db import get_documents
+    live, menu_list = _menu_context(business)
+    cards = []
+    for i, entry in enumerate(menu_list):
+        rows = (editing or {}).get(i) or menu_form.item_rows(entry)
+        cards.append({"index": i, "original": entry.get("item", ""), "rows": rows,
+                      "errors": (errors or {}).get(i, []),
+                      "preview": menu.render_item(menu.items({"menu": [entry]})[0])})
+    new_rows = (editing or {}).get("new") or menu_form.item_rows({})
+    sections = []
+    for d in get_documents(business["id"]):
+        core = d["title"].split("(")[0].strip()
+        if core and core not in sections:
+            sections.append(core)
+    return render_template(
+        "admin/menu.html", business=business, cards=cards, new_rows=new_rows,
+        new_errors=(errors or {}).get("new", []), sections=sections,
+        waiting=(menu.differences(live, menu.with_draft(live, business["id"]))
+                 if menu.draft_menu(business["id"]) is not None else []),
+    ), status
+
+
+@admin_bp.route("/business/<int:business_id>/menu")
+@login_required
+def menu_page(business_id):
+    """Every menu item, each editable: names, prices, extras, notes."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    return _render_menu(business)
+
+
+def _save_menu(business, new_list, message):
+    import menu
+    from admin.auth import current_user
+    menu.save_draft(business["id"], new_list, updated_by=current_user()["email"])
+    flash(message, "success")
+    return redirect(url_for("admin.menu_page", business_id=business["id"]))
+
+
+@admin_bp.route("/business/<int:business_id>/menu/<int:index>/save", methods=["POST"])
+@login_required
+def menu_item_save(business_id, index):
+    import menu_form
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    _live, menu_list = _menu_context(business)
+    others = [e.get("item", "") for j, e in enumerate(menu_list) if j != index]
+    entry, errors = menu_form.parse_item_form(request.form, others)
+    if errors:
+        return _render_menu(business, errors={index: errors},
+                            editing={index: menu_form.form_rows(request.form)}, status=400)
+    new_list, stale = menu_form.replace_item(menu_list, index, entry,
+                                             request.form.get("original", ""))
+    if stale:
+        flash(stale, "error")
+        return redirect(url_for("admin.menu_page", business_id=business_id))
+    return _save_menu(business, new_list, f"Saved “{entry['item']}”. Publish to "
+                      f"make it live.")
+
+
+@admin_bp.route("/business/<int:business_id>/menu/add", methods=["POST"])
+@login_required
+def menu_item_add(business_id):
+    import menu_form
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    _live, menu_list = _menu_context(business)
+    entry, errors = menu_form.parse_item_form(
+        request.form, [e.get("item", "") for e in menu_list])
+    if errors:
+        return _render_menu(business, errors={"new": errors},
+                            editing={"new": menu_form.form_rows(request.form)}, status=400)
+    return _save_menu(business, menu_list + [entry],
+                      f"Added “{entry['item']}”. Publish to make it live.")
+
+
+@admin_bp.route("/business/<int:business_id>/menu/<int:index>/delete", methods=["POST"])
+@login_required
+def menu_item_delete(business_id, index):
+    import menu_form
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    _live, menu_list = _menu_context(business)
+    new_list, stale = menu_form.replace_item(menu_list, index, None,
+                                             request.form.get("original", ""))
+    if stale:
+        flash(stale, "error")
+        return redirect(url_for("admin.menu_page", business_id=business_id))
+    return _save_menu(business, new_list, f"Removed “{request.form.get('original')}” "
+                      f"from the menu. Publish to make it live.")
+
+
+@admin_bp.route("/business/<int:business_id>/menu/discard", methods=["POST"])
+@login_required
+def menu_discard(business_id):
+    """Drop the menu's unpublished changes (sections are left alone)."""
+    import menu
+    from db import unpublished_changes, set_documents_clean
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    menu.discard_draft(business_id)
+    # If the menu was the only thing unpublished, the business is clean again.
+    changes = unpublished_changes(get_business_by_id(business_id))
+    if not (changes["edited"] or changes["new"] or changes["deleted"]):
+        set_documents_clean(business_id)
+    flash("Menu changes discarded — customers see the published menu.", "success")
+    return redirect(url_for("admin.menu_page", business_id=business_id))
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/upload", methods=["POST"])

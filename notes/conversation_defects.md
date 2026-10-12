@@ -1317,3 +1317,23 @@ Evals with the bakery and salon menus (2026-10-11): rag_eval 89/89 core,
 Belmont's own regex: "you're just under 24 hours before, so we'd charge
 50%" is right (the tool said 23 hours, 50%, and the judge passed it). The
 "just under" pattern now skips a sentence that names the charge.
+
+### The owner's menu editor (2026-10-11)
+
+A Menu tab (admin/templates/admin/menu.html, menu_form.py): one collapsible
+card per item, with its name, other words customers use, the section its
+prices go with, options with a price and a note, extras (per option or
+"any", priced each or once), and the by-the-piece fields. A price is ONE
+text box typed as an owner would write it: 48, from 110, 20 to 60, or words
+("quoted after a trial"); "4O" is a mistake, not a quote. Saves go into the
+draft menu (Publish makes them live; "Discard menu changes" drops them and
+marks the business clean if nothing else differs). Renaming an option
+carries its extras' prices and notes; removing one takes its extras with
+it. A failed save re-shows the owner's typing with the mistakes as
+sentences (400). Each save names the item the page showed, so a stale page
+can't overwrite a newer change. unsaved-edits.js tracks every field of a
+menu card (data-track-edits="any"): Save greys until something changes,
+the card's header shows "Unsaved edits" even when it's closed, and leaving
+warns. Checked in Chromium (10 checks, desktop and phone width).
+menu_form_test 48: all 19 existing items round-trip through the form
+unchanged; the rename-carries-extras check proven to fail when removed.

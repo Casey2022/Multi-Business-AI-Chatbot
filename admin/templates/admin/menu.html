@@ -1,0 +1,184 @@
+{% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
+{% block title %}Menu — {{ business.name }}{% endblock %}
+
+{% macro item_fields(rows, sections) %}
+  <div class="field">
+    <label>Item</label>
+    <input class="section-title" type="text" name="item" value="{{ rows.item }}"
+           placeholder="e.g. pizza, haircut, cupcake">
+  </div>
+  <div class="field">
+    <label>Other words customers use (comma-separated)</label>
+    <input type="text" name="aliases" value="{{ rows.aliases }}" placeholder="pizzas, pie">
+    <span class="hint">The assistant looks prices up when a customer names the item or one of these.</span>
+  </div>
+  <div class="field">
+    <label>Knowledge-base section these prices go with</label>
+    <select name="section">
+      <option value="" {% if not rows.section %}selected{% endif %}>— none —</option>
+      {% for s in sections %}<option value="{{ s }}" {% if s == rows.section %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      {% if rows.section and rows.section not in sections %}<option value="{{ rows.section }}" selected>{{ rows.section }} (no such section)</option>{% endif %}
+    </select>
+    <span class="hint">The prices are shown with this section, so the assistant reads them together.</span>
+  </div>
+
+  <div class="field">
+    <label>Options and prices</label>
+    <div class="tablewrap">
+      <table class="menu-table">
+        <thead><tr><th>Option</th><th>Price</th><th>Note (said with the price)</th><th>Remove</th></tr></thead>
+        <tbody>
+        {% for o in rows.options %}{% set i = loop.index0 %}
+          <tr>
+            <td><input type="hidden" name="opt{{ i }}_original" value="{{ o.original }}">
+                <input type="text" name="opt{{ i }}_name" value="{{ o.name }}" aria-label="Option name" placeholder="{% if not o.name %}add an option{% endif %}"></td>
+            <td><input type="text" name="opt{{ i }}_price" value="{{ o.price }}" aria-label="Price" placeholder="{% if not o.name %}e.g. 48{% endif %}"></td>
+            <td><input type="text" name="opt{{ i }}_note" value="{{ o.note }}" aria-label="Note"></td>
+            <td>{% if o.name %}<input type="checkbox" name="opt{{ i }}_remove" value="yes" aria-label="Remove {{ o.name }}">{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Extras (toppings, add-ons)</label>
+    <div class="tablewrap">
+      <table class="menu-table">
+        <thead><tr><th>Extra</th><th>On</th><th>Price</th><th>Each</th><th>Remove</th></tr></thead>
+        <tbody>
+        {% for a in rows.add_ons %}{% set i = loop.index0 %}
+          <tr>
+            <td><input type="text" name="add{{ i }}_name" value="{{ a.name }}" aria-label="Extra" placeholder="{% if not a.name %}add an extra{% endif %}"></td>
+            <td><select name="add{{ i }}_on" aria-label="Which option">
+                  <option value="any" {% if a.on in ('', 'any') %}selected{% endif %}>any</option>
+                  {% for o in rows.options if o.name %}
+                  <option value="{{ o.original or o.name }}" {% if a.on in (o.original, o.name) and a.on %}selected{% endif %}>{{ o.name }}</option>
+                  {% endfor %}
+                </select></td>
+            <td><input type="text" name="add{{ i }}_price" value="{{ a.price }}" aria-label="Price"></td>
+            <td><input type="checkbox" name="add{{ i }}_each" value="yes" {% if a.each %}checked{% endif %} aria-label="Priced each"></td>
+            <td>{% if a.name %}<input type="checkbox" name="add{{ i }}_remove" value="yes" aria-label="Remove">{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <span class="hint">“Each” means per piece (3 toppings = 3 × the price). An extra not listed for an option can't go on it.</span>
+  </div>
+
+  <details class="field" {% if rows.by_piece %}open{% endif %}>
+    <summary>Sold by the piece (cupcakes, muffins…)</summary>
+    <div class="menu-piece">
+      <label>Price each <input type="text" name="each" value="{{ rows.each }}" placeholder="e.g. 3.25"></label>
+      <label>Only in multiples of <input type="text" name="sold_by" value="{{ rows.sold_by }}" inputmode="numeric" placeholder="e.g. 12"></label>
+      <label>Minimum <input type="text" name="minimum" value="{{ rows.minimum }}" inputmode="numeric"></label>
+      <label>Note <input type="text" name="each_note" value="{{ rows.each_note }}"></label>
+    </div>
+    <table class="menu-table mt-3">
+      <thead><tr><th>Pack of</th><th>Price</th><th>Remove</th></tr></thead>
+      <tbody>
+      {% for k in rows.packs %}{% set i = loop.index0 %}
+        <tr>
+          <td><input type="text" name="pack{{ i }}_count" value="{{ k.count }}" inputmode="numeric" aria-label="Pack size" placeholder="{% if not k.count %}e.g. 12{% endif %}"></td>
+          <td><input type="text" name="pack{{ i }}_price" value="{{ k.price }}" aria-label="Pack price"></td>
+          <td>{% if k.count %}<input type="checkbox" name="pack{{ i }}_remove" value="yes" aria-label="Remove">{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+{% endmacro %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> › {{ business.name }}
+</div>
+
+<div class="page-header">
+  <h1>{{ business.name }}</h1>
+  <div class="subtitle">Menu — {{ cards | length }} item{{ '' if cards | length == 1 else 's' }}.
+    The assistant answers price questions from here, and nowhere else.</div>
+</div>
+
+{{ ui.destinations(business, 'menu') }}
+
+{% if waiting %}
+<div class="banner">
+  <div><strong>Unpublished menu changes.</strong> Customers still get the published prices.
+    <div class="cell-sub">{{ waiting | join("; ") }}.</div></div>
+  <div class="banner-actions">
+    <form method="POST" action="{{ url_for('admin.menu_discard', business_id=business.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">Discard menu changes</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary" type="submit">Publish changes</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-pad guidance">
+    Click an item to edit it. Type a price the way you'd write it on the board: <strong>48</strong>,
+    <strong>from 110</strong> (a starting price), <strong>20 to 60</strong> (a range), or
+    words like <strong>quoted after a trial</strong>. Anything not on this page, the
+    assistant will say isn't on the menu rather than guess. Changes are saved as a
+    draft: preview them on the Knowledge base page, then publish.
+  </div>
+</div>
+
+{% for c in cards %}
+<div class="card" id="item-{{ c.index }}">
+  <form method="POST" action="{{ url_for('admin.menu_item_save', business_id=business.id, index=c.index) }}" data-track-edits="any">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="original" value="{{ c.original }}">
+    <details class="menu-item" {% if c.errors %}open{% endif %}>
+      <summary class="card-title">
+        <span>{{ c.original }}</span>
+        <span class="chip chip-quiet" data-unsaved-flag hidden>Unsaved edits</span>
+        <span class="menu-reads">{{ c.preview }}</span>
+      </summary>
+      {% if c.errors %}
+      <div class="card-pad"><ul class="form-errors">{% for e in c.errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      {{ item_fields(c.rows, sections) }}
+      <div class="section-foot">
+        <span class="meta">Saved changes wait for Publish.</span>
+        <span class="toolbar"><button class="btn btn-primary" type="submit" data-save-button>Save</button></span>
+      </div>
+    </details>
+  </form>
+  <div class="section-foot menu-remove">
+    <span class="meta"></span>
+    <form method="POST" action="{{ url_for('admin.menu_item_delete', business_id=business.id, index=c.index) }}"
+          onsubmit="return confirm('Remove {{ c.original }} from the menu? You can discard this before publishing.');">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="original" value="{{ c.original }}">
+      <button class="btn btn-danger btn-sm" type="submit">Remove item</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty"><p>No menu yet. Add an item below, or upload a
+  photo of your menu on the Knowledge base page.</p></div></div>
+{% endfor %}
+
+<div class="card card-add" id="add-item">
+  <div class="card-title">Add an item</div>
+  <form method="POST" action="{{ url_for('admin.menu_item_add', business_id=business.id) }}" data-track-edits="any">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    {% if new_errors %}
+    <div class="card-pad"><ul class="form-errors">{% for e in new_errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+    {% endif %}
+    {{ item_fields(new_rows, sections) }}
+    <div class="section-foot"><span class="meta"></span>
+      <span class="toolbar"><button class="btn btn-primary" type="submit" data-save-button>Add item</button></span></div>
+  </form>
+</div>
+{% endblock %}

@@ -26,18 +26,41 @@
     return (text || "").replace(/\r\n?/g, "\n").trim();
   }
 
+  // data-track-edits="any" (the menu editor): every visible field counts,
+  // and there's no title/body pair to require.
+  function trackAll(form) {
+    return form.getAttribute("data-track-edits") === "any";
+  }
+
   function fields(form) {
-    return Array.prototype.slice.call(
-      form.querySelectorAll("input[name='title'], textarea[name='body']"));
+    return Array.prototype.slice.call(form.querySelectorAll(trackAll(form)
+      ? "input:not([type=hidden]):not([type=submit]), textarea, select"
+      : "input[name='title'], textarea[name='body']"));
+  }
+
+  function changed(el) {
+    if (el.type === "checkbox" || el.type === "radio") {
+      return el.checked !== el.defaultChecked;
+    }
+    if (el.tagName === "SELECT") {
+      var marked = Array.prototype.some.call(el.options, function (o) {
+        return o.defaultSelected;
+      });
+      // With nothing marked selected, the browser shows the first option.
+      if (!marked) return el.selectedIndex > 0;
+      return Array.prototype.some.call(el.options, function (o) {
+        return o.selected !== o.defaultSelected;
+      });
+    }
+    return norm(el.value) !== norm(el.defaultValue);
   }
 
   function isEdited(form) {
-    return fields(form).some(function (el) {
-      return norm(el.value) !== norm(el.defaultValue);
-    });
+    return fields(form).some(changed);
   }
 
   function isComplete(form) {
+    if (trackAll(form)) return true;
     var list = fields(form);
     return list.length > 0 && list.every(function (el) {
       return norm(el.value) !== "";
@@ -67,6 +90,7 @@
     var forms = document.querySelectorAll("form[data-track-edits]");
     Array.prototype.forEach.call(forms, function (form) {
       form.addEventListener("input", function () { sync(form); });
+      form.addEventListener("change", function () { sync(form); });
       form.addEventListener("submit", function () { submitting = form; });
       sync(form);
     });
