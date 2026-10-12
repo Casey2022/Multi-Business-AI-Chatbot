@@ -1,0 +1,66 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Support inbox{% endblock %}
+
+{% block content %}
+{% set open_requests = requests | selectattr('status', 'equalto', 'open') | list %}
+<div class="page-header">
+  <h1>Support inbox</h1>
+  <div class="subtitle">Help requests from owners and demo visitors.
+    {{ open_requests | length }} open.</div>
+</div>
+
+<div class="stack">
+{% if not email_ready %}
+  <p class="hint hint-blocked">Email alerts are off, so requests only arrive here. To get an
+    email for each one, set SUPPORT_ALERT_EMAIL and SMTP_HOST (with SMTP_USER and
+    SMTP_PASSWORD) on the server; see support.py.</p>
+{% endif %}
+
+{% for r in requests %}
+<div class="card card-pad support-item">
+  <div class="support-meta">
+    <span class="cell-strong">#{{ r.id }} · {{ r.business_name or 'No business' }}</span>
+    {% if r.is_demo %}<span class="chip chip-quiet">Demo</span>{% endif %}
+    {% if r.status == 'open' %}<span class="chip chip-pending">Open</span>
+    {% else %}<span class="chip chip-booked">Resolved</span>{% endif %}
+    <span>{{ r.created_at | friendly_time }}</span>
+  </div>
+
+  <div class="support-message">{{ r.message }}</div>
+
+  <dl class="attached">
+    <dt>From</dt><dd>{{ 'Demo visitor' if r.is_demo else r.user_email }}</dd>
+    <dt>Reply to</dt><dd>{% if r.is_demo %}{{ r.contact or 'no address left' }}{% else %}{{ r.user_email }}{% endif %}</dd>
+    <dt>Page</dt><dd>{% if r.context.page %}<a href="{{ r.context.page }}">{{ r.context.page }}</a>{% else %}—{% endif %}</dd>
+    <dt>Error reference</dt><dd>{{ r.context.error_id or '—' }}</dd>
+    <dt>Version</dt><dd>{{ r.context.version or '—' }}</dd>
+    <dt>Alert</dt><dd>{{ r.alert or 'sending…' }}</dd>
+  </dl>
+
+  {% if r.status == 'open' %}
+  <form method="POST" action="{{ url_for('admin.support_resolve', request_id=r.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="reply-{{ r.id }}">Note for them (optional)</label>
+      <textarea id="reply-{{ r.id }}" name="reply" rows="2"
+                placeholder="Shown on their Help page beside the request."></textarea>
+    </div>
+    <div class="toolbar"><button class="btn btn-primary btn-sm" type="submit">Mark resolved</button></div>
+  </form>
+  {% else %}
+  <div class="support-reply">
+    Resolved by {{ r.resolved_by }}, {{ r.resolved_at | friendly_time }}.
+    {% if r.reply %}<br><strong>Note:</strong> {{ r.reply }}{% endif %}
+  </div>
+  <form method="POST" action="{{ url_for('admin.support_reopen', request_id=r.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-nav btn-sm" type="submit">Reopen</button>
+  </form>
+  {% endif %}
+</div>
+{% else %}
+<div class="card"><div class="empty"><p>No help requests yet.</p></div></div>
+{% endfor %}
+</div>
+{% endblock %}

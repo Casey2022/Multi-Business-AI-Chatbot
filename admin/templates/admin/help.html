@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
+{% block title %}Help{% if business %} — {{ business.name }}{% endif %}{% endblock %}
+
+{% block content %}
+{% if business %}
+<div class="breadcrumb">{{ business.name }} › Help</div>
+{% endif %}
+
+<div class="page-header">
+  <h1>Help</h1>
+  <div class="subtitle">Stuck, or something not working the way you expect? Ask us.
+    A person reads every message.</div>
+</div>
+
+{% if business %}{{ ui.destinations(business, '') }}{% endif %}
+
+<div class="stack">
+<form method="POST" action="{{ url_for('admin.help_page') }}" class="card">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+  {% if page %}<input type="hidden" name="from" value="{{ page }}">{% endif %}
+  {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
+
+  <div class="card-title">Ask for help</div>
+
+  <div class="field">
+    <label for="help-message">What's going on?</label>
+    <textarea id="help-message" name="message" rows="6" maxlength="{{ max_message }}"
+              placeholder="What you were trying to do, and what happened instead."
+              required>{{ message }}</textarea>
+    {% if reply_to and not needs_contact %}<span class="hint">We'll reply to {{ reply_to }}.</span>{% endif %}
+  </div>
+
+  {% if needs_contact %}
+  <div class="field">
+    <label for="help-contact">Your email (optional)</label>
+    <input type="email" id="help-contact" name="contact" value="{{ contact }}"
+           class="w-short" autocomplete="email">
+    <span class="hint">This is a demo, so we don't have your email. Leave one if
+      you'd like a reply; it's only used to answer this.</span>
+  </div>
+  {% endif %}
+
+  <div class="field">
+    <label>Sent along with your message</label>
+    <dl class="attached">
+      <dt>Business</dt><dd>{{ attached.business or '—' }}</dd>
+      <dt>Page</dt><dd>{{ attached.page or '—' }}</dd>
+      {% if attached.error_id %}<dt>Error reference</dt><dd>{{ attached.error_id }}</dd>{% endif %}
+      <dt>Version</dt><dd>{{ attached.version }}</dd>
+    </dl>
+    <span class="hint">So we can find the problem without a round of questions.
+      Nothing from your customers' conversations or appointments is included.</span>
+  </div>
+
+  <div class="toolbar card-pad">
+    <button class="btn btn-primary" type="submit">Send to support</button>
+    {% if page %}<a class="btn btn-nav" href="{{ page }}">Back to where you were</a>{% endif %}
+  </div>
+</form>
+
+{% if requests %}
+<div class="card">
+  <div class="card-title">Your requests</div>
+  <div class="support-list card-pad">
+    {% for r in requests %}
+    <div class="support-item">
+      <div class="support-meta">
+        <span>#{{ r.id }} · {{ r.created_at | friendly_time }}</span>
+        {% if r.status == 'open' %}<span class="chip chip-pending">Open</span>
+        {% else %}<span class="chip chip-booked">Resolved</span>{% endif %}
+      </div>
+      <div class="support-message">{{ r.message }}</div>
+      {% if r.reply %}<div class="support-reply"><strong>Our reply:</strong> {{ r.reply }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

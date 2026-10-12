@@ -56,6 +56,18 @@
       <a class="nav-link" href="{{ url_for('demo_leave') }}">Back to your account</a>
     {% endif %}
 
+    {# Owners ask for help from any page, and the page they were on goes
+       with the request. Operators get the inbox those requests land in. #}
+    {% if viewer %}
+      {% if is_operator %}
+        {% set open_count = open_support_count() %}
+        <a class="nav-link" href="{{ url_for('admin.support_inbox') }}">Support{% if open_count %}
+          <span class="nav-count">{{ open_count }}</span>{% endif %}</a>
+      {% else %}
+        <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': request.path}) }}">Help</a>
+      {% endif %}
+    {% endif %}
+
     <a class="nav-link" href="{{ url_for('admin.logout') }}">Log out</a>
     {% endblock %}
   </div>

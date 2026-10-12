@@ -1,0 +1,30 @@
+<!doctype html>
+{# Standalone, not admin/base.html: whatever just failed might be something
+   base.html needs too (the database, the session). #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Something went wrong — Simon Says</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<div class="page">
+  <div class="card error-card">
+    <div class="card-title">Something went wrong on our side</div>
+    <div class="card-pad">
+      <p>That's our fault, not yours. Nothing you saved before this is lost.</p>
+      <p class="hint">Reference: <strong>{{ error_id }}</strong>. Quote it if you write to us;
+        "Tell us about it" fills it in for you.</p>
+      <div class="toolbar">
+        <a class="btn btn-primary" href="{{ help_url }}">Tell us about it</a>
+        <a class="btn btn-nav" href="{{ url_for('admin.dashboard') }}">Back to the portal</a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -169,6 +169,14 @@ VOYAGE_API_KEY=your-key
 SECRET_KEY=generate-with-secrets.token_hex(32)
 ADMIN_PASSWORD=choose-one
 ALLOW_UNSIGNED_REQUESTS=true    # dev only — lets curl tests skip Twilio signature checks
+
+# Optional: email the operator for each Help request (they always reach /admin/support).
+# With Gmail, use an app password, not the account password.
+SUPPORT_ALERT_EMAIL=you@example.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=your-app-password
 ```
 
 Then:
@@ -192,6 +200,8 @@ URLs worth knowing:
 | `/demo` | the sandbox: pick a business and get your own copy |
 | `/demo/start` | mints that copy and signs you in as its owner |
 | `/admin` | the owner's portal |
+| `/admin/help` | an owner asks the operator for help (page and error reference attached) |
+| `/admin/support` | the operator's inbox of help requests |
 | `/webchat/<slug>` | the JSON endpoint the chat page posts to |
 | `/sms` | the Twilio webhook |
 

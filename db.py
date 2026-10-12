@@ -269,6 +269,33 @@ def init_db():
         )
     """)
 
+    # support_requests — an owner (or demo visitor) asking the operator for
+    # help, from the Help page. The app attaches the context itself (which
+    # business, which page, the error reference, the app version) as JSON,
+    # because "the menu thing is broken" can't be acted on without it.
+    # business_name is a copy, not a lookup: a demo visitor's report is
+    # worth keeping after the idle sweep deletes their sandbox. contact is
+    # only set when the sender has no real login email (a demo visitor who
+    # chose to leave one). Resolved requests are pruned (prune_personal_data).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS support_requests (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id    INTEGER,
+            business_name  TEXT,
+            user_email     TEXT,
+            contact        TEXT,
+            is_demo        INTEGER DEFAULT 0,
+            message        TEXT    NOT NULL,
+            context        TEXT    NOT NULL,
+            status         TEXT    NOT NULL DEFAULT 'open',
+            alert          TEXT,
+            created_at     TEXT    NOT NULL,
+            resolved_at    TEXT,
+            resolved_by    TEXT,
+            reply          TEXT
+        )
+    """)
+
     # --- migrations -------------------------------------------------------
     # CREATE TABLE IF NOT EXISTS is a no-op once a table exists, so a new
     # column on an existing table needs an explicit ALTER. Guarded by an
@@ -667,6 +694,11 @@ def delete_business(business_id, *, force=False):
     # geocode_cache is deliberately left alone: it is keyed by the address
     # asked about, not by who asked, and a resolved address stays resolved.
     # rate_limits is left to prune_rate_limits — its rows expire by window.
+
+    # Support requests outlive the business (a demo visitor's bug report is
+    # still a bug); they keep the name they were filed under.
+    conn.execute("UPDATE support_requests SET business_id = NULL WHERE business_id = ?",
+                 (business_id,))
 
     cur = conn.execute("DELETE FROM businesses WHERE id = ?", (business_id,))
     deleted["businesses"] = cur.rowcount
@@ -1218,6 +1250,97 @@ def delete_upload_proposal(business_id):
     conn.close()
 
 
+# --- support requests (the Help page; see support.py) ----------------------
+
+def add_support_request(*, business_id, business_name, user_email, contact,
+                        is_demo, message, context, created_at=None):
+    """File a request for help. Returns its id."""
+    import json as _json
+    from datetime import datetime as _dt
+    conn = get_connection()
+    cur = conn.execute(
+        "INSERT INTO support_requests (business_id, business_name, user_email, "
+        "contact, is_demo, message, context, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (business_id, business_name, user_email, contact, 1 if is_demo else 0,
+         message, _json.dumps(context), created_at or _dt.now().isoformat()))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
+
+
+def _support_row(row):
+    import json as _json
+    out = dict(row)
+    try:
+        out["context"] = _json.loads(out["context"] or "{}")
+    except ValueError:
+        out["context"] = {}
+    return out
+
+
+def get_support_request(request_id):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM support_requests WHERE id = ?",
+                       (request_id,)).fetchone()
+    conn.close()
+    return _support_row(row) if row else None
+
+
+def list_support_requests(*, user_email=None, limit=200):
+    """Newest first, open before resolved. With user_email, only that
+    person's own (what the Help page shows them)."""
+    conn = get_connection()
+    sql, args = "SELECT * FROM support_requests", []
+    if user_email is not None:
+        sql += " WHERE user_email = ?"
+        args.append(user_email)
+    sql += " ORDER BY status = 'resolved', created_at DESC, id DESC LIMIT ?"
+    args.append(limit)
+    rows = conn.execute(sql, args).fetchall()
+    conn.close()
+    return [_support_row(r) for r in rows]
+
+
+def count_open_support_requests():
+    conn = get_connection()
+    n = conn.execute("SELECT COUNT(*) FROM support_requests WHERE status = 'open'"
+                     ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def resolve_support_request(request_id, resolved_by, reply=None):
+    """Mark a request handled, with an optional note the sender will see."""
+    from datetime import datetime as _dt
+    conn = get_connection()
+    cur = conn.execute(
+        "UPDATE support_requests SET status = 'resolved', resolved_at = ?, "
+        "resolved_by = ?, reply = ? WHERE id = ?",
+        (_dt.now().isoformat(), resolved_by, (reply or "").strip() or None, request_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount == 1
+
+
+def reopen_support_request(request_id):
+    conn = get_connection()
+    cur = conn.execute(
+        "UPDATE support_requests SET status = 'open', resolved_at = NULL, "
+        "resolved_by = NULL WHERE id = ?", (request_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount == 1
+
+
+def set_support_alert(request_id, alert):
+    """How the operator was told ("emailed", "email not set up", "email failed: …")."""
+    conn = get_connection()
+    conn.execute("UPDATE support_requests SET alert = ? WHERE id = ?", (alert, request_id))
+    conn.commit()
+    conn.close()
+
+
 def mark_documents_dirty(business_id):
     """Knowledge-base content changed somewhere other than a section (the
     menu): show "unpublished changes", keeping a snapshot to discard back to."""
@@ -1492,6 +1615,9 @@ def get_geocode_usage(usage_key, day):
 MESSAGE_RETENTION_DAYS = int(os.environ.get("MESSAGE_RETENTION_DAYS", "90"))
 STATE_RETENTION_DAYS   = int(os.environ.get("STATE_RETENTION_DAYS", "7"))
 GEOCODE_RETENTION_DAYS = int(os.environ.get("GEOCODE_RETENTION_DAYS", "30"))
+# Resolved support requests: long enough to spot a problem that keeps coming
+# back, not forever. Open ones are never pruned; someone still owes a reply.
+SUPPORT_RETENTION_DAYS = int(os.environ.get("SUPPORT_RETENTION_DAYS", "180"))
 
 
 def _cutoff(days):
@@ -1531,6 +1657,10 @@ def prune_personal_data(now=None):
         cur = conn.execute("DELETE FROM geocode_cache WHERE fetched_at < ?",
                            (_cutoff(GEOCODE_RETENTION_DAYS),))
         removed["geocode_cache"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM support_requests WHERE status = 'resolved' "
+                           "AND resolved_at < ?", (_cutoff(SUPPORT_RETENTION_DAYS),))
+        removed["support_requests"] = cur.rowcount
 
         conn.commit()
     finally:

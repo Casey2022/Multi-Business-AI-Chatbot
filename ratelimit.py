@@ -184,3 +184,19 @@ def login_attempt(ip, email):
         (f"login-user:{email}",  LOGIN_PER_MINUTE, 60),
         (f"login-user:{email}",  LOGIN_PER_HOUR, 3600),
     ])
+
+
+SUPPORT_PER_HOUR    = _limit("SUPPORT_PER_HOUR", 5)
+SUPPORT_PER_DAY     = _limit("SUPPORT_PER_DAY", 20)
+SUPPORT_IP_PER_HOUR = _limit("SUPPORT_IP_PER_HOUR", 10)
+
+
+def support(user_email, ip):
+    """Limits for one Help request. Each can send an email to the operator,
+    and demo visitors can file them, so this is a public way to fill an
+    inbox. Per IP too: every demo visitor is a different login."""
+    return check_all([
+        (f"support:{user_email}", SUPPORT_PER_HOUR, 3600),
+        (f"support:{user_email}", SUPPORT_PER_DAY, 86400),
+        (f"support-ip:{ip}",      SUPPORT_IP_PER_HOUR, 3600),
+    ])
