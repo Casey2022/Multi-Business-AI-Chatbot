@@ -955,3 +955,9 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-weight: 400; fo
 }
 .assistant-ask { display: flex; gap: var(--s2); }
 .assistant-ask input[type="text"] { flex: 1; min-width: 0; }
+.assistant-actions {
+  margin-top: var(--s2); padding: var(--s2) var(--s3); border-radius: var(--radius-sm);
+  background: var(--pending-wash); font-size: var(--text-sm); color: var(--ink-soft);
+}
+.assistant-actions-title { font-weight: 600; color: var(--pending); }
+.assistant-actions ul { margin: var(--s1) 0; padding-left: var(--s4); color: var(--ink); }

@@ -215,6 +215,177 @@ def main():
             ok = True
         check(f"a question that's {why} is refused in words", ok)
 
+    heading("menu changes (stage 2)")
+    import assistant_actions as aa
+    import menu
+    check("Crosstown is offered the menu tools", aa.offered(cross, cfg) == aa.TOOLS)
+    check("Bob's (no menu) and an operator aren't",
+          aa.offered(bob, bob_cfg) == [] and aa.offered(None, None) == [])
+    check("the instructions say which: can change the menu, or can't change anything",
+          aa.TOOLS and assistant.CAN_CHANGE_MENU in assistant.system_prompt(
+              cross, cfg, can_change_menu=True)[0]["text"]
+          and assistant.CANT_CHANGE in assistant.system_prompt(bob, bob_cfg)[0]["text"])
+    db.add_document_section(7, "Pizza Sizes and Prices", "Sizes.")
+
+    def change(tool, **args):
+        return aa.run(tool, args, cross, cfg, "o@x.com")
+
+    def draft_item(name):
+        d = menu.draft_menu(7) or []
+        return next((e for e in d if e["item"] == name), None)
+
+    menu.discard_draft(7)
+    db.set_documents_clean(7)
+    text, action = change("change_menu_price", item="Pizza", option="18-inch LARGE", price="24")
+    check("a price change is saved as a draft, described like the banner",
+          action and action["lines"] == ["18-inch large pizza: $22 → $24"]
+          and draft_item("pizza")["options"]["18-inch large"] == 24, (text, action))
+    check("…customers still get the published price",
+          config.load_config("config/crosstown_pizza.yaml", 7)["menu"][0]["options"]["18-inch large"] == 22)
+    check("…and the banner knows (documents marked unpublished, by the assistant)",
+          db.get_business_by_id(7)["documents_dirty"] == 1
+          and "via assistant" in str(db.get_connection().execute(
+              "SELECT updated_by FROM config_overrides WHERE business_id = 7 AND field = 'menu_draft'"
+          ).fetchone()[0]))
+    check("the tool result tells the model it isn't live yet",
+          "Publish changes" in text and "Saved as a draft" in text)
+    text, action = change("change_menu_price", item="pizza", option="18-inch large", price="4O")
+    check("a typo is refused in the form's own words, nothing saved",
+          action is None and "4O" in text and draft_item("pizza")["options"]["18-inch large"] == 24, text)
+    text, action = change("change_menu_price", item="calzone", option="large", price="12")
+    check("an item that isn't on the menu: refused, listing what is",
+          action is None and "no menu item called “calzone”" in text and "“wings”" in text, text)
+    text, action = change("change_menu_price", item="pies", option="extra large", price="30")
+    check("an alias finds the item; an unknown option lists the real ones",
+          action is None and "no option called “extra large”" in text and "18-inch large" in text, text)
+    text, action = change("change_menu_price", item="pizza", option="18-inch large", price="24")
+    check("the same price again changes nothing", action is None and "already" in text, text)
+    text, action = change("add_menu_option", item="wings", option="60 wings", price="58")
+    check("an option is added", action and action["lines"] == ["new: 60 wings $58"], (text, action))
+    text, action = change("add_menu_option", item="wings", option="60 Wings", price="57")
+    check("…not twice", action is None and "already has" in text, text)
+    text, action = change("remove_menu_option", item="pizza", option="10-inch personal")
+    d = draft_item("pizza")
+    check("an option is removed, and its extras' prices with it",
+          action and "removed: 10-inch personal pizza" in action["lines"]
+          and "10-inch personal" not in d["options"]
+          and "10-inch personal" not in d["add_ons"]["topping"]["prices"]
+          and "gluten-free crust" not in d.get("add_ons", {}), (action, d.get("add_ons")))
+    text, action = change("remove_menu_option", item="sub", option="any sub on a 10-inch roll")
+    check("the only option can't be removed (remove the item instead)",
+          action is None and "remove the item instead" in text, text)
+    text, action = change("set_extra_price", item="pizza", extra="topping", on="18-inch large", price="3")
+    check("an extra's price for one option changes",
+          action and action["lines"] == ["topping on 18-inch large: $2.75 → $3"]
+          and draft_item("pizza")["add_ons"]["topping"]["each"] is True, (text, action))
+    text, action = change("set_extra_price", item="pizza", extra="vegan cheese", price="2.50")
+    check("an extra with one price: that price, without naming the option",
+          action and action["lines"] == ["vegan cheese on any: $2 → $2.50"], (text, action))
+    text, action = change("set_extra_price", item="pizza", extra="anchovies", price="2", each=True)
+    check("a new extra is added", action and action["lines"] == ["new: anchovies on any $2"]
+          and draft_item("pizza")["add_ons"]["anchovies"]["each"] is True, (text, action))
+    text, action = change("set_extra_price", item="pizza", extra="topping", on="XL", price="4")
+    check("an extra for an option that doesn't exist is refused", action is None
+          and "no option called “XL”" in text, text)
+    text, action = change("add_menu_item", item="calzone", options=[
+        {"option": "regular", "price": "12"}, {"option": "large", "price": "from 16"}],
+        other_words="calzones", section="pizza sizes and prices")
+    d = draft_item("calzone")
+    check("an item is added, with the form's price formats and a real section",
+          action and action["lines"][0].startswith("new on the menu: calzone")
+          and d["options"] == {"regular": 12, "large": {"from": 16}}
+          and d["section"] == "Pizza Sizes and Prices" and d["aliases"] == ["calzones"], (text, d))
+    text, action = change("add_menu_item", item="Calzone", options=[{"option": "x", "price": "1"}])
+    check("…not twice", action is None and "already an item" in text, text)
+    text, action = change("add_menu_item", item="stromboli", options=[{"option": "x", "price": "1"}],
+                          section="Desserts")
+    check("a section that doesn't exist is refused, listing the real ones",
+          action is None and "no knowledge-base section called “Desserts”" in text, text)
+    text, action = change("remove_menu_item", item="calzone")
+    check("an item is removed", action and action["lines"] == ["removed from the menu: calzone"]
+          and draft_item("calzone") is None, (text, action))
+    check("the banner now lists every kind of change, removals too",
+          {"removed: 10-inch personal pizza", "new: 60 wings $58"}
+          <= set(menu.differences(config.load_config("config/crosstown_pizza.yaml", 7),
+                                  menu.with_draft(config.load_config("config/crosstown_pizza.yaml", 7), 7))))
+    check("an unknown tool does nothing", change("delete_everything")[1] is None)
+    menu.discard_draft(7)
+
+    heading("the conversation loop")
+    menu.discard_draft(7)
+    db.clear_assistant_turns(business_id=7, user_email="o@x.com")
+    use = Block(type="tool_use", id="t1", name="change_menu_price",
+                input={"item": "pizza", "option": "18-inch large", "price": "24"})
+    script = [types.SimpleNamespace(content=[Block(type="text", text="Changing it."), use],
+                                    stop_reason="tool_use", usage=None),
+              response("Done: the 18-inch large is now $24, saved as a draft. Press "
+                       "“Publish changes” to make it live.")]
+    calls = []
+    llm._create = lambda **call: (calls.append(call), script.pop(0))[1]
+    try:
+        out = assistant.answer("o@x.com", cross, cfg, "Raise the large pizza to $24")
+        check("the change is made, then the model is told and replies",
+              len(calls) == 2 and out["actions"] and out["reply"].startswith("Done:"), out)
+        sent = calls[1]["messages"]
+        check("…the second call carries the tool use and its result",
+              sent[-2]["role"] == "assistant" and sent[-2]["content"][-1]["type"] == "tool_use"
+              and sent[-1]["content"][0]["type"] == "tool_result"
+              and "Saved as a draft" in sent[-1]["content"][0]["content"]
+              and not sent[-1]["content"][0].get("is_error"))
+        turns = db.recent_assistant_turns(business_id=7, user_email="o@x.com")
+        check("the change is recorded on the assistant's turn",
+              turns[-1]["actions"][0]["lines"] == ["18-inch large pizza: $22 → $24"])
+        msgs = assistant._messages(turns, "undo that")
+        check("…and the next question sees it (so 'undo that' works)",
+              "[Saved as drafts: 18-inch large pizza: $22 → $24]" in msgs[-2]["content"])
+
+        bad = Block(type="tool_use", id="t2", name="change_menu_price",
+                    input={"item": "calzone", "option": "large", "price": "12"})
+        script[:] = [types.SimpleNamespace(content=[bad], stop_reason="tool_use", usage=None),
+                     response("There's no calzone on your menu. Want me to add one?")]
+        calls.clear()
+        out = assistant.answer("o@x.com", cross, cfg, "Make the calzone $12")
+        check("a refused change goes back as an error, and nothing is recorded",
+              calls[1]["messages"][-1]["content"][0].get("is_error") is True
+              and out["actions"] == [] and "calzone" in out["reply"], out)
+
+        many = [Block(type="tool_use", id=f"m{k}", name="change_menu_price",
+                      input={"item": "wings", "option": "10 wings", "price": str(13 + k)})
+                for k in range(3)]
+        script[:] = [types.SimpleNamespace(content=many, stop_reason="tool_use", usage=None),
+                     response("Done.")]
+        real_max, aa.MAX_CHANGES = aa.MAX_CHANGES, 2
+        try:
+            out = assistant.answer("o@x.com", cross, cfg, "wings")
+        finally:
+            aa.MAX_CHANGES = real_max
+        check("no more than MAX_CHANGES changes per question",
+              len(out["actions"]) == 2 and "more than 2 changes" in
+              str(calls[-1]["messages"][-1]["content"][2]["content"]), out["actions"])
+
+        def fail_second(**call):
+            if fail_second.n:
+                raise RuntimeError("API down")
+            fail_second.n += 1
+            return types.SimpleNamespace(content=[Block(
+                type="tool_use", id="f1", name="change_menu_price",
+                input={"item": "salad", "option": "garden salad", "price": "11"})],
+                stop_reason="tool_use", usage=None)
+        fail_second.n = 0
+        llm._create = fail_second
+        out = assistant.answer("o@x.com", cross, cfg, "garden salad to 11")
+        check("a failure after a change still says what was drafted",
+              out["actions"] and "garden salad: $10 → $11" in out["reply"], out)
+
+        script[:] = [response("Your menu tab is off, so there's no menu to change.")]
+        llm._create = lambda **call: (calls.append(call), script.pop(0))[1]
+        assistant.answer("b@x.com", bob, bob_cfg, "Raise my drain cleaning price")
+        check("Bob's gets no menu tools", [t["name"] for t in calls[-1]["tools"]]
+              == ["hand_off_to_support"])
+    finally:
+        llm._create = real_create
+        menu.discard_draft(7)
+
     heading("the route")
     routes = (ROOT / "admin" / "support_routes.py").read_text()
     ask = routes.split("def help_ask(")[1].split("\n@")[0]
@@ -223,6 +394,10 @@ def main():
           and hasattr(ratelimit, "assistant"))
     check("a failure is logged and told to the owner, never a 500",
           "log.exception(" in ask and "couldn't answer just now" in ask)
+    check("Publish and Discard pressed on the Help page come back to it",
+          'request.form.get("back") == "help"' in (ROOT / "admin" / "routes.py").read_text()
+          and "ui.unpublished_banner(business, 'help')" in
+          (ROOT / "admin" / "templates" / "admin" / "help.html").read_text())
     check("assistant turns are cleared with a demo business",
           ("assistant_turns", "business_id") in db._TENANT_TABLES)
 

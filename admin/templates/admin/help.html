@@ -14,7 +14,8 @@
     assistant how to do it, or write to us. A person reads every message.</div>
 </div>
 
-{% if business %}{{ ui.destinations(business, '') }}{% endif %}
+{% if business %}{{ ui.destinations(business, '') }}
+{{ ui.unpublished_banner(business, 'help') }}{% endif %}
 
 <div class="stack">
 <div class="card" id="assistant">
@@ -36,6 +37,14 @@
       <div class="assistant-turn assistant-turn-{{ t.role }}">
         <div class="assistant-who">{{ 'You' if t.role == 'owner' else 'Assistant' }}</div>
         <div class="assistant-text">{{ t.content }}</div>
+        {% if t.actions %}
+        <div class="assistant-actions">
+          <div class="assistant-actions-title">Saved as a draft</div>
+          <ul>{% for a in t.actions %}{% for line in a.lines %}<li>{{ line }}</li>{% endfor %}{% endfor %}</ul>
+          <div>Customers see it once you press “Publish changes”.
+            {% if business %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
+        </div>
+        {% endif %}
         {% if t.handoff and loop.last %}
         <div class="assistant-handoff">I've drafted a message to support below from this
           conversation. Check it, then press “Send to support”.</div>
@@ -44,10 +53,16 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="hint">How do I add a menu item? Where do I change my hours? Why isn't my
-      new price showing? The assistant knows the portal and your setup. It can't see
-      your customers' conversations or appointments, and it can't change anything for
-      you yet.</p>
+    {% if business and menu_switched_on(business) %}
+    <p class="hint">Where do I change my hours? Why isn't my new price showing? Or ask it
+      to make a menu change: “raise the large to $24”. Menu changes it makes are saved
+      as drafts for you to publish; everything else, it tells you where to go. It can't
+      see your customers' conversations or appointments.</p>
+    {% else %}
+    <p class="hint">How do I cancel an appointment? Where do I change my hours? Why isn't
+      my new section showing? The assistant knows the portal and your setup, and tells
+      you where to go. It can't see your customers' conversations or appointments.</p>
+    {% endif %}
     {% endif %}
     <form method="POST" action="{{ url_for('admin.help_ask') }}" class="assistant-ask">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -55,7 +70,7 @@
       {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
       <label for="assistant-question" class="sr-only">Your question</label>
       <input type="text" id="assistant-question" name="question" maxlength="{{ max_question }}"
-             placeholder="Ask how to do something" autocomplete="off" required
+             placeholder="{{ 'Ask how to do something, or for a menu change' if business and menu_switched_on(business) else 'Ask how to do something' }}" autocomplete="off" required
              {{ 'autofocus' if turns }}>
       <button class="btn btn-primary" type="submit" data-busy-label="Thinking…">Ask</button>
     </form>

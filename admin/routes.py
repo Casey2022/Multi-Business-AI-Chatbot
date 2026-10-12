@@ -403,6 +403,10 @@ _BACK_TO = {"knowledge": "admin.knowledge", "menu": "admin.menu_page",
 
 
 def _back_to(business_id):
+    # The Help page too: the owner assistant drafts menu changes there, and
+    # the banner lets the owner publish them without leaving the page.
+    if request.form.get("back") == "help":
+        return redirect(url_for("admin.help_page") + "#assistant")
     endpoint = _BACK_TO.get(request.form.get("back", ""), "admin.knowledge")
     return redirect(url_for(endpoint, business_id=business_id))
 

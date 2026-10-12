@@ -154,6 +154,16 @@ Ask through Help (**Send to support**) for any of these:
 
 On the Help page you can ask the owner assistant how to do something
 (**Ask the assistant**), or write to a person with **Send to support**.
+
+If you have a Menu tab, the assistant can also change your menu for you:
+ask it ("raise the large pizza to $24", "add a calzone at $12", "take the
+gluten-free crust off"). It changes prices, options, extras and items,
+and saves each change as a draft, exactly as if you'd made it on the Menu
+page: it's listed under "Saved as a draft" and in the banner, and
+customers don't see it until you press **Publish changes**. To undo it,
+ask the assistant to change it back, or press **Discard menu changes** on
+the Menu page. It doesn't change anything else (knowledge-base sections,
+settings or appointments); for those it tells you where to go.
 The support message carries the page you were on and the version of the
 app, never your customers' conversations or appointments, and you'll see
 the reply on the Help page.

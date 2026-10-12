@@ -291,6 +291,36 @@ def replace_item(menu_list, index, entry, expected_name):
     return items, None
 
 
+def rows_to_form(rows):
+    """What the browser posts for these rows (the inverse of form_rows).
+
+    The owner assistant changes an item by changing its rows, the way an
+    owner edits the boxes, and posting them through parse_item_form, so a
+    change it makes passes exactly the checks a typed one does."""
+    f = {"item": rows.get("item", ""), "aliases": rows.get("aliases", ""),
+         "section": rows.get("section", ""), "each": rows.get("each", "") or "",
+         "each_note": rows.get("each_note", "") or "",
+         "sold_by": str(rows.get("sold_by") or ""), "minimum": str(rows.get("minimum") or "")}
+    for i, r in enumerate(rows.get("options") or []):
+        for k in ("original", "name", "price", "note", "order"):
+            f[f"opt{i}_{k}"] = str(r.get(k, "") or "")
+        if r.get("remove"):
+            f[f"opt{i}_remove"] = "yes"
+    for i, r in enumerate(rows.get("add_ons") or []):
+        for k in ("name", "on", "price"):
+            f[f"add{i}_{k}"] = str(r.get(k, "") or "")
+        if r.get("each"):
+            f[f"add{i}_each"] = "yes"
+        if r.get("remove"):
+            f[f"add{i}_remove"] = "yes"
+    for i, r in enumerate(rows.get("packs") or []):
+        f[f"pack{i}_count"] = str(r.get("count", "") or "")
+        f[f"pack{i}_price"] = str(r.get("price", "") or "")
+        if r.get("remove"):
+            f[f"pack{i}_remove"] = "yes"
+    return f
+
+
 def form_rows(form):
     """The rows the page shows, from a submitted form (to re-show it with
     the owner's typing intact after an error)."""

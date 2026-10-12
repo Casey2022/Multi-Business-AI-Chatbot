@@ -37,22 +37,8 @@ def heading(text):
 
 
 def to_form(rows):
-    f = {"item": rows["item"], "aliases": rows["aliases"], "section": rows["section"],
-         "each": rows["each"], "each_note": rows["each_note"],
-         "sold_by": str(rows["sold_by"]), "minimum": str(rows["minimum"])}
-    for i, r in enumerate(rows["options"]):
-        for k in ("original", "name", "price", "note", "order"):
-            f[f"opt{i}_{k}"] = str(r.get(k, ""))
-    for i, r in enumerate(rows["add_ons"]):
-        for k in ("name", "on", "price"):
-            f[f"add{i}_{k}"] = r[k]
-        if r["each"]:
-            f[f"add{i}_each"] = "yes"
-    for i, r in enumerate(rows["packs"]):
-        f[f"pack{i}_count"] = str(r["count"])
-        f[f"pack{i}_price"] = r["price"]
-    return f
-
+    import menu_form
+    return menu_form.rows_to_form(rows)
 
 def main():
     helpers._load_scheduler()

@@ -755,6 +755,7 @@ def differences(old_config, new_config):
     lines = []
     for it in items(new_config):
         was = before.get(it["item"])
+        start = len(lines)
         if was is None:
             lines.append(f"new on the menu: {it['item']} ({render_item(it)})")
             continue
@@ -783,4 +784,25 @@ def differences(old_config, new_config):
                     lines.append(f"new: {name} on {where} {price_text(price)}")
                 elif old != price:
                     lines.append(f"{name} on {where}: {price_text(old)} → {price_text(price)}")
+        # What's gone. (Without these, removing something left the banner
+        # saying only "knowledge-base changes".)
+        for option in was["options"]:
+            if option not in it["options"]:
+                lines.append(f"removed: {_label(was, option)}")
+        for name, spec in was["add_ons"].items():
+            new_prices = it["add_ons"].get(name, {"prices": {}})["prices"]
+            for option in spec["prices"]:
+                if option not in new_prices:
+                    lines.append(f"removed: {name} on {'any' if option == 'any' else option}")
+        if was["each"] is not None and it["each"] is None:
+            lines.append(f"{it['item']}: no longer sold by the piece")
+        for count in was["packs"]:
+            if count not in it["packs"]:
+                lines.append(f"removed: {it['item']}, {count} for {price_text(was['packs'][count])}")
+        if len(lines) == start and render_item(it) != render_item(was):
+            lines.append(f"{it['item']}: notes or wording changed")
+    names = {it["item"] for it in items(new_config)}
+    for name in before:
+        if name not in names:
+            lines.append(f"removed from the menu: {name}")
     return lines
