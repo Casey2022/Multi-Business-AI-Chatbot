@@ -200,7 +200,7 @@ URLs worth knowing:
 | `/demo` | the sandbox: pick a business and get your own copy |
 | `/demo/start` | mints that copy and signs you in as its owner |
 | `/admin` | the owner's portal |
-| `/admin/help` | an owner asks the operator for help (page and error reference attached) |
+| `/admin/help` | an owner asks the assistant how to do something (`assistant.py`, answering from `admin/owner_guide.md`), or asks the operator for help (page and error reference attached) |
 | `/admin/support` | the operator's inbox of help requests |
 | `/webchat/<slug>` | the JSON endpoint the chat page posts to |
 | `/sms` | the Twilio webhook |

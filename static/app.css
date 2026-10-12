@@ -930,3 +930,28 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-weight: 400; fo
 }
 .error-card { max-width: 560px; margin: var(--s6) auto; }
 .error-card .card-pad { display: flex; flex-direction: column; gap: var(--s3); }
+
+/* ---------------------------------------------------------------------- *
+ * Owner assistant (Help page)
+ * ---------------------------------------------------------------------- */
+.inline-form { display: inline; margin: 0; }
+.assistant-thread {
+  display: flex; flex-direction: column; gap: var(--s3);
+  margin-bottom: var(--s4);
+  /* No scroll box: at most 12 turns are shown, and a box would open
+     scrolled to the top, hiding the answer just given. */
+}
+.assistant-turn {
+  max-width: 85%; padding: var(--s2) var(--s3); border-radius: var(--radius);
+  font-size: var(--text-md); line-height: 1.5;
+}
+.assistant-turn-owner { align-self: flex-end; background: var(--pen-wash); }
+.assistant-turn-assistant { align-self: flex-start; background: var(--surface-sunk); }
+.assistant-who { font-size: var(--text-xs); color: var(--ink-faint); margin-bottom: 2px; }
+.assistant-text { white-space: pre-line; color: var(--ink); }
+.assistant-handoff {
+  margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--rule);
+  font-size: var(--text-sm); color: var(--pending);
+}
+.assistant-ask { display: flex; gap: var(--s2); }
+.assistant-ask input[type="text"] { flex: 1; min-width: 0; }

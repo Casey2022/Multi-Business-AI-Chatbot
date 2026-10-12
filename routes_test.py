@@ -146,6 +146,18 @@ def main():
     print(f"  endpoints:  {len(endpoints)}")
     print(f"  url_for references: {len(referenced)} distinct")
     check("some routes were found at all", len(endpoints) > 5, f"{len(endpoints)}")
+    # The readers above skip a file that doesn't parse, so its routes would
+    # just vanish from the list (2026-10-12: a syntax error in
+    # support_routes.py showed up as six "no route registers it" failures).
+    broken = []
+    for path in sorted(ROOT.rglob("*.py")):
+        if "venv" in path.parts:
+            continue
+        try:
+            ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as e:
+            broken.append(f"{path.relative_to(ROOT)}:{e.lineno}: {e.msg}")
+    check("every Python file parses", not broken, "; ".join(broken))
 
     heading("Every url_for names a real endpoint")
     for endpoint in sorted(referenced):

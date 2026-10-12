@@ -296,6 +296,25 @@ def init_db():
         )
     """)
 
+    # assistant_turns — the owner assistant on the Help page (assistant.py).
+    # One row per message, owner or assistant, per person per business; the
+    # last few are the conversation the next reply sees. Owners' own words
+    # about their own business, never customer data. `handoff` holds the
+    # summary when the assistant offered to pass the question to support.
+    # `actions` (JSON) records any draft change the assistant made.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS assistant_turns (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id  INTEGER,
+            user_email   TEXT    NOT NULL,
+            role         TEXT    NOT NULL,
+            content      TEXT    NOT NULL,
+            handoff      TEXT,
+            actions      TEXT,
+            created_at   TEXT    NOT NULL
+        )
+    """)
+
     # --- migrations -------------------------------------------------------
     # CREATE TABLE IF NOT EXISTS is a no-op once a table exists, so a new
     # column on an existing table needs an explicit ALTER. Guarded by an
@@ -637,6 +656,7 @@ _TENANT_TABLES = (
     ("config_overrides",   "business_id"),
     ("published_snapshot", "business_id"),
     ("upload_proposals",   "business_id"),
+    ("assistant_turns",    "business_id"),
     ("users",              "business_id"),
 )
 
@@ -1250,6 +1270,57 @@ def delete_upload_proposal(business_id):
     conn.close()
 
 
+# --- owner assistant (the Help page; see assistant.py) ---------------------
+
+def _business_clause(business_id):
+    return ("business_id IS NULL", []) if business_id is None else ("business_id = ?", [business_id])
+
+
+def add_assistant_turn(*, business_id, user_email, role, content, handoff=None,
+                       actions=None, created_at=None):
+    import json as _json
+    from datetime import datetime as _dt
+    conn = get_connection()
+    cur = conn.execute(
+        "INSERT INTO assistant_turns (business_id, user_email, role, content, handoff, "
+        "actions, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (business_id, user_email, role, content, handoff,
+         _json.dumps(actions) if actions else None, created_at or _dt.now().isoformat()))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
+
+
+def recent_assistant_turns(*, business_id, user_email, limit=12):
+    """The last `limit` turns for one person at one business, oldest first."""
+    import json as _json
+    where, args = _business_clause(business_id)
+    conn = get_connection()
+    rows = conn.execute(
+        f"SELECT * FROM assistant_turns WHERE user_email = ? AND {where} "
+        f"ORDER BY id DESC LIMIT ?", [user_email, *args, limit]).fetchall()
+    conn.close()
+    out = []
+    for row in reversed(rows):
+        d = dict(row)
+        try:
+            d["actions"] = _json.loads(d["actions"]) if d["actions"] else []
+        except ValueError:
+            d["actions"] = []
+        out.append(d)
+    return out
+
+
+def clear_assistant_turns(*, business_id, user_email):
+    where, args = _business_clause(business_id)
+    conn = get_connection()
+    conn.execute(f"DELETE FROM assistant_turns WHERE user_email = ? AND {where}",
+                 [user_email, *args])
+    conn.commit()
+    conn.close()
+
+
 # --- support requests (the Help page; see support.py) ----------------------
 
 def add_support_request(*, business_id, business_name, user_email, contact,
@@ -1618,6 +1689,8 @@ GEOCODE_RETENTION_DAYS = int(os.environ.get("GEOCODE_RETENTION_DAYS", "30"))
 # Resolved support requests: long enough to spot a problem that keeps coming
 # back, not forever. Open ones are never pruned; someone still owes a reply.
 SUPPORT_RETENTION_DAYS = int(os.environ.get("SUPPORT_RETENTION_DAYS", "180"))
+# Owner-assistant conversations: how-to chat, useful for a few weeks at most.
+ASSISTANT_RETENTION_DAYS = int(os.environ.get("ASSISTANT_RETENTION_DAYS", "30"))
 
 
 def _cutoff(days):
@@ -1661,6 +1734,10 @@ def prune_personal_data(now=None):
         cur = conn.execute("DELETE FROM support_requests WHERE status = 'resolved' "
                            "AND resolved_at < ?", (_cutoff(SUPPORT_RETENTION_DAYS),))
         removed["support_requests"] = cur.rowcount
+
+        cur = conn.execute("DELETE FROM assistant_turns WHERE created_at < ?",
+                           (_cutoff(ASSISTANT_RETENTION_DAYS),))
+        removed["assistant_turns"] = cur.rowcount
 
         conn.commit()
     finally:

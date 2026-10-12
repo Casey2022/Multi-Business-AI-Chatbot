@@ -33,14 +33,23 @@ def open_support_count():
 
 
 def _render_help(user, business, page, error_id, message="", contact="", status=200):
+    import assistant
+    from db import recent_assistant_turns
     is_demo = bool(business and business.get("is_demo"))
+    turns = recent_assistant_turns(business_id=(business or {}).get("id"),
+                                   user_email=user["email"], limit=assistant.HISTORY_TURNS)
+    # After a hand-off, the support message is drafted from the conversation
+    # (unless the owner is already writing one).
+    drafted = assistant.support_draft(turns) if not message else ""
     return render_template(
         "admin/help.html",
+        turns=turns, max_question=assistant.MAX_QUESTION,
+        drafted=bool(drafted),
         business=business, page=page, error_id=error_id,
         attached=support.context_for(business, page, error_id),
         needs_contact=is_demo,
         reply_to=None if is_demo else (user["email"] if support.looks_like_email(user["email"]) else None),
-        message=message, contact=contact, max_message=support.MAX_MESSAGE,
+        message=message or drafted, contact=contact, max_message=support.MAX_MESSAGE,
         requests=list_support_requests(user_email=user["email"], limit=20),
     ), status
 
@@ -78,6 +87,57 @@ def help_page():
         return redirect(url_for("admin.help_page"))
 
     return _render_help(user, business, page, error_id)
+
+
+def _back_to_help(page, error_id, anchor="assistant"):
+    args = {k: v for k, v in (("from", page), ("error", error_id)) if v}
+    return redirect(url_for("admin.help_page", **args) + f"#{anchor}")
+
+
+@admin_bp.route("/help/ask", methods=["POST"])
+@login_required
+def help_ask():
+    """A question for the owner assistant (assistant.py). The answer lands in
+    the conversation on the Help page."""
+    import assistant
+    from config import load_config
+    from admin.routes import pending_changes
+    user = current_user()
+    business = get_business_by_id(user["business_id"]) if user["business_id"] else None
+    page = support.clean_page(request.form.get("from"))
+    error_id = support.clean_error_id(request.form.get("error"))
+    try:
+        question = assistant.clean_question(request.form.get("question"))
+    except assistant.AssistantProblem as e:
+        flash(str(e), "error")
+        return _back_to_help(page, error_id)
+    allowed, wait = ratelimit.assistant(user["email"], _login_ip())
+    if not allowed:
+        minutes = max(1, round(wait / 60))
+        flash(f"You've asked a lot of questions in a short time. Try again in about "
+              f"{minutes} minute{'' if minutes == 1 else 's'}, or send it to support "
+              f"below.", "error")
+        return _back_to_help(page, error_id)
+    try:
+        config = load_config(business["config_path"], business["id"]) if business else {}
+        assistant.answer(user["email"], business, config, question,
+                         pending=pending_changes(business) if business else [], page=page)
+    except Exception:
+        log.exception("Owner assistant failed (business %s)", (business or {}).get("id"))
+        flash("The assistant couldn't answer just now. Try again in a moment, or "
+              "send your question to support below.", "error")
+    return _back_to_help(page, error_id)
+
+
+@admin_bp.route("/help/assistant/clear", methods=["POST"])
+@login_required
+def help_assistant_clear():
+    """Start the assistant conversation over."""
+    from db import clear_assistant_turns
+    user = current_user()
+    clear_assistant_turns(business_id=user["business_id"] or None, user_email=user["email"])
+    return _back_to_help(support.clean_page(request.form.get("from")),
+                         support.clean_error_id(request.form.get("error")))
 
 
 @admin_bp.route("/support")

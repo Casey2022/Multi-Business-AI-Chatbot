@@ -10,19 +10,66 @@
 
 <div class="page-header">
   <h1>Help</h1>
-  <div class="subtitle">Stuck, or something not working the way you expect? Ask us.
-    A person reads every message.</div>
+  <div class="subtitle">Stuck, or something not working the way you expect? Ask the
+    assistant how to do it, or write to us. A person reads every message.</div>
 </div>
 
 {% if business %}{{ ui.destinations(business, '') }}{% endif %}
 
 <div class="stack">
-<form method="POST" action="{{ url_for('admin.help_page') }}" class="card">
+<div class="card" id="assistant">
+  <div class="card-title split-baseline">
+    <span>Ask the assistant</span>
+    {% if turns %}
+    <form method="POST" action="{{ url_for('admin.help_assistant_clear') }}" class="inline-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% if page %}<input type="hidden" name="from" value="{{ page }}">{% endif %}
+      {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
+      <button class="btn btn-nav btn-sm" type="submit">Start over</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="card-pad">
+    {% if turns %}
+    <div class="assistant-thread">
+      {% for t in turns %}
+      <div class="assistant-turn assistant-turn-{{ t.role }}">
+        <div class="assistant-who">{{ 'You' if t.role == 'owner' else 'Assistant' }}</div>
+        <div class="assistant-text">{{ t.content }}</div>
+        {% if t.handoff and loop.last %}
+        <div class="assistant-handoff">I've drafted a message to support below from this
+          conversation. Check it, then press “Send to support”.</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="hint">How do I add a menu item? Where do I change my hours? Why isn't my
+      new price showing? The assistant knows the portal and your setup. It can't see
+      your customers' conversations or appointments, and it can't change anything for
+      you yet.</p>
+    {% endif %}
+    <form method="POST" action="{{ url_for('admin.help_ask') }}" class="assistant-ask">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% if page %}<input type="hidden" name="from" value="{{ page }}">{% endif %}
+      {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
+      <label for="assistant-question" class="sr-only">Your question</label>
+      <input type="text" id="assistant-question" name="question" maxlength="{{ max_question }}"
+             placeholder="Ask how to do something" autocomplete="off" required
+             {{ 'autofocus' if turns }}>
+      <button class="btn btn-primary" type="submit" data-busy-label="Thinking…">Ask</button>
+    </form>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('admin.help_page') }}" class="card" id="support">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
   {% if page %}<input type="hidden" name="from" value="{{ page }}">{% endif %}
   {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
 
-  <div class="card-title">Ask for help</div>
+  <div class="card-title">Ask a person</div>
+  {% if drafted %}<p class="hint card-pad">Drafted from your conversation with the
+    assistant. Change anything you like before sending.</p>{% endif %}
 
   <div class="field">
     <label for="help-message">What's going on?</label>

@@ -240,6 +240,9 @@ def main():
     heading("Teardown")
     # A photo's proposed changes, waiting for review, belong to the demo too.
     db.save_upload_proposal(clone["id"], "Large 18\" $25", [])
+    # So is the owner assistant's conversation.
+    db.add_assistant_turn(business_id=clone["id"], user_email="demo@example.com",
+                          role="owner", content="How do I add a menu item?")
     before = row_counts(clone["id"])
     check("the clone had rows worth deleting", all(before.values()), before)
 

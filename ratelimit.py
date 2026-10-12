@@ -200,3 +200,18 @@ def support(user_email, ip):
         (f"support:{user_email}", SUPPORT_PER_DAY, 86400),
         (f"support-ip:{ip}",      SUPPORT_IP_PER_HOUR, 3600),
     ])
+
+
+ASSISTANT_PER_HOUR    = _limit("ASSISTANT_PER_HOUR", 30)
+ASSISTANT_PER_DAY     = _limit("ASSISTANT_PER_DAY", 150)
+ASSISTANT_IP_PER_HOUR = _limit("ASSISTANT_IP_PER_HOUR", 60)
+
+
+def assistant(user_email, ip):
+    """Limits for one question to the owner assistant. Each is a model call
+    on the shared API budget, and demo visitors can ask, so per IP too."""
+    return check_all([
+        (f"assistant:{user_email}", ASSISTANT_PER_HOUR, 3600),
+        (f"assistant:{user_email}", ASSISTANT_PER_DAY, 86400),
+        (f"assistant-ip:{ip}",      ASSISTANT_IP_PER_HOUR, 3600),
+    ])
