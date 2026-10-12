@@ -389,6 +389,39 @@ def knowledge(business_id):
     )
 
 
+# Where Publish and Discard send you back to: the page you pressed them on.
+# Only these named pages, never a URL from the form (an open redirect).
+_BACK_TO = {"knowledge": "admin.knowledge", "menu": "admin.menu_page",
+            "settings": "admin.settings"}
+
+
+def _back_to(business_id):
+    endpoint = _BACK_TO.get(request.form.get("back", ""), "admin.knowledge")
+    return redirect(url_for(endpoint, business_id=business_id))
+
+
+@admin_bp.app_template_global()
+def pending_changes(business):
+    """What Publish would put live, as short lines ([] when nothing waits).
+    The banner on the Knowledge base, Menu and Settings pages shows these."""
+    from db import unpublished_changes
+    fresh = get_business_by_id(business["id"]) if business else None
+    if not fresh or not fresh["documents_dirty"]:
+        return []
+    changes = unpublished_changes(fresh)
+    lines = []
+    if changes["edited"]:
+        n = len(changes["edited"])
+        lines.append(f"{n} section{'' if n == 1 else 's'} edited")
+    if changes["new"]:
+        n = len(changes["new"])
+        lines.append(f"{n} new section{'' if n == 1 else 's'}")
+    if changes["deleted"]:
+        lines.append("deleted: " + ", ".join(changes["deleted"]))
+    lines += [f"menu: {line}" for line in menu_changes_waiting(fresh)]
+    return lines or ["knowledge-base changes"]
+
+
 def section_price_lines(business, sections):
     """{section id: the menu price lines that section's chunk carries}. The
     owner sees them read-only under the section: the menu (config menu:) is
@@ -791,15 +824,15 @@ def knowledge_discard(business_id):
     had_menu_draft = menu.draft_menu(business_id) is not None
     menu.discard_draft(business_id)
     if discard_document_changes(business_id, updated_by=current_user()["email"]):
-        flash("Changes discarded — the sections are back to what customers "
-              "see. Anything you'd written is still in each section's History.",
-              "success")
+        flash("Changes discarded — the sections and menu are back to what "
+              "customers see. Anything you'd written is still in each "
+              "section's History.", "success")
     elif had_menu_draft:
         flash("Menu changes discarded.", "success")
     else:
         flash("There's no published version saved to go back to yet. Publish "
               "once, and Discard will work from then on.", "error")
-    return redirect(url_for("admin.knowledge", business_id=business_id))
+    return _back_to(business_id)
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/add", methods=["POST"])
@@ -930,7 +963,7 @@ def knowledge_publish(business_id):
         flash(f"Publishing failed: {e}. Your previous content is still live.",
               "error")
 
-    return redirect(url_for("admin.knowledge", business_id=business_id))
+    return _back_to(business_id)
 
 
 @admin_bp.route("/knowledge/<int:document_id>/history")

@@ -110,7 +110,24 @@ def main():
     js = (ROOT / "static" / "unsaved-edits.js").read_text()
     check("each section has the publish chips",
           "Changed since publish" in page and "New since publish" in page)
-    check("deleted sections are named in the banner", "changes.deleted" in page)
+    macros = (ROOT / "admin" / "templates" / "admin" / "_macros.html").read_text()
+    check("deleted sections are named in the banner (pending_changes → the shared banner)",
+          'lines.append("deleted: " + ", ".join(changes["deleted"]))' in routes
+          and "ui.unpublished_banner(business, 'knowledge')" in page
+          and "pending_changes(business)" in macros)
+    settings = (ROOT / "admin" / "templates" / "admin" / "settings.html").read_text()
+    menu_page = (ROOT / "admin" / "templates" / "admin" / "menu.html").read_text()
+    check("the same banner, with Publish, on the Menu and Settings pages",
+          "ui.unpublished_banner(business, 'settings')" in settings
+          and "ui.unpublished_banner(business, 'menu')" in menu_page)
+    check("Publish and Discard go back to the page they were pressed on",
+          routes.split("def knowledge_publish(")[1].count("return _back_to(business_id)") >= 1
+          and "return _back_to(business_id)" in routes.split("def knowledge_discard(")[1][:2000]
+          and macros.count('name="back" value="{{ back }}"') == 2)
+    check("…named pages only, never a URL from the form",
+          "_BACK_TO.get(request.form.get(\"back\", \"\"), \"admin.knowledge\")" in routes)
+    check("Settings says its own changes don't wait for Publish",
+          "take effect" in macros and "back == 'settings'" in macros)
     check("section and add forms are tracked, with their buttons marked",
           page.count("data-track-edits") == 2 and page.count("data-save-button") == 2)
     check("the Unsaved chip starts hidden (the page is right without the script)",

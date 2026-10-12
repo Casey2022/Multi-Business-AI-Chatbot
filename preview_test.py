@@ -376,9 +376,11 @@ def main():
     check("Discard has a POST route that checks access",
           '"/business/<int:business_id>/knowledge/discard", methods=["POST"]' in routes
           and "require_business_access(business_id)" in routes.split("def knowledge_discard")[1][:300])
-    check("the unpublished banner offers Discard beside Publish, with CSRF",
-          "url_for('admin.knowledge_discard'" in page and
-          "_csrf_token" in page.split("knowledge_discard")[1][:200])
+    macros = (ROOT / "admin" / "templates" / "admin" / "_macros.html").read_text()
+    check("the unpublished banner (shared macro) offers Discard beside Publish, with CSRF",
+          "ui.unpublished_banner(business, 'knowledge')" in page
+          and "url_for('admin.knowledge_discard'" in macros
+          and "_csrf_token" in macros.split("knowledge_discard")[1][:200])
     check("the page shows Now and After for each result",
           "r.now" in page and "r.after" in page and "After you publish" in page)
 

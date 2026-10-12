@@ -39,3 +39,34 @@
     {% endfor %}
   </div>
 {% endmacro %}
+
+{% macro unpublished_banner(business, back) %}
+  {# Knowledge-base and menu edits are drafts until Publish. The same banner
+     on every page that makes them (and Settings), with Publish and Discard
+     returning to the page they were pressed on (`back`). Extra buttons can
+     be passed with {% call %}. #}
+  {% set pending = pending_changes(business) %}
+  {% if pending %}
+  <div class="banner">
+    <div><strong>Unpublished changes.</strong> Customers are still being answered
+      from the previous version.
+      <div class="cell-sub">Waiting: {{ pending | join("; ") }}.</div>
+      {% if back == 'settings' %}<div class="cell-sub">Settings on this page take effect
+        as soon as you save them; Publish is for knowledge-base and menu changes.</div>{% endif %}
+    </div>
+    <div class="banner-actions">
+      {% if caller is defined %}{{ caller() }}{% endif %}
+      <form method="POST" action="{{ url_for('admin.knowledge_discard', business_id=business.id) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <button class="btn" type="submit">Discard all changes</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <button class="btn btn-primary" type="submit">Publish changes</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+{% endmacro %}

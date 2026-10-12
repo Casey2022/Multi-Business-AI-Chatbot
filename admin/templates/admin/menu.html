@@ -111,22 +111,14 @@
 
 {{ ui.destinations(business, 'menu') }}
 
-{% if waiting %}
-<div class="banner">
-  <div><strong>Unpublished menu changes.</strong> Customers still get the published prices.
-    <div class="cell-sub">{{ waiting | join("; ") }}.</div></div>
-  <div class="banner-actions">
-    <form method="POST" action="{{ url_for('admin.menu_discard', business_id=business.id) }}">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-      <button class="btn" type="submit">Discard menu changes</button>
-    </form>
-    <form method="POST" action="{{ url_for('admin.knowledge_publish', business_id=business.id) }}">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-      <button class="btn btn-primary" type="submit">Publish changes</button>
-    </form>
-  </div>
-</div>
-{% endif %}
+{% call ui.unpublished_banner(business, 'menu') %}
+  {% if waiting %}
+  <form method="POST" action="{{ url_for('admin.menu_discard', business_id=business.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <button class="btn" type="submit">Discard menu changes</button>
+  </form>
+  {% endif %}
+{% endcall %}
 
 <div class="card">
   <div class="card-pad guidance">

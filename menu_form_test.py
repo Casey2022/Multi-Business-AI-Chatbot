@@ -193,7 +193,8 @@ def main():
           'data-move="up" aria-label="Move up" hidden' in page)
     check("item forms track every field for Save and the leave warning",
           page.count('data-track-edits="any"') == 2 and 'trackAll(form)' in js)
-    check("every form has a CSRF token", page.count("csrf_token()") == 5)
+    check("every form on the page has a CSRF token (the banner's are in the macro)",
+          page.count("csrf_token()") == 4 and macros.count("csrf_token()") == 2)
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1

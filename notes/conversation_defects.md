@@ -1347,3 +1347,13 @@ Owner feedback on the menu editor (2026-10-12):
   (PLACES in _macros.html); a test checks neither page names a destination
   itself. styles_test caught an undeclared --text-base on the way.
 menu_form_test 57; ↑↓ checked in Chromium (7 checks).
+Publish from every page that makes drafts (2026-10-12, Casey): one banner
+macro (ui.unpublished_banner, fed by the pending_changes template global)
+on the Knowledge base, Menu and Settings pages: what's waiting ("1 section
+edited; menu: 6 wings $8 (new)"), Discard all, Publish. Both return to the
+page they were pressed on — a named page from a short list (_BACK_TO), never
+a URL from the form. On Settings it says its own fields take effect when
+saved. Swapping the knowledge page's banner for the macro left half the old
+one behind (cut at an inner {% endif %}); no test noticed, so
+templates_test.py now compiles every template with Jinja (proven to fail on
+a stray {% endif %}).

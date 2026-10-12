@@ -16,6 +16,8 @@
 
 {{ ui.destinations(business, 'settings') }}
 
+{{ ui.unpublished_banner(business, 'settings') }}
+
 <form method="POST" class="stack">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
