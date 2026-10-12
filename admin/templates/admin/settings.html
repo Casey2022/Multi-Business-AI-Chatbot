@@ -138,7 +138,7 @@
 
   <div class="card">
     <div class="card-title">Answers to customer questions</div>
-    <p class="hint">{{ 'Policies and anything' if choice_values['menu_enabled'] == 'yes'
+    <p class="guidance card-pad">{{ 'Policies and anything' if choice_values['menu_enabled'] == 'yes'
          else 'Prices, policies, and anything' }} customers ask about live in one place: the
       <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge
       base</a>. Add or edit a section there and press Publish.</p>
@@ -147,13 +147,15 @@
   {% if policy_lines %}
   <div class="card">
     <div class="card-title">{{ policy_lines[0].rstrip(':') }}</div>
-    <p class="hint">Set up with your operator. The assistant applies these
-      rules exactly, working out the timing itself, so it never has to
-      interpret wording. To change them, ask your operator.</p>
-    <ul>
-      {% for line in policy_lines[1:] %}<li>{{ line }}</li>
-      {% endfor %}
-    </ul>
+    <div class="guidance card-pad">
+      <p>Set up with your operator. The assistant applies these
+        rules exactly, working out the timing itself, so it never has to
+        interpret wording. To change them, ask your operator.</p>
+      <ul>
+        {% for line in policy_lines[1:] %}<li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
   {% endif %}
 

@@ -70,7 +70,7 @@
       {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
       <label for="assistant-question" class="sr-only">Your question</label>
       <input type="text" id="assistant-question" name="question" maxlength="{{ max_question }}"
-             placeholder="{{ 'Ask how to do something, or for a menu change' if business and menu_switched_on(business) else 'Ask how to do something' }}" autocomplete="off" required
+             placeholder="Ask how to do something" autocomplete="off" required
              {{ 'autofocus' if turns }}>
       <button class="btn btn-primary" type="submit" data-busy-label="Thinking…">Ask</button>
     </form>
