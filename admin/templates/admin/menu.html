@@ -28,10 +28,15 @@
     <label>Options and prices</label>
     <div class="tablewrap">
       <table class="menu-table">
-        <thead><tr><th>Option</th><th>Price</th><th>Note (said with the price)</th><th>Remove</th></tr></thead>
-        <tbody>
+        <thead><tr><th>Order</th><th>Option</th><th>Price</th><th>Note (said with the price)</th><th>Remove</th></tr></thead>
+        <tbody data-reorder>
         {% for o in rows.options %}{% set i = loop.index0 %}
           <tr>
+            <td class="menu-order">
+              <input type="text" name="opt{{ i }}_order" value="{{ o.order }}" inputmode="numeric" aria-label="Position" data-order>
+              <button class="btn btn-sm" type="button" data-move="up" aria-label="Move up" hidden>↑</button>
+              <button class="btn btn-sm" type="button" data-move="down" aria-label="Move down" hidden>↓</button>
+            </td>
             <td><input type="hidden" name="opt{{ i }}_original" value="{{ o.original }}">
                 <input type="text" name="opt{{ i }}_name" value="{{ o.name }}" aria-label="Option name" placeholder="{% if not o.name %}add an option{% endif %}"></td>
             <td><input type="text" name="opt{{ i }}_price" value="{{ o.price }}" aria-label="Price" placeholder="{% if not o.name %}e.g. 48{% endif %}"></td>

@@ -1337,3 +1337,13 @@ the card's header shows "Unsaved edits" even when it's closed, and leaving
 warns. Checked in Chromium (10 checks, desktop and phone width).
 menu_form_test 48: all 19 existing items round-trip through the form
 unchanged; the rename-carries-extras check proven to fail when removed.
+Owner feedback on the menu editor (2026-10-12):
+- Options can be put in order: an "Order" number per row, which the server
+  sorts by, and ↑/↓ buttons (static/row-order.js) that swap rows and
+  renumber them. The order is what the assistant reads, too.
+- The Menu tab was missing from the Businesses list and the appointments
+  page (an owner's first page): both had their own copy of the nav links,
+  the drift _macros.html was written to stop. All pages now read one list
+  (PLACES in _macros.html); a test checks neither page names a destination
+  itself. styles_test caught an undeclared --text-base on the way.
+menu_form_test 57; ↑↓ checked in Chromium (7 checks).

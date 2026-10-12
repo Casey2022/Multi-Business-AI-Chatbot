@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
 
 {% block title %}Appointments — {{ business.name }}{% endblock %}
 
@@ -14,15 +15,7 @@
   </div>
 </div>
 
-{# Where an owner goes next. Buttons rather than a row of links separated by
-   middots: these are the four places this business is managed from, and they
-   deserve to look like the destinations they are. #}
-<div class="toolbar toolbar-nav">
-  <a class="btn btn-nav" href="{{ url_for('admin.conversations', business_id=business.id) }}">Conversations</a>
-  <a class="btn btn-nav" href="{{ url_for('admin.calendar_view', business_id=business.id) }}">Calendar</a>
-  <a class="btn btn-nav" href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge base</a>
-  <a class="btn btn-nav" href="{{ url_for('admin.settings', business_id=business.id) }}">Settings</a>
-</div>
+{{ ui.destinations(business, 'appointments') }}
 
 <div class="card">
   {% if appointment_list %}

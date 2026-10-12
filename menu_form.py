@@ -87,7 +87,8 @@ def item_rows(entry):
     options = entry.get("options") or {}
     notes = entry.get("notes") or {}
     rows = [{"original": name, "name": name, "price": price_to_text(p),
-             "note": notes.get(name, "")} for name, p in options.items()]
+             "note": notes.get(name, ""), "order": i + 1}
+            for i, (name, p) in enumerate(options.items())]
     add_rows = []
     for add_name, spec in (entry.get("add_ons") or {}).items():
         if not isinstance(spec, dict) or "prices" not in spec:
@@ -101,8 +102,8 @@ def item_rows(entry):
         "item": entry.get("item", ""),
         "aliases": ", ".join(entry.get("aliases") or []),
         "section": entry.get("section", ""),
-        "options": rows + [{"original": "", "name": "", "price": "", "note": ""}
-                           for _ in range(BLANK_ROWS)],
+        "options": rows + [{"original": "", "name": "", "price": "", "note": "",
+                            "order": len(rows) + k + 1} for k in range(BLANK_ROWS)],
         "add_ons": add_rows + [{"name": "", "on": "any", "price": "", "each": False}
                                for _ in range(BLANK_ROWS)],
         "each": price_to_text(entry.get("each")),
@@ -164,7 +165,17 @@ def parse_item_form(form, other_item_names=()):
 
     # Options, with renames remembered so add-ons and notes follow them.
     options, notes, renamed, seen, removed = {}, {}, {}, set(), set()
-    for row in _rows(form, "opt", ("original", "name", "price", "note")):
+    # Shown in the order the owner set ("Order" numbers, or the ↑↓ buttons
+    # that renumber them): the menu lists options in this order everywhere.
+    option_rows = _rows(form, "opt", ("original", "name", "price", "note", "order"))
+    def _position(pair):
+        i, row = pair
+        try:
+            return (float(row["order"]), i)
+        except (TypeError, ValueError):
+            return (float("inf"), i)
+    option_rows = [row for _i, row in sorted(enumerate(option_rows), key=_position)]
+    for row in option_rows:
         if row["remove"] or (not row["name"] and not row["price"]):
             if row["original"]:
                 removed.add(row["original"])
@@ -285,7 +296,8 @@ def form_rows(form):
     the owner's typing intact after an error)."""
     def rows(prefix, fields, blank):
         out = [r for r in ({f: (form.get(f"{prefix}{i}_{f}") or "") for f in fields}
-                           for i in range(MAX_ROWS)) if any(r.values())]
+                           for i in range(MAX_ROWS))
+               if any(v for k, v in r.items() if k != "order")]
         return out + [dict(blank) for _ in range(BLANK_ROWS)]
     add = []
     for i in range(MAX_ROWS):
@@ -296,8 +308,8 @@ def form_rows(form):
     return {
         "item": form.get("item", ""), "aliases": form.get("aliases", ""),
         "section": form.get("section", ""),
-        "options": rows("opt", ("original", "name", "price", "note"),
-                        {"original": "", "name": "", "price": "", "note": ""}),
+        "options": rows("opt", ("original", "name", "price", "note", "order"),
+                        {"original": "", "name": "", "price": "", "note": "", "order": ""}),
         "add_ons": add + [{"name": "", "on": "any", "price": "", "each": False}
                           for _ in range(BLANK_ROWS)],
         "each": form.get("each", ""), "each_note": form.get("each_note", ""),

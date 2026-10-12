@@ -2,25 +2,40 @@
 
    The nav was pasted into nine templates once. Every time that happens the
    copies drift: one page gets a new link, another keeps a dead one, and
-   nobody notices because each page looks fine on its own. #}
+   nobody notices because each page looks fine on its own. (It happened
+   again on 2026-10-12: the Menu tab reached every business page but not
+   the Businesses list, which kept its own copy of the links. Both now read
+   PLACES.) #}
+
+{# The places a business is managed from: (key, label, short label, endpoint). #}
+{% set PLACES = [
+     ('appointments',  'Appointments',   'Appointments',  'admin.appointments'),
+     ('conversations', 'Conversations',  'Conversations', 'admin.conversations'),
+     ('calendar',      'Calendar',       'Calendar',      'admin.calendar_view'),
+     ('knowledge',     'Knowledge base', 'Knowledge',     'admin.knowledge'),
+     ('menu',          'Menu',           'Menu',          'admin.menu_page'),
+     ('settings',      'Settings',       'Settings',      'admin.settings')] %}
 
 {% macro destinations(business, current='') %}
-  {# The places a business is managed from. `current` names the page
-     you're on, which is shown as plain text rather than a link — a button
-     that reloads the page you're already looking at is a small lie. #}
+  {# `current` names the page you're on, which is shown as plain text rather
+     than a link — a button that reloads the page you're already looking at
+     is a small lie. #}
   <div class="toolbar toolbar-nav">
-    {% for key, label, endpoint in [
-         ('appointments',  'Appointments',   'admin.appointments'),
-         ('conversations', 'Conversations',  'admin.conversations'),
-         ('calendar',      'Calendar',       'admin.calendar_view'),
-         ('knowledge',     'Knowledge base', 'admin.knowledge'),
-         ('menu',          'Menu',           'admin.menu_page'),
-         ('settings',      'Settings',       'admin.settings')] %}
+    {% for key, label, short, endpoint in PLACES %}
       {% if key == current %}
         <span class="btn btn-here" aria-current="page">{{ label }}</span>
       {% else %}
         <a class="btn btn-nav" href="{{ url_for(endpoint, business_id=business.id) }}">{{ label }}</a>
       {% endif %}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro destination_links(business) %}
+  {# The same places, small, for a row in the Businesses list. #}
+  <div class="toolbar">
+    {% for key, label, short, endpoint in PLACES %}
+      <a class="btn btn-nav btn-sm" href="{{ url_for(endpoint, business_id=business.id) }}">{{ short }}</a>
     {% endfor %}
   </div>
 {% endmacro %}

@@ -889,3 +889,7 @@ details.menu-item > summary::before { content: "▸"; color: var(--ink-faint); }
 details.menu-item[open] > summary::before { content: "▾"; }
 details.menu-item > summary .menu-reads { flex-basis: 100%; font-weight: 400; font-size: var(--text-sm); color: var(--ink-soft); }
 .menu-remove { justify-content: flex-end; }
+.menu-order { white-space: nowrap; }
+.menu-table .menu-order input[type=text] { width: 3rem; min-width: 3rem; }
+.menu-order .btn { padding: 2px var(--s2); font-size: var(--text-md); line-height: 1.4;
+                   border: 1px solid var(--rule-strong); background: var(--surface); }

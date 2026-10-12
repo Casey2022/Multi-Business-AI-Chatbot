@@ -41,8 +41,8 @@ def to_form(rows):
          "each": rows["each"], "each_note": rows["each_note"],
          "sold_by": str(rows["sold_by"]), "minimum": str(rows["minimum"])}
     for i, r in enumerate(rows["options"]):
-        for k in ("original", "name", "price", "note"):
-            f[f"opt{i}_{k}"] = r[k]
+        for k in ("original", "name", "price", "note", "order"):
+            f[f"opt{i}_{k}"] = str(r.get(k, ""))
     for i, r in enumerate(rows["add_ons"]):
         for k in ("name", "on", "price"):
             f[f"add{i}_{k}"] = r[k]
@@ -117,6 +117,31 @@ def main():
     check("a starting price and a note on a new option",
           entry["options"]["party size"] == {"from": 40} and entry["notes"]["party size"] == "call ahead")
 
+    heading("putting options in order")
+    wings = cx["menu"][1]
+    form = to_form(mf.item_rows(wings))
+    form["opt3_name"], form["opt3_price"], form["opt3_order"] = "6 wings", "8", "0"
+    entry, errors = mf.parse_item_form(form)
+    check("a new option numbered 0 goes first (6 wings before 10)",
+          not errors and list(entry["options"]) == ["6 wings", "10 wings", "20 wings", "40 wings"],
+          (errors, list(entry.get("options", {}))))
+    form = to_form(mf.item_rows(wings))
+    form["opt0_order"], form["opt2_order"] = "3", "1"
+    entry, errors = mf.parse_item_form(form)
+    check("renumbering swaps them", list(entry["options"]) == ["40 wings", "20 wings", "10 wings"])
+    form = to_form(mf.item_rows(wings))
+    form["opt1_order"] = "x"
+    entry, errors = mf.parse_item_form(form)
+    check("a non-number order goes last, nothing lost",
+          list(entry["options"]) == ["10 wings", "40 wings", "20 wings"] and not errors)
+    check("the order is what the assistant reads too",
+          menu.render_item(menu.items({"menu": [entry]})[0]).startswith(
+              "Wings prices: 10 wings $12, 40 wings $40, 20 wings $22"))
+    shown = mf.form_rows({"item": "w", "opt0_name": "10 wings", "opt0_price": "1",
+                          "opt0_order": "1", "opt1_order": "2"})
+    check("an untouched blank row with only its order number isn't re-shown as filled",
+          [r["name"] for r in shown["options"]] == ["10 wings", "", ""], shown["options"])
+
     heading("mistakes come back as sentences")
     def errs(changes, base=pizza, others=()):
         f = to_form(mf.item_rows(base))
@@ -157,6 +182,15 @@ def main():
     page = (ROOT / "admin" / "templates" / "admin" / "menu.html").read_text()
     js = (ROOT / "static" / "unsaved-edits.js").read_text()
     check("Menu is in the nav", "'admin.menu_page'" in macros)
+    dash = (ROOT / "admin" / "templates" / "admin" / "dashboard.html").read_text()
+    appts = (ROOT / "admin" / "templates" / "admin" / "appointments.html").read_text()
+    check("the Businesses list uses the shared places (it had its own copy, without Menu)",
+          "ui.destination_links(b)" in dash and "admin.settings" not in dash)
+    check("so does the appointments page (an owner's first page)",
+          "ui.destinations(business, 'appointments')" in appts and "admin.settings" not in appts)
+    check("one list of places feeds both", macros.count("PLACES") >= 3)
+    check("the ↑↓ buttons start hidden (the Order numbers work without them)",
+          'data-move="up" aria-label="Move up" hidden' in page)
     check("item forms track every field for Save and the leave warning",
           page.count('data-track-edits="any"') == 2 and 'trackAll(form)' in js)
     check("every form has a CSRF token", page.count("csrf_token()") == 5)
