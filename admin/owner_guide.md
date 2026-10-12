@@ -14,7 +14,7 @@ Every business page has the same row of tabs:
 - **Conversations**: everything customers said to the assistant, and what it said back.
 - **Calendar**: this week's bookings, hour by hour.
 - **Knowledge base**: everything the assistant knows about your business. It answers customer questions from here.
-- **Menu**: your items and prices. Only businesses that keep prices on a menu have this tab (see **Prices on a menu?** under Settings).
+- **Menu**: your items and prices. Only businesses that keep prices on a menu have this tab. No Menu tab? You can switch it on yourself: in Settings, set **Prices on a menu?** to yes and press **Save settings**.
 - **Settings**: business details, how the assistant sounds, services, booking questions.
 
 At the top of every page, **Chat as a customer** opens your chat in a new

@@ -59,7 +59,7 @@ TOOLS = [
                      "extra if it isn't there yet."),
      "input_schema": {"type": "object", "properties": {
          "item": _ITEM,
-         "extra": {"type": "string", "description": "The extra's name (e.g. “topping”, “extra cheese”)."},
+         "extra": {"type": "string", "description": "The extra's name exactly as listed in the setup to change an existing one (e.g. “topping”), or a new name to add one."},
          "price": _PRICE,
          "on": {"type": "string", "description": "Which option it's priced for, exactly as listed, or “any” for every option. Default “any”."},
          "each": {"type": "boolean", "description": "True if the price is per piece (3 toppings = 3 × the price). Leave out to keep it as it is."}},
@@ -93,8 +93,16 @@ def offered(business, config):
     return TOOLS if menu.enabled(menu.with_draft(config or {}, business["id"])) else []
 
 
+def _key(name):
+    """A name for comparing: case, spacing and a plural "s" don't count, so
+    "Toppings" is the "topping" extra (2026-10-12: the model wrote
+    "toppings" and a second, duplicate extra was created)."""
+    text = " ".join(str(name or "").split()).lower()
+    return text[:-1] if text.endswith("s") and len(text) > 3 else text
+
+
 def _same(a, b):
-    return " ".join(str(a or "").split()).lower() == " ".join(str(b or "").split()).lower()
+    return _key(a) == _key(b)
 
 
 def _find_item(menu_list, name):

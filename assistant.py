@@ -98,11 +98,15 @@ def business_facts(business, config, pending=()):
                      "cleared after a while.")
     has_menu = menu.enabled(menu.with_draft(config, business.get("id"))) \
         if business.get("id") is not None else menu.enabled(config)
-    lines.append("Prices on a menu: " + ("yes (they have a Menu tab)" if has_menu
-                                         else "no (no Menu tab)"))
+    lines.append("Prices on a menu: " + (
+        "yes (they have a Menu tab)" if has_menu else
+        "no (no Menu tab; they can switch it on themselves: Settings, “Prices on a "
+        "menu?”, Yes, “Save settings”)"))
     if has_menu:
         draft = menu.with_draft(config, business.get("id"))
-        names = [f"{it['item']} ({', '.join(it['options']) or 'no options'})"
+        names = [f"{it['item']} (options: {', '.join(it['options']) or 'none'}"
+                 + (f"; extras: {', '.join(it['add_ons'])}" if it["add_ons"] else "")
+                 + (f"; sold by the piece" if it["each"] is not None else "") + ")"
                  for it in menu.items(draft)]
         lines.append("Menu items: " + ("; ".join(names) if names else "none yet"))
     try:
@@ -157,7 +161,11 @@ def system_prompt(business, config, pending=(), page=None, can_change_menu=False
         "and remind them to publish when a change needs it.\n"
         "- If the guide doesn't cover it, something seems broken, it's a change "
         "only the operator can make, or they ask for a person, say so in a "
-        "sentence and call hand_off_to_support.\n"
+        "sentence AND call hand_off_to_support in the same reply. The tool "
+        "drafts the support message for them right below this conversation, "
+        "so don't tell them to go to Help or to write to support themselves: "
+        "they're already on the Help page. Say you've drafted it below for them "
+        "to check and send.\n"
         "- Questions that aren't about running their business on this portal: "
         "say briefly that you can only help with the portal.\n"
         "- Keep it short: a sentence or two, or a short numbered list of steps. "

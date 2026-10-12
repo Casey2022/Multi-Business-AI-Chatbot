@@ -127,7 +127,14 @@ def main():
     check("…the sections, what's waiting, and the page",
           "Pizza Sizes" in setup and "large pizza $22 → $25" in setup
           and "/admin/business/7/menu" in setup)
+    check("the setup names each item's extras (so the model uses the real name)",
+          "extras: topping, gluten-free crust, vegan cheese" in setup, setup)
+    check("a hand-off is a tool call, not 'go to Help' (they're on it; eval, 2026-10-12)",
+          "AND call hand_off_to_support" in system[0]["text"]
+          and "already on the Help page" in system[0]["text"])
     bob_setup = assistant.system_prompt(bob, bob_cfg)[1]["text"]
+    check("Bob's setup says they can switch the menu on themselves (eval, 2026-10-12)",
+          "switch it on themselves" in bob_setup and "Prices on a menu?" in bob_setup)
     check("Bob's: no Menu tab, and no menu items line",
           "Prices on a menu: no" in bob_setup and "Menu items" not in bob_setup, bob_setup)
     check("an operator (no business) still gets an answer",
@@ -281,6 +288,12 @@ def main():
     text, action = change("set_extra_price", item="pizza", extra="vegan cheese", price="2.50")
     check("an extra with one price: that price, without naming the option",
           action and action["lines"] == ["vegan cheese on any: $2 → $2.50"], (text, action))
+    text, action = change("set_extra_price", item="pizza", extra="Toppings", on="14-inch medium",
+                          price="2.50")
+    d = draft_item("pizza")
+    check("'Toppings' is the topping extra, not a second one (eval, 2026-10-12)",
+          action and action["lines"] == ["topping on 14-inch medium: $2.25 → $2.50"]
+          and "Toppings" not in d["add_ons"], (text, action, list(d["add_ons"])))
     text, action = change("set_extra_price", item="pizza", extra="anchovies", price="2", each=True)
     check("a new extra is added", action and action["lines"] == ["new: anchovies on any $2"]
           and draft_item("pizza")["add_ons"]["anchovies"]["each"] is True, (text, action))

@@ -81,7 +81,9 @@ CASES = [
     {"name": "a customer's conversation (Ridgeline)", "slug": "ridgeline_contracting",
      "ask": "What did the customer named Jim ask about yesterday?",
      "must": [r"conversations"],
-     "must_not": [r"\bJim (asked|wanted|said|was asking)\b"], "handoff": False},
+     # A made-up answer says what Jim asked; "to find what Jim asked about,
+     # open Conversations" is the right one, so "what Jim asked" doesn't count.
+     "must_not": [r"(?<!what )\bJim (asked|wanted|said|was asking)\b"], "handoff": False},
     {"name": "update from a photo (Sunrise)", "slug": "sunrise_bakery_and_cafe",
      "ask": "Can I use a photo of my new menu board to update my prices?",
      "must": [r"read photo|update from a photo", r"publish"], "handoff": False},
