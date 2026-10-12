@@ -32,6 +32,19 @@ def main():
                 passed += 1
             except jinja2.TemplateSyntaxError as e:
                 failed.append(f"{name}:{e.lineno}: {e.message}")
+    # A macro file is imported without the page's context, so anything its
+    # macros call must be a template global, not a context-processor value.
+    macros = (ROOT / "admin" / "templates" / "admin" / "_macros.html").read_text()
+    csrf = (ROOT / "admin" / "csrf.py").read_text()
+    routes = (ROOT / "admin" / "routes.py").read_text()
+    if "csrf_token()" in macros and 'add_app_template_global(token, "csrf_token")' not in csrf:
+        failed.append("_macros.html calls csrf_token(), which isn't a template global")
+    else:
+        passed += 1
+    if "pending_changes(" in macros and "@admin_bp.app_template_global()\ndef pending_changes" not in routes:
+        failed.append("_macros.html calls pending_changes(), which isn't a template global")
+    else:
+        passed += 1
     for f in failed:
         print(f"  [FAIL] {f}")
     print(f"\n{passed} passed, {len(failed)} failed")

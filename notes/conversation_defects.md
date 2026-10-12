@@ -1357,3 +1357,10 @@ saved. Swapping the knowledge page's banner for the macro left half the old
 one behind (cut at an inner {% endif %}); no test noticed, so
 templates_test.py now compiles every template with Jinja (proven to fail on
 a stray {% endif %}).
+First real load of the Menu page after that (2026-10-12): "'csrf_token' is
+undefined" from the banner macro. csrf_token came from a context
+processor, and {% import %} doesn't pass the page's context to a macro
+file; my render check had put csrf_token in Jinja's globals, so it couldn't
+see the difference. Fixed by also registering it as a template global
+(admin/csrf.py); templates_test checks that anything _macros.html calls is
+a global. Lesson for render checks: give them context the way Flask does.

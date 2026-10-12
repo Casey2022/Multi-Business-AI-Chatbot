@@ -65,6 +65,14 @@ def csrf_for_templates():
     return {"csrf_token": token}
 
 
+# And as a template GLOBAL: a context processor's values are part of the
+# page's context, which an imported macro file doesn't see ({% import %} is
+# without context by default). The shared Publish banner in _macros.html
+# (2026-10-12) failed with "'csrf_token' is undefined" on the first real
+# page load; a global is visible everywhere, imports included.
+admin_bp.add_app_template_global(token, "csrf_token")
+
+
 @admin_bp.before_app_request
 def check():
     """Reject a state-changing request that didn't come from one of our forms.
