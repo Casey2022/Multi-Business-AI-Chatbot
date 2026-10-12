@@ -348,7 +348,11 @@ tbody tr:hover td { background: var(--surface-sunk); }
   border-bottom: 1px solid var(--rule);
 }
 .field:last-child { border-bottom: 0; }
-.field > label { font-size: var(--text-sm); font-weight: 500; }
+/* A field's name ("Title", "Business name", "Options and prices"): the
+   thing an owner scans for, so it outranks the hint under it clearly. */
+.field > label, .field .split-baseline > label, details.field > summary {
+  font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: .01em;
+}
 .hint, .field .hint { font-size: var(--text-sm); color: var(--ink-faint); }
 
 /* A field that can't apply yet. Dimmed rather than hidden: an owner who
@@ -955,9 +959,9 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .menu-table input[type=text], .menu-table select { width: 100%; min-width: 4.5rem; }
 .menu-table td, .menu-table th { padding: var(--s1) var(--s2); }
 .menu-piece { display: flex; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s2); }
-.menu-piece label { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--text-sm); }
+.menu-piece label { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--text-md); font-weight: 500; }
 .form-errors { color: var(--refused); padding-left: var(--s4); }
-details.field > summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
+details.field > summary { cursor: pointer; }
 .chip[hidden] { display: none; }
 details.menu-item > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline;
                               gap: var(--s2); list-style: none; }
