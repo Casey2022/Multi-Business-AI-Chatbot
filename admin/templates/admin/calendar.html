@@ -44,7 +44,9 @@
             {{ '%d:00'|format(h if h <= 12 else h - 12) }}{{ 'am' if h < 12 else 'pm' }}
           </td>
           {% for d in days %}
-            <td class="{{ '' if open_days[d.weekday()] else 'closed' }}">
+            {% set note = blocked.get((d.weekday(), h)) %}
+            <td class="{{ '' if open_days[d.weekday()] else 'closed' }} {{ 'blocked' if note }}"
+                {% if note %}title="Blocked: {{ note }}"{% endif %}>
               {% for appt in slots.get((d.weekday(), h), []) %}
                 <a class="slot {{ 'is-highlighted' if highlight == appt.id }}"
                    href="{{ url_for('admin.appointment_detail', appointment_id=appt.id) }}"
@@ -64,7 +66,77 @@
 </div>
 
 <p class="footnote">
-  Shows bookings taken through the assistant. Appointments added directly in
-  Google Calendar still block availability, but won't appear here.
+  Shows bookings taken through the assistant; striped hours are time you've blocked off.
+  Appointments added directly in Google Calendar still block availability, but won't
+  appear here.
 </p>
+
+<div class="card" id="block">
+  <div class="card-title">Block off time</div>
+  <form method="POST" action="{{ url_for('admin.calendar_block_add', business_id=business.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <div class="field-row">
+        <div class="field">
+          <label for="blk-from">From</label>
+          <input type="date" id="blk-from" name="from_date" required
+                 value="{{ block_form.get('from_date', '') }}">
+        </div>
+        <div class="field">
+          <label for="blk-until">Until (optional)</label>
+          <input type="date" id="blk-until" name="until_date"
+                 value="{{ block_form.get('until_date', '') }}">
+        </div>
+      </div>
+      <label class="chip-check block-allday">
+        <input type="checkbox" id="blk-allday" name="all_day" value="yes"
+               {{ 'checked' if not block_form or block_form.get('all_day') == 'yes' }}>
+        <span>Whole day</span>
+      </label>
+      <div class="field-row block-times">
+        <div class="field">
+          <label for="blk-start">Start time</label>
+          <input type="time" id="blk-start" name="from_time" step="900"
+                 value="{{ block_form.get('from_time', '') }}"
+                 data-enabled-by="all_day" data-enabled-when="unchecked">
+        </div>
+        <div class="field">
+          <label for="blk-end">End time</label>
+          <input type="time" id="blk-end" name="until_time" step="900"
+                 value="{{ block_form.get('until_time', '') }}"
+                 data-enabled-by="all_day" data-enabled-when="unchecked">
+        </div>
+      </div>
+      <span class="hint">Whole day blocks every day from the first to the last. Untick it
+        for specific hours: from the start time on the first day to the end time on the
+        last (one day if you leave “Until” empty).</span>
+    </div>
+    <div class="field">
+      <label for="blk-note">Note (only you see this)</label>
+      <input type="text" id="blk-note" name="note" maxlength="120"
+             placeholder="Vacation, dentist, staff training…" value="{{ block_form.get('note', '') }}">
+    </div>
+    <div class="toolbar card-pad">
+      <button class="btn btn-primary" type="submit">Block this time</button>
+    </div>
+  </form>
+
+  {% if blocks %}
+  <div class="block-list">
+    <div class="eyebrow card-pad">Blocked time coming up</div>
+    {% for b in blocks %}
+      <div class="block-row">
+        <div>
+          <div class="cell-strong">{{ b.label }}</div>
+          {% if b.note %}<div class="cell-sub">{{ b.note }}</div>{% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('admin.calendar_block_remove', business_id=business.id, block_id=b.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm" type="submit">Remove</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

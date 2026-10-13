@@ -88,9 +88,25 @@
     </div>
   {% endif %}
 
+  {% if business is defined and business and business.id %}
+    {% set paused_info = booking_pause(business) %}
+    {% if paused_info %}
+      {# A switch an owner can forget: say so on every page while it's off. #}
+      <div class="banner">
+        <div><strong>New bookings are paused{% if paused_info.resume_on %} until
+          {{ paused_info.resume_on.strftime('%A, %B %-d') }}{% endif %}.</strong>
+          <div class="cell-sub">Customers who ask to book are told: “{{ paused_info.reply }}”</div>
+        </div>
+        <div class="banner-actions">
+          <a class="btn" href="{{ url_for('admin.settings', business_id=business.id) }}#bookings">Change</a>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
-      <div class="flash flash-{{ 'error' if category == 'error' else 'success' }}">
+      <div class="flash flash-{{ category if category in ('error', 'warning') else 'success' }}">
         {{ message }}
       </div>
     {% endfor %}

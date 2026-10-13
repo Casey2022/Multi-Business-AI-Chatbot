@@ -119,7 +119,26 @@ def settings(config):
         "max_alternatives": int(s.get("max_alternatives", 3)),
         "business_hours":   s.get("business_hours", {}),
         "blackout":         s.get("blackout", []),
+        # Dated blocks the owner set on the Calendar page (booking_control),
+        # put here by config.load_config: [(start, end)] datetimes.
+        "blocks":           _parse_blocks(s.get("blocks", [])),
     }
+
+
+def _parse_blocks(raw):
+    out = []
+    for b in raw or []:
+        try:
+            out.append((datetime.strptime(b["start"], "%Y-%m-%d %H:%M"),
+                        datetime.strptime(b["end"], "%Y-%m-%d %H:%M")))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+def _in_block(start, end, sched):
+    """True if [start, end) touches time the owner blocked off."""
+    return any(start < b_end and end > b_start for b_start, b_end in sched.get("blocks", []))
 
 
 def within_business_hours(dt, duration_min, sched):
@@ -146,6 +165,9 @@ def within_business_hours(dt, duration_min, sched):
         # and ends after it starts.
         if dt.time() < b_end and end.time() > b_start:
             return False
+
+    if _in_block(dt, end, sched):
+        return False
 
     return True
 
@@ -245,7 +267,8 @@ def find_alternatives(config, desired_iso, busy, service=None):
 
 
 def slot_rejection_reason(config, start_iso, busy, service=None):
-    """Why a slot is unavailable: 'past', 'closed', 'blackout', 'conflict', or None."""
+    """Why a slot is unavailable: 'past', 'closed', 'blackout', 'blocked'
+    (the owner blocked it off), 'conflict', or None."""
     sched    = settings(config)
     duration = duration_for(config, service)
 
@@ -272,6 +295,9 @@ def slot_rejection_reason(config, start_iso, busy, service=None):
         b_end   = datetime.strptime(window["end"],   "%H:%M").time()
         if start.time() < b_end and end.time() > b_start:
             return "blackout"
+
+    if _in_block(start, end, sched):
+        return "blocked"
 
     if not is_slot_available(config, start_iso, busy, service):
         return "conflict"

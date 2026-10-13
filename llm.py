@@ -388,6 +388,19 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
         channel_specific = guardrails.get(channel, "")
         guardrails_text  = f"{universal}\n\n{channel_specific}".strip()
 
+    # Bookings paused by the owner: the usual "here's how to book" would be
+    # wrong, so it's replaced, only while paused. The booking flow itself
+    # refuses in code (scheduler); this keeps a question about booking
+    # from being answered with an invitation to book.
+    import booking_control
+    if booking_control.paused(config):
+        booking_text = (
+            "\n\nNew bookings are paused right now. If the customer asks about "
+            "booking, availability or ordering, tell them: "
+            + booking_control.paused_reply(config)
+            + " Don't offer times or say they can book. Questions about the "
+              "business are answered as usual.")
+
     return f"""You are an SMS assistant for {business['name']}.
                Today is {today_str}.
 

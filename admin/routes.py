@@ -326,8 +326,43 @@ def settings(business_id):
                     had_error = True
                     continue
                 value = raw
+            elif spec["type"] == "long_text":
+                import booking_control
+                value = " ".join(raw.split())
+                if len(value) > booking_control.MAX_MESSAGE:
+                    flash(f"{spec['label']}: keep it under {booking_control.MAX_MESSAGE} "
+                          f"characters.", "error")
+                    had_error = True
+                    continue
+                current = load_config(business["config_path"], business_id)
+                if not value or value in (booking_control.DEFAULT_MESSAGE,
+                                          booking_control.default_message(current)):
+                    clear_config_override(business_id, field)   # the standard wording
+                    continue
+            elif spec["type"] == "date":
+                value = raw.strip()
+                if not value:
+                    clear_config_override(business_id, field)
+                    continue
+                from datetime import date as _date
+                import clock
+                try:
+                    chosen = _date.fromisoformat(value)
+                except ValueError:
+                    flash(f"{spec['label']}: that isn't a date.", "error")
+                    had_error = True
+                    continue
+                if chosen <= clock.business_today(load_config(business["config_path"], business_id)):
+                    flash(f"{spec['label']}: choose a day after today.", "error")
+                    had_error = True
+                    continue
             else:
                 value = raw.strip()
+
+            if field == "booking.accepting" and value is True and get_nested(base, field) is None:
+                # Taking bookings is the default; no need to pin it.
+                clear_config_override(business_id, field)
+                continue
 
             if value == get_nested(base, field):
                 # Matches the file — drop any override so the field goes back
@@ -337,6 +372,11 @@ def settings(business_id):
                 set_config_override(business_id, field, value,
                                     updated_by=user["email"])
 
+        # Taking bookings again: a resume date would mean nothing now, and
+        # would quietly apply the next time bookings are paused.
+        if request.form.get("booking.accepting") == "yes":
+            clear_config_override(business_id, "booking.resume_on")
+
         if had_error:
             flash("Your other settings were saved.", "success")
         else:
@@ -344,6 +384,8 @@ def settings(business_id):
         return redirect(url_for("admin.settings", business_id=business_id))
 
     config = load_config(business["config_path"], business_id)
+    import booking_control
+    pause = booking_control.pause_state(config)
 
     # Whether this deployment can check an address at all. The service-area
     # controls are the only settings whose effect depends on something the
@@ -369,7 +411,10 @@ def settings(business_id):
             field: choice_value(config, field, spec)
             for field, spec in EDITABLE_FIELDS.items()
             if spec["type"] == "select"
-        } | {"menu_enabled": "yes" if menu_switched_on(business) else "no"},
+        } | {"menu_enabled": "yes" if menu_switched_on(business) else "no",
+             "booking.accepting": "no" if pause["paused"] else "yes"},
+        pause = pause,
+        paused_message = booking_control.message_template(config),
         menu_lock = _menu_cannot_switch_off(business),
     )
 
@@ -409,6 +454,22 @@ def _back_to(business_id):
         return redirect(url_for("admin.help_page") + "#assistant")
     endpoint = _BACK_TO.get(request.form.get("back", ""), "admin.knowledge")
     return redirect(url_for(endpoint, business_id=business_id))
+
+
+@admin_bp.app_template_global()
+def booking_pause(business):
+    """{"resume_on", "reply"} while this business has new bookings paused,
+    else None. Drawn as a banner on every business page (base.html)."""
+    import booking_control
+    try:
+        fresh = get_business_by_id(business["id"])
+        config = load_config(fresh["config_path"], fresh["id"])
+    except Exception:
+        return None
+    state = booking_control.pause_state(config)
+    if not state["paused"]:
+        return None
+    return {"resume_on": state["resume_on"], "reply": booking_control.paused_reply(config)}
 
 
 @admin_bp.app_template_global()
@@ -1137,17 +1198,87 @@ def calendar_view(business_id):
         for d in days
     }
 
+    # Time the owner blocked off: shaded on the grid, listed under it.
+    import booking_control
+    from db import list_time_blocks
+    now_str = clock.business_now(config).strftime("%Y-%m-%d %H:%M")
+    upcoming = list_time_blocks(business_id, ending_after=now_str)
+    grid_hours = list(range(grid_start, grid_end + 1))
+
     return render_template(
         "admin/calendar.html",
         business   = business,
         days       = days,
-        hours      = list(range(grid_start, grid_end + 1)),
+        hours      = grid_hours,
         slots      = slots,
         open_days  = open_days,
         offset     = offset,
         today      = today,
         highlight  = highlight,
+        blocked    = booking_control.cells(upcoming, days, grid_hours),
+        blocks     = [{**b, "label": booking_control.describe(b)} for b in upcoming],
+        block_form = request.args,      # what was typed, after a refused block
     )
+
+
+@admin_bp.route("/business/<int:business_id>/calendar/block", methods=["POST"])
+@login_required
+def calendar_block_add(business_id):
+    """Block off time: a whole day, several days, or specific hours."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import clock
+    import booking_control
+    from datetime import datetime, timedelta
+    from config import load_config
+    from db import add_time_block, get_appointments
+    from admin.auth import current_user
+    config = load_config(business["config_path"], business_id)
+    block, errors = booking_control.parse_block_form(request.form,
+                                                     clock.business_today(config))
+    if errors:
+        for e in errors:
+            flash(e, "error")
+        return redirect(url_for("admin.calendar_view", business_id=business_id,
+                                **{k: v for k, v in request.form.items()
+                                   if k in ("from_date", "until_date", "from_time",
+                                            "until_time", "all_day", "note")}) + "#block")
+    starts_at, ends_at, all_day, note = block
+    add_time_block(business_id, starts_at, ends_at, all_day=all_day, note=note,
+                   created_by=current_user()["email"])
+    saved = {"starts_at": starts_at, "ends_at": ends_at, "all_day": all_day}
+    flash(f"Blocked {booking_control.describe(saved)}. The assistant won't offer that time.",
+          "success")
+    # Not cancelled, but the owner should know.
+    clashes = booking_control.appointments_in(saved, get_appointments(business_id), config)
+    if clashes:
+        who = "; ".join(f"{a.get('customer_name') or a.get('phone')}, {a['datetime']}"
+                        for a in clashes[:5])
+        flash(f"Heads up: {len(clashes)} booked appointment{'s' if len(clashes) > 1 else ''} "
+              f"fall{'s' if len(clashes) == 1 else ''} in that time ({who}). They're not "
+              f"cancelled; move or cancel them from Appointments if you need to.", "warning")
+    week = 0
+    try:
+        start_day = datetime.strptime(starts_at, "%Y-%m-%d %H:%M").date()
+        today = clock.business_today(config)
+        week = ((start_day - timedelta(days=start_day.weekday()))
+                - (today - timedelta(days=today.weekday()))).days // 7
+    except Exception:
+        pass
+    return redirect(url_for("admin.calendar_view", business_id=business_id, week=week))
+
+
+@admin_bp.route("/business/<int:business_id>/calendar/block/<int:block_id>/remove",
+                methods=["POST"])
+@login_required
+def calendar_block_remove(business_id, block_id):
+    require_business_access(business_id)
+    from db import delete_time_block
+    if delete_time_block(business_id, block_id):
+        flash("Unblocked. The assistant can offer that time again.", "success")
+    return redirect(url_for("admin.calendar_view", business_id=business_id) + "#block")
 
 @admin_bp.route("/appointment/<int:appointment_id>")
 @login_required

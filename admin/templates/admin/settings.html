@@ -21,6 +21,42 @@
 <form method="POST" class="stack">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
+  <div class="card" id="bookings">
+    <div class="card-title">Bookings</div>
+    {% set off = choice_values['booking.accepting'] == 'no' %}
+    <div class="field">
+      <label for="b-accepting">{{ fields['booking.accepting'].label }}</label>
+      <select id="b-accepting" name="booking.accepting" class="w-auto">
+        {% for value, caption in fields['booking.accepting'].options.items() %}
+          <option value="{{ value }}" {{ 'selected' if choice_values['booking.accepting'] == value }}>{{ caption }}</option>
+        {% endfor %}
+      </select>
+      {% if pause.resumed %}
+        <span class="hint">Bookings turned back on by themselves on
+          {{ pause.resume_on.strftime('%A, %B %-d') }}, as you asked.</span>
+      {% else %}
+        <span class="hint">Paused, the assistant still answers questions; anyone asking
+          to book (or part-way through booking) gets the message below instead.</span>
+      {% endif %}
+    </div>
+    <div class="field {{ 'is-inert' if not off }}">
+      <label for="b-message">{{ fields['booking.paused_message'].label }}</label>
+      <textarea id="b-message" name="booking.paused_message" rows="3" maxlength="400"
+                data-enabled-by="booking.accepting" data-enabled-when="no"
+                {{ 'disabled' if not off }}>{{ paused_message }}</textarea>
+      <span class="hint">{phone} becomes your phone number. Clear the box to go back to
+        the standard wording.</span>
+    </div>
+    <div class="field {{ 'is-inert' if not off }}">
+      <label for="b-resume">{{ fields['booking.resume_on'].label }}</label>
+      <input type="date" id="b-resume" name="booking.resume_on" class="w-short"
+             value="{{ pause.resume_on.isoformat() if pause.resume_on and not pause.resumed else '' }}"
+             data-enabled-by="booking.accepting" data-enabled-when="no"
+             {{ 'disabled' if not off }}>
+      <span class="hint">Optional. Leave it empty to stay paused until you switch it back.</span>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Business details</div>
 

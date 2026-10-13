@@ -243,6 +243,8 @@ def main():
     # So is the owner assistant's conversation.
     db.add_assistant_turn(business_id=clone["id"], user_email="demo@example.com",
                           role="owner", content="How do I add a menu item?")
+    # And the time it blocked off on the Calendar page.
+    db.add_time_block(clone["id"], "2099-01-05 00:00", "2099-01-06 00:00", all_day=True)
     before = row_counts(clone["id"])
     check("the clone had rows worth deleting", all(before.values()), before)
 

@@ -350,7 +350,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .field:last-child { border-bottom: 0; }
 /* A field's name ("Title", "Business name", "Options and prices"): the
    thing an owner scans for, so it outranks the hint under it clearly. */
-.field > label, .field .split-baseline > label, details.field > summary {
+.field > label:not(.chip-check), .field .split-baseline > label, details.field > summary {
   font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: .01em;
 }
 .hint, .field .hint { font-size: var(--text-sm); color: var(--ink-faint); }
@@ -404,6 +404,7 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid;
 }
 .flash-success { background: linear-gradient(var(--booked-wash), var(--booked-wash)), var(--smoke);  border-color: var(--booked);  color: var(--booked); }
+.flash-warning { background: linear-gradient(var(--pending-wash), var(--pending-wash)), var(--smoke); border-color: var(--pending); color: var(--pending); }
 .flash-error   { background: linear-gradient(var(--refused-wash), var(--refused-wash)), var(--smoke); border-color: var(--refused); color: var(--refused); }
 
 /* ---------------------------------------------------------------------- *
@@ -1193,3 +1194,22 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   /* On a real phone, the drawn phone would be a phone inside a phone. */
   .phone { width: 100%; height: calc(100vh - 140px); border-radius: 24px; border-width: 6px; }
 }
+
+/* ---------------------------------------------------------------------- *
+ * Blocked time (Calendar page; booking_control.py)
+ * ---------------------------------------------------------------------- */
+.weekgrid td.blocked {
+  background: repeating-linear-gradient(135deg, rgba(243,196,126,.16) 0 6px,
+              rgba(243,196,126,.04) 6px 12px);
+}
+.block-allday { margin-top: var(--s2); align-self: flex-start; }
+/* With "Whole day" ticked the times don't apply, so they step out of the
+   way (field-deps.js marks them inert); without the script they stay. */
+.block-times .field.is-inert { display: none; }
+.block-list { border-top: 1px solid var(--rule); }
+.block-list .eyebrow { padding-bottom: 0; }
+.block-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  padding: var(--s3) var(--s4); border-top: 1px solid var(--rule);
+}
+.block-list .eyebrow + .block-row { border-top: 0; }

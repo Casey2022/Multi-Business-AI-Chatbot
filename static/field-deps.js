@@ -8,6 +8,9 @@
 //           data-enabled-by="business.service_radius.enabled"
 //           data-enabled-when="yes">
 //
+// A checkbox controller is matched by "checked" / "unchecked" (the Calendar
+// page's "Whole day" box hides the start and end times while it's ticked).
+//
 // Why data attributes rather than a line of code per pair: the rule lives
 // next to the field it governs, in the template, where someone editing that
 // field will see it. A list of pairs kept in here is a second place to
@@ -34,7 +37,9 @@
     // server rendered it rather than overriding a decision made upstream.
     if (controller.disabled) return;
 
-    var live = controller.value === wanted;
+    var live = controller.type === "checkbox"
+      ? (controller.checked ? "checked" : "unchecked") === wanted
+      : controller.value === wanted;
     field.disabled = !live;
 
     var wrapper = field.closest(".field");

@@ -120,6 +120,23 @@ def business_facts(business, config, pending=()):
     noun = (config.get("booking") or {}).get("noun")
     if noun:
         lines.append(f"They call a booking: {noun}")
+    import booking_control
+    pause = booking_control.pause_state(config)
+    if pause["paused"]:
+        lines.append("Taking new bookings: no, paused"
+                     + (f" until {pause['resume_on']:%A, %B %-d}" if pause["resume_on"] else "")
+                     + f". Customers asking to book are told: {booking_control.paused_reply(config)}")
+    else:
+        lines.append("Taking new bookings: yes")
+    try:
+        from db import list_time_blocks
+        import clock
+        now = clock.business_now(config).strftime("%Y-%m-%d %H:%M")
+        upcoming = [booking_control.describe(b) for b in
+                    list_time_blocks(business["id"], ending_after=now)[:8]]
+    except Exception:
+        upcoming = []
+    lines.append("Blocked time coming up: " + ("; ".join(upcoming) if upcoming else "none"))
     lines.append("Waiting to publish: " + ("; ".join(pending) if pending else "nothing"))
     return lines
 

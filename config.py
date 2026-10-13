@@ -53,6 +53,23 @@ EDITABLE_FIELDS = {
     "booking.extra_questions": {"label": "Extra booking questions",
                                 "type": "questions"},
 
+    # Pausing new bookings (booking_control.py). Never set means taking
+    # bookings. The message and the date only matter while it's "no"; the
+    # Settings page shows them then, and saving "yes" clears the date.
+    "booking.accepting": {
+        "label": "Taking new bookings?",
+        "type": "select",
+        "coerce": "bool",
+        "options": {
+            "yes": "Yes — the assistant takes bookings",
+            "no":  "No — pause new bookings",
+        },
+    },
+    "booking.paused_message": {"label": "What the assistant says instead",
+                               "type": "long_text"},
+    "booking.resume_on": {"label": "Turn bookings back on automatically on",
+                          "type": "date"},
+
     # Whether the business has a Menu page at all. Off for a business that
     # quotes per job (a plumber, a contractor). The Settings page won't let
     # it go off while the menu still has items, so prices never vanish by
@@ -324,6 +341,19 @@ def load_config(config_path, business_id=None):
                 # EDITABLE_FIELDS; "menu_draft" is deliberately ignored here:
                 # customers see a menu change only once it's published.
                 config["menu"] = value
+
+        # The owner's blocked time (Calendar page), read by scheduling.py
+        # beside the weekly blackout. Only blocks that haven't ended: past
+        # ones can't affect a booking, and the list stays short.
+        try:
+            from db import list_time_blocks
+            from datetime import datetime as _dt, timedelta as _td
+            since = (_dt.now() - _td(days=1)).strftime("%Y-%m-%d %H:%M")
+            blocks = [{"start": b["starts_at"], "end": b["ends_at"]}
+                      for b in list_time_blocks(business_id, ending_after=since)]
+        except Exception:
+            blocks = []
+        config.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = blocks
 
         # Stamp the business's immutable slug onto the config, AFTER the
         # overrides so nothing an owner types can reach it. Anything that

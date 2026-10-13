@@ -315,6 +315,24 @@ def init_db():
         )
     """)
 
+    # time_blocks — time the owner has blocked off (Calendar page): a whole
+    # day, several days, or specific hours. starts_at/ends_at are business-
+    # local "YYYY-MM-DD HH:MM", ends_at exclusive (a whole day ends at the
+    # next midnight). Read by config.load_config into the scheduling
+    # settings; see booking_control.py.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS time_blocks (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id  INTEGER NOT NULL,
+            starts_at    TEXT    NOT NULL,
+            ends_at      TEXT    NOT NULL,
+            all_day      INTEGER NOT NULL DEFAULT 0,
+            note         TEXT,
+            created_by   TEXT,
+            created_at   TEXT    NOT NULL
+        )
+    """)
+
     # --- migrations -------------------------------------------------------
     # CREATE TABLE IF NOT EXISTS is a no-op once a table exists, so a new
     # column on an existing table needs an explicit ALTER. Guarded by an
@@ -657,6 +675,7 @@ _TENANT_TABLES = (
     ("published_snapshot", "business_id"),
     ("upload_proposals",   "business_id"),
     ("assistant_turns",    "business_id"),
+    ("time_blocks",        "business_id"),
     ("users",              "business_id"),
 )
 
@@ -1268,6 +1287,47 @@ def delete_upload_proposal(business_id):
     conn.execute("DELETE FROM upload_proposals WHERE business_id = ?", (business_id,))
     conn.commit()
     conn.close()
+
+
+# --- blocked time (the Calendar page; see booking_control.py) ---------------
+
+def add_time_block(business_id, starts_at, ends_at, all_day=False, note=None,
+                   created_by=None):
+    from datetime import datetime as _dt
+    conn = get_connection()
+    cur = conn.execute(
+        "INSERT INTO time_blocks (business_id, starts_at, ends_at, all_day, note, "
+        "created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (business_id, starts_at, ends_at, 1 if all_day else 0, note or None,
+         created_by, _dt.now().isoformat()))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
+
+
+def list_time_blocks(business_id, ending_after=None):
+    """One business's blocks, soonest first; with ending_after, only those
+    that end after that "YYYY-MM-DD HH:MM"."""
+    sql, args = "SELECT * FROM time_blocks WHERE business_id = ?", [business_id]
+    if ending_after:
+        sql += " AND ends_at > ?"
+        args.append(ending_after)
+    conn = get_connection()
+    rows = conn.execute(sql + " ORDER BY starts_at, id", args).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_time_block(business_id, block_id):
+    """Remove one block. Scoped by business, so an id from someone else's
+    business deletes nothing. Returns True if a row went."""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM time_blocks WHERE id = ? AND business_id = ?",
+                       (block_id, business_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
 
 
 # --- owner assistant (the Help page; see assistant.py) ---------------------

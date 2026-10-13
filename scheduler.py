@@ -1139,7 +1139,8 @@ def _unavailable_message(desired_iso, alternatives, config, reason=None):
         lead = f"{desired} has already passed."
     elif reason == "closed":
         lead = f"We're closed then — our hours are {hours}."
-    elif reason == "blackout":
+    elif reason in ("blackout", "blocked"):
+        # Blocked by the owner: their note is private, so no reason given.
         lead = f"We're not available at {desired}."
     else:
         lead = f"Sorry, {desired} is already booked."
@@ -1265,6 +1266,16 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
     # Everything this turn writes is checked against the revision we read
     # here. If it moved, this turn lost the race and is discarded.
     _turn_revision.set(current.get("revision", 0))
+
+    # Bookings paused by the owner (Settings): no booking starts or carries
+    # on, whatever brought the customer here: a keyword, the classifier, or
+    # a booking already under way when the owner paused. Code, not the
+    # prompt, so it can't be talked round (booking_control.py).
+    import booking_control
+    if booking_control.paused(config):
+        _save_state(phone, business_id, "idle", pending={})
+        log.info("Bookings are paused for business %s; told %s so", business_id, phone)
+        return booking_control.paused_reply(config)
 
     # --- Cancel: transversal, checked before anything else ---
     if text in ("cancel", "stop", "nevermind", "never mind"):

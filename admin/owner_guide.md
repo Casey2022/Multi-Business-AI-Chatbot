@@ -65,6 +65,22 @@ Appointments added directly in Google Calendar still block availability,
 but don't appear here. Connecting a Google Calendar is set up by your
 operator: the assistant on the Help page drafts the message for you.
 
+### Blocking off time
+
+Under the week, **Block off time** keeps the assistant from booking a day,
+several days, or specific hours (a vacation, a dentist appointment, a
+staff training morning).
+
+- Choose the day under From. For several days, also choose Until.
+- Leave **Whole day** ticked to block every day from the first to the last. Untick it to choose a Start time and an End time instead: the block runs from the start time on the first day to the end time on the last.
+- Add a note if you like. Only you see it; customers are just told that time isn't available, and offered other times.
+- Press **Block this time**.
+
+Blocked hours show striped on the calendar, and the list under the form
+shows what's coming up. **Remove** unblocks one. If appointments are
+already booked inside a block, you're told which; they aren't cancelled,
+so move or cancel them yourself if you need to.
+
 ## Knowledge base
 
 The assistant answers customer questions only from these sections.
@@ -131,6 +147,7 @@ then publish.
 
 Changes here take effect as soon as you press **Save settings**.
 
+- **Taking new bookings?**: set it to No to pause new bookings, say while you're away or fully booked. The assistant keeps answering questions, but anyone asking to book (or part-way through booking) gets your message instead. **What the assistant says instead** starts with a standard wording; change it if you like ({phone} becomes your phone number; clear it to go back to the standard). **Turn bookings back on automatically on** is optional: choose a day and bookings switch back on by themselves that morning. While bookings are paused, every page shows a reminder with a **Change** button.
 - Business details: **Business name**, **Phone**, **Address**, **Hours (as shown to customers)** and **Service area**, as the assistant tells customers.
 - **Limit service area?** and **How far will you travel?**: with the limit on, the assistant asks for the customer's address early in the booking and turns away addresses further than your distance. This needs address checking, which your operator sets up; without it the switch is greyed out.
 - **Personality**: how the assistant sounds.
