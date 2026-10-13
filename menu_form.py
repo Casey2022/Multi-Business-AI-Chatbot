@@ -276,14 +276,34 @@ def parse_item_form(form, other_item_names=()):
     return entry, errors
 
 
-def replace_item(menu_list, index, entry, expected_name):
+def fingerprint(entry):
+    """A short digest of one stored menu item, exactly as the page showed it.
+
+    The page sends it back with Save and Remove. Comparing names alone let a
+    stale page win: the owner assistant (or a second person) changes the
+    large pizza to $24, the owner presses Save on the card they opened
+    before that, and the whole item, $22 and all, is written back over it.
+    """
+    import hashlib
+    import json
+    text = json.dumps(entry or {}, sort_keys=True, default=str, ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def replace_item(menu_list, index, entry, expected_name, expected_fingerprint=None):
     """A new menu list with item `index` replaced (None deletes it), or
     (None, reason) when the item there isn't the one the page showed, so a
-    stale page can't overwrite someone else's change."""
+    stale page can't overwrite someone else's change. With a fingerprint
+    (the Menu page sends one), any change since the page loaded counts; the
+    name alone is the fallback for callers that only know the name."""
     items = list(menu_list or [])
-    if index < 0 or index >= len(items) or items[index].get("item") != expected_name:
-        return None, ("The menu changed since this page was loaded. Reload "
-                      "the page and make the change again.")
+    stale = (index < 0 or index >= len(items) or items[index].get("item") != expected_name
+             or (expected_fingerprint is not None
+                 and fingerprint(items[index]) != expected_fingerprint))
+    if stale:
+        return None, ("This item changed since the page was loaded (perhaps by the "
+                      "assistant). Reload the page to see it, then make your change "
+                      "again.")
     if entry is None:
         del items[index]
     else:

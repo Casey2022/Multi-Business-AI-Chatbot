@@ -33,23 +33,7 @@
   <div class="card-pad">
     {% if turns %}
     <div class="assistant-thread">
-      {% for t in turns %}
-      <div class="assistant-turn assistant-turn-{{ t.role }}">
-        <div class="assistant-who">{{ 'You' if t.role == 'owner' else 'Assistant' }}</div>
-        <div class="assistant-text">{{ t.content }}</div>
-        {% if t.actions %}
-        <div class="assistant-actions">
-          <div class="assistant-actions-title">Saved as a draft</div>
-          <ul>{% for a in t.actions %}{% for line in a.lines %}<li>{{ line }}</li>{% endfor %}{% endfor %}</ul>
-          <div>Customers see it once you press “Publish changes”.
-            {% if business %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
-        </div>
-        {% endif %}
-        {% if t.handoff and loop.last %}
-        <div class="assistant-handoff">I've drafted a message to support below from this
-          conversation. Check it, then press “Send to support”.</div>
-        {% endif %}
-      </div>
+      {% for t in turns %}{{ ui.assistant_turn(t, business, loop.last, 'help') }}
       {% endfor %}
     </div>
     {% else %}

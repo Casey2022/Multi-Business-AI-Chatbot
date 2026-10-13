@@ -131,7 +131,7 @@ def main():
           "extras: topping, gluten-free crust, vegan cheese" in setup, setup)
     check("a hand-off is a tool call, not 'go to Help' (they're on it; eval, 2026-10-12)",
           "AND call hand_off_to_support" in system[0]["text"]
-          and "already on the Help page" in system[0]["text"])
+          and "don't tell them to go to Help" in system[0]["text"])
     bob_setup = assistant.system_prompt(bob, bob_cfg)[1]["text"]
     check("Bob's setup says they can switch the menu on themselves (eval, 2026-10-12)",
           "switch it on themselves" in bob_setup and "Prices on a menu?" in bob_setup)
@@ -423,6 +423,54 @@ def main():
           'request.form.get("back") == "help"' in (ROOT / "admin" / "routes.py").read_text()
           and "ui.unpublished_banner(business, 'help')" in
           (ROOT / "admin" / "templates" / "admin" / "help.html").read_text())
+    heading("the pop-out panel (every owner page)")
+    base = (ROOT / "admin" / "templates" / "admin" / "base.html").read_text()
+    pop = (ROOT / "admin" / "templates" / "admin" / "_assistant_pop.html").read_text()
+    js = (ROOT / "static" / "assistant-pop.js").read_text()
+    check("base.html includes the panel only where assistant_panel() offers it, and loads its script",
+          "{% set ap = assistant_panel() %}" in base and '{% include "admin/_assistant_pop.html" %}' in base
+          and "assistant-pop.js" in base)
+    check("without the script, the corner button is a link to the Help page",
+          'href="{{ ap.help_url }}#assistant"' in pop and pop.count("<form method=\"POST\"") == 2)
+    # assistant_panel, run from its own source against stand-ins.
+    import ast as _ast
+    fn = next(n for n in _ast.parse(routes).body
+              if isinstance(n, _ast.FunctionDef) and n.name == "assistant_panel")
+    fn.decorator_list = []
+    users = {}
+    pns = {"current_user": lambda: users.get("u"), "get_business_by_id": db.get_business_by_id,
+           "request": types.SimpleNamespace(endpoint="admin.menu_page", path="/admin/business/7/menu"),
+           "url_for": lambda ep, **kw: "/admin/help" + ("?from=" + kw["from"] if "from" in kw else ""),
+           "support": types.SimpleNamespace(clean_page=lambda p: p),
+           "log": types.SimpleNamespace(exception=lambda *a, **k: None)}
+    exec(compile(_ast.Module(body=[fn], type_ignores=[]), "support_routes.py", "exec"), pns)
+    users["u"] = {"email": "o@x.com", "is_operator": 0, "business_id": 7}
+    panel = pns["assistant_panel"]()
+    check("an owner gets the panel, with their conversation and the page they're on",
+          panel and panel["business"]["id"] == 7 and panel["page"] == "/admin/business/7/menu"
+          and panel["help_url"] == "/admin/help?from=/admin/business/7/menu" and "turns" in panel)
+    users["u"] = {"email": "op@x.com", "is_operator": 1, "business_id": None}
+    check("an operator doesn't (no business of their own to ask about)", pns["assistant_panel"]() is None)
+    users["u"] = {"email": "o@x.com", "is_operator": 0, "business_id": 7}
+    pns["request"].endpoint = "admin.help_page"
+    check("nor does the Help page, which has the assistant inline", pns["assistant_panel"]() is None)
+    users.clear()
+    check("nor anyone signed out", pns["assistant_panel"]() is None)
+    ask_src = routes.split("def help_ask(")[1].split("\n@")[0]
+    check("the panel's questions get JSON: the reply, the drafted lines, the hand-off, errors in words",
+          "jsonify(reply=" in ask_src and "actions=[l for a in out[\"actions\"]" in ask_src
+          and "jsonify(error=message), status" in ask_src and "429)" in ask_src)
+    check("replies go into the page as text, never as HTML", "innerHTML" not in js
+          and "textContent" in js)
+    check("a change refreshes the page with a GET (never re-posting a form), unless there are unsaved edits",
+          "window.location.assign(window.location.pathname + window.location.search)" in js
+          and "portalHasUnsavedEdits" in js and "location.reload" not in js
+          and "window.portalHasUnsavedEdits" in (ROOT / "static" / "unsaved-edits.js").read_text())
+    menu_html = (ROOT / "admin" / "templates" / "admin" / "menu.html").read_text()
+    routes_main = (ROOT / "admin" / "routes.py").read_text()
+    check("the Menu page's Save and Remove send the item's fingerprint, and the routes check it",
+          menu_html.count('name="fingerprint"') == 2
+          and routes_main.count('request.form.get("fingerprint")') == 2)
     check("assistant turns are cleared with a demo business",
           ("assistant_turns", "business_id") in db._TENANT_TABLES)
 

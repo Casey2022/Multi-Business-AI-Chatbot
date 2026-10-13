@@ -20,7 +20,8 @@ Every business page has the same row of tabs:
 At the top of every page, **Chat as a customer** opens your chat in a new
 tab, so you can ask the assistant something and hear exactly what a
 customer would. **Help** is where you can ask the owner assistant, or
-reach a person.
+reach a person. The assistant is also on every page: press
+**Ask the assistant** in the bottom corner.
 
 ## Drafts and Publish
 
@@ -156,6 +157,13 @@ to support for you to check and send. Or write one yourself under
 
 On the Help page you can ask the owner assistant how to do something
 (**Ask the assistant**), or write to a person with **Send to support**.
+
+The same assistant is on every page, behind the **Ask the assistant**
+button in the bottom corner: it opens a panel over the page you're on,
+with the same conversation as the Help page, and stays open as you move
+from page to page. Press **Close** (or Esc) to put it away. When it
+changes your menu, the page refreshes to show the change, unless you have
+unsaved edits on it, in which case it tells you instead.
 
 If you have a Menu tab, the assistant can also change your menu for you:
 ask it ("raise the large pizza to $24", "add a calzone at $12", "take the

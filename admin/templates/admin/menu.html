@@ -135,6 +135,7 @@
   <form method="POST" action="{{ url_for('admin.menu_item_save', business_id=business.id, index=c.index) }}" data-track-edits="any">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="original" value="{{ c.original }}">
+    <input type="hidden" name="fingerprint" value="{{ c.fingerprint }}">
     <details class="menu-item" {% if c.errors %}open{% endif %}>
       <summary class="card-title">
         <span>{{ c.original }}</span>
@@ -157,6 +158,7 @@
           onsubmit="return confirm('Remove {{ c.original }} from the menu? You can discard this before publishing.');">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="original" value="{{ c.original }}">
+    <input type="hidden" name="fingerprint" value="{{ c.fingerprint }}">
       <button class="btn btn-danger btn-sm" type="submit">Remove item</button>
     </form>
   </div>

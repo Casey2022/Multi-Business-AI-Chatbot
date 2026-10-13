@@ -99,6 +99,9 @@
   {% block content %}{% endblock %}
 </div>
 
+{% set ap = assistant_panel() %}
+{% if ap %}{% include "admin/_assistant_pop.html" %}{% endif %}
+
 {# Progressive enhancement: any <table data-resizable> gets draggable
    column edges, remembered per table. The tables work without it. #}
 <script src="{{ url_for('static', filename='table-resize.js') }}" defer></script>
@@ -108,6 +111,7 @@
 <script src="{{ url_for('static', filename='photo-upload.js') }}" defer></script>
 <script src="{{ url_for('static', filename='row-order.js') }}" defer></script>
 <script src="{{ url_for('static', filename='busy-submit.js') }}" defer></script>
+<script src="{{ url_for('static', filename='assistant-pop.js') }}" defer></script>
 
 </body>
 </html>

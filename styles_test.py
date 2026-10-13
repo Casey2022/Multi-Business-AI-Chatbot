@@ -34,6 +34,10 @@ ADDED_BY_SCRIPT = {
     "notice",     # demo.html, on a notice the business sent unprompted
     "picker-hidden",  # date-picker.js, hides the field its button replaces
     "col-grip",   # table-resize.js, the draggable column edge
+    "is-thinking",        # assistant-pop.js, the "Thinking…" turn
+    "is-error",           # assistant-pop.js, a turn saying something failed
+    "is-open",            # assistant-pop.js, the corner button while the panel is open
+    "assistant-refresh",  # assistant-pop.js, "Refreshing the page…" / unsaved-edits note
 }
 
 PASSED, FAILED = [], []

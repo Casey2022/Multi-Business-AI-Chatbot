@@ -8,7 +8,7 @@
 
 import logging
 
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 
 import ratelimit
 import support
@@ -30,6 +30,43 @@ def open_support_count():
     except Exception:
         log.exception("Couldn't count support requests")
         return 0
+
+
+@admin_bp.app_template_global()
+def assistant_panel():
+    """The pop-out assistant for this page (base.html), or None where it
+    isn't offered: signed out, operators (they have no business of their
+    own to ask about), and the Help page, which has the assistant inline.
+    Never takes a page down."""
+    try:
+        user = current_user()
+        if not user or user["is_operator"] or not user["business_id"]:
+            return None
+        if request.endpoint == "admin.help_page":
+            return None
+        import assistant
+        from db import recent_assistant_turns
+        business = get_business_by_id(user["business_id"])
+        if not business:
+            return None
+        page = support.clean_page(request.path)
+        return {
+            "business": business,
+            "page": page,
+            "help_url": url_for("admin.help_page", **({"from": page} if page else {})),
+            "turns": recent_assistant_turns(business_id=business["id"],
+                                            user_email=user["email"],
+                                            limit=assistant.HISTORY_TURNS),
+            "max_question": assistant.MAX_QUESTION,
+        }
+    except Exception:
+        log.exception("Couldn't build the assistant panel")
+        return None
+
+
+def _wants_json():
+    """The pop-out panel asks with fetch; a plain form post gets a redirect."""
+    return request.headers.get("X-Requested-With") == "fetch"
 
 
 def _render_help(user, business, page, error_id, message="", contact="", status=200):
@@ -106,26 +143,38 @@ def help_ask():
     business = get_business_by_id(user["business_id"]) if user["business_id"] else None
     page = support.clean_page(request.form.get("from"))
     error_id = support.clean_error_id(request.form.get("error"))
+    as_json = _wants_json()
+
+    def problem(message, status):
+        if as_json:
+            return jsonify(error=message), status
+        flash(message, "error")
+        return _back_to_help(page, error_id)
+
     try:
         question = assistant.clean_question(request.form.get("question"))
     except assistant.AssistantProblem as e:
-        flash(str(e), "error")
-        return _back_to_help(page, error_id)
+        return problem(str(e), 400)
     allowed, wait = ratelimit.assistant(user["email"], _login_ip())
     if not allowed:
         minutes = max(1, round(wait / 60))
-        flash(f"You've asked a lot of questions in a short time. Try again in about "
-              f"{minutes} minute{'' if minutes == 1 else 's'}, or send it to support "
-              f"below.", "error")
-        return _back_to_help(page, error_id)
+        return problem(f"You've asked a lot of questions in a short time. Try again in "
+                       f"about {minutes} minute{'' if minutes == 1 else 's'}, or ask a "
+                       f"person on the Help page.", 429)
     try:
         config = load_config(business["config_path"], business["id"]) if business else {}
-        assistant.answer(user["email"], business, config, question,
-                         pending=pending_changes(business) if business else [], page=page)
+        out = assistant.answer(user["email"], business, config, question,
+                               pending=pending_changes(business) if business else [],
+                               page=page)
     except Exception:
         log.exception("Owner assistant failed (business %s)", (business or {}).get("id"))
-        flash("The assistant couldn't answer just now. Try again in a moment, or "
-              "send your question to support below.", "error")
+        return problem("The assistant couldn't answer just now. Try again in a moment, "
+                       "or ask a person on the Help page.", 500)
+    if as_json:
+        help_args = {"from": page} if page else {}
+        return jsonify(reply=out["reply"], handoff=bool(out["handoff"]),
+                       actions=[l for a in out["actions"] for l in a["lines"]],
+                       help_url=url_for("admin.help_page", **help_args) + "#support")
     return _back_to_help(page, error_id)
 
 
@@ -136,6 +185,8 @@ def help_assistant_clear():
     from db import clear_assistant_turns
     user = current_user()
     clear_assistant_turns(business_id=user["business_id"] or None, user_email=user["email"])
+    if _wants_json():
+        return jsonify(ok=True)
     return _back_to_help(support.clean_page(request.form.get("from")),
                          support.clean_error_id(request.form.get("error")))
 

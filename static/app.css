@@ -1039,3 +1039,66 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-family: var(--b
 }
 .assistant-actions-title { font-weight: 600; color: var(--pending); }
 .assistant-actions ul { margin: var(--s1) 0; padding-left: var(--s4); color: var(--ink); }
+
+/* ---------------------------------------------------------------------- *
+ * The assistant on every owner page (_assistant_pop.html, assistant-pop.js)
+ * ---------------------------------------------------------------------- */
+.assistant-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 40;
+  display: inline-flex; align-items: center; gap: var(--s2);
+  padding: 11px 18px; border-radius: 999px;
+  font-size: var(--text-sm); font-weight: 600; text-decoration: none; color: #fff;
+  background: linear-gradient(135deg, var(--pen-fill), var(--pen-fill-2));
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 8px 28px rgba(0,0,0,.35), 0 0 24px rgba(43,108,176,.35);
+}
+.assistant-fab:hover { color: #fff; }
+.assistant-fab-dot { width: 8px; height: 8px; border-radius: 50%; background: #9FF0D6;
+                     box-shadow: 0 0 8px #6FD3C0; }
+/* Clear of a page's sticky Save bar (Settings), whose button sits bottom-right. */
+body:has(.savebar) .assistant-fab { bottom: 88px; }
+
+.assistant-pop {
+  position: fixed; right: 20px; bottom: 76px; z-index: 41;
+  width: min(400px, calc(100vw - 40px));
+  height: min(600px, calc(100vh - 110px));
+  display: flex; flex-direction: column;
+  /* Denser than a card: it floats over a page full of text. */
+  background: rgba(10,19,34,.93);
+  backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--rule-strong); border-radius: var(--radius);
+  box-shadow: 0 18px 60px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+.assistant-pop[hidden] { display: none; }
+body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh - 170px)); }
+.assistant-pop-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  padding: var(--s3) var(--s4); border-bottom: 1px solid var(--rule);
+}
+.assistant-pop-title { font-family: var(--display); font-size: var(--display-md); font-weight: 600; }
+.assistant-pop-thread {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--s3);
+  padding: var(--s4);
+}
+.assistant-pop .assistant-turn { max-width: 92%; font-size: 13.5px; }
+.assistant-pop .assistant-ask { padding: var(--s3); border-top: 1px solid var(--rule); }
+.assistant-pop-foot { padding: 0 var(--s4) var(--s3); font-size: var(--text-sm); text-align: right; }
+.assistant-turn.is-thinking .assistant-text { color: var(--ink-faint); font-style: italic; }
+.assistant-turn.is-error { border: 1px solid var(--refused); }
+.assistant-refresh { margin-top: var(--s2); font-size: var(--text-sm); color: var(--ink-faint); }
+
+@media (max-width: 640px) {
+  .assistant-fab { right: 14px; bottom: 14px; }
+  body:has(.savebar) .assistant-fab { bottom: 80px; }
+  /* On a phone the panel is the whole screen; its own Close button is the way out. */
+  .assistant-pop, body:has(.savebar) .assistant-pop {
+    inset: 0; width: 100%; height: 100%; border-radius: 0; border: 0;
+  }
+  .assistant-fab.is-open { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-pop:not([hidden]) { animation: fadeUp .25s ease both; }
+}
+.assistant-pop-empty { margin: auto 0; text-align: center; }

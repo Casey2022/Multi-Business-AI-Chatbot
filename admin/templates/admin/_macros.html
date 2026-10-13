@@ -74,3 +74,29 @@
   </div>
   {% endif %}
 {% endmacro %}
+
+{% macro assistant_turn(t, business, is_last=False, where='help', help_url='') %}
+  {# One turn of the owner assistant's conversation. Drawn here for the Help
+     page and the pop-out panel alike; assistant-pop.js builds the same
+     markup for a reply that arrives without a page load. #}
+  <div class="assistant-turn assistant-turn-{{ t.role }}">
+    <div class="assistant-who">{{ 'You' if t.role == 'owner' else 'Assistant' }}</div>
+    <div class="assistant-text">{{ t.content }}</div>
+    {% if t.actions %}
+    <div class="assistant-actions">
+      <div class="assistant-actions-title">Saved as a draft</div>
+      <ul>{% for a in t.actions %}{% for line in a.lines %}<li>{{ line }}</li>{% endfor %}{% endfor %}</ul>
+      <div>Customers see it once you press “Publish changes”.
+        {% if business %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
+    </div>
+    {% endif %}
+    {% if t.handoff and is_last %}
+    <div class="assistant-handoff">
+      {% if where == 'help' %}I've drafted a message to support below from this
+        conversation. Check it, then press “Send to support”.
+      {% else %}I've drafted a message to support from this conversation.
+        <a href="{{ help_url }}#support">Open it on the Help page</a> to check it and send it.{% endif %}
+    </div>
+    {% endif %}
+  </div>
+{% endmacro %}

@@ -607,6 +607,7 @@ def _render_menu(business, errors=None, editing=None, status=200):
     for i, entry in enumerate(menu_list):
         rows = (editing or {}).get(i) or menu_form.item_rows(entry)
         cards.append({"index": i, "original": entry.get("item", ""), "rows": rows,
+                      "fingerprint": menu_form.fingerprint(entry),
                       "errors": (errors or {}).get(i, []),
                       "preview": menu.render_item(menu.items({"menu": [entry]})[0])})
     new_rows = (editing or {}).get("new") or menu_form.item_rows({})
@@ -661,7 +662,8 @@ def menu_item_save(business_id, index):
         return _render_menu(business, errors={index: errors},
                             editing={index: menu_form.form_rows(request.form)}, status=400)
     new_list, stale = menu_form.replace_item(menu_list, index, entry,
-                                             request.form.get("original", ""))
+                                             request.form.get("original", ""),
+                                             request.form.get("fingerprint"))
     if stale:
         flash(stale, "error")
         return redirect(url_for("admin.menu_page", business_id=business_id))
@@ -701,7 +703,8 @@ def menu_item_delete(business_id, index):
         return off
     _live, menu_list = _menu_context(business)
     new_list, stale = menu_form.replace_item(menu_list, index, None,
-                                             request.form.get("original", ""))
+                                             request.form.get("original", ""),
+                                             request.form.get("fingerprint"))
     if stale:
         flash(stale, "error")
         return redirect(url_for("admin.menu_page", business_id=business_id))

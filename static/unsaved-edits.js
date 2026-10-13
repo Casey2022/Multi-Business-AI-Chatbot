@@ -88,6 +88,12 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     var forms = document.querySelectorAll("form[data-track-edits]");
+
+    // Asked by assistant-pop.js before it refreshes the page to show a
+    // change the assistant made: a refresh would throw this typing away.
+    window.portalHasUnsavedEdits = function () {
+      return Array.prototype.some.call(forms, isEdited);
+    };
     Array.prototype.forEach.call(forms, function (form) {
       form.addEventListener("input", function () { sync(form); });
       form.addEventListener("change", function () { sync(form); });

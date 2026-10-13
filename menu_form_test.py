@@ -153,6 +153,16 @@ def main():
     check("…but not if the page showed a different item there",
           mf.replace_item(lst, 1, {"item": "z"}, "a")[0] is None)
     check("deleting", mf.replace_item(lst, 0, None, "a")[0] == [lst[1]])
+    shown = mf.fingerprint(lst[1])
+    changed = [lst[0], {**lst[1], "options": {"y": 99}}]
+    check("a price changed since the page loaded is caught, not overwritten",
+          mf.replace_item(changed, 1, {"item": "b", "options": {"y": 3}}, "b", shown)[0] is None)
+    check("…and so is a Remove pressed on the stale card",
+          mf.replace_item(changed, 1, None, "b", shown)[0] is None)
+    check("an unchanged item saves with its fingerprint",
+          mf.replace_item(lst, 1, {"item": "b", "options": {"y": 3}}, "b", shown)[0] is not None)
+    check("the fingerprint ignores key order (the same item is the same item)",
+          mf.fingerprint({"item": "x", "options": {"a": 1}}) == mf.fingerprint({"options": {"a": 1}, "item": "x"}))
 
     heading("the page and its routes")
     routes = (ROOT / "admin" / "routes.py").read_text()

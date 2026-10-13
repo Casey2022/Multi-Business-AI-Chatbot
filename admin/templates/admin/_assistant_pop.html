@@ -1,0 +1,44 @@
+{# _assistant_pop.html — the owner assistant, on every owner page.
+
+   Included by base.html when assistant_panel() offers it (owners only, not
+   on the Help page). Without assistant-pop.js the corner button is simply a
+   link to the Help page, where the same assistant works with ordinary form
+   posts. With it, the button opens this panel, questions go by fetch, and
+   the conversation (the same one the Help page shows) carries on from page
+   to page. #}
+{% import "admin/_macros.html" as ui %}
+<a class="assistant-fab" href="{{ ap.help_url }}#assistant" data-assistant-toggle
+   aria-controls="assistant-pop" aria-expanded="false">
+  <span class="assistant-fab-dot" aria-hidden="true"></span>Ask the assistant
+</a>
+<section class="assistant-pop" id="assistant-pop" role="dialog" aria-label="Owner assistant" hidden>
+  <div class="assistant-pop-head">
+    <span class="assistant-pop-title">Ask the assistant</span>
+    <span class="toolbar">
+      <form method="POST" action="{{ url_for('admin.help_assistant_clear') }}" class="inline-form" data-assistant-clear>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        {% if ap.page %}<input type="hidden" name="from" value="{{ ap.page }}">{% endif %}
+        <button class="btn btn-sm" type="submit">Start over</button>
+      </form>
+      <button class="btn btn-sm" type="button" data-assistant-close aria-label="Close the assistant">Close</button>
+    </span>
+  </div>
+  <div class="assistant-pop-thread" data-assistant-thread aria-live="polite">
+    {% for t in ap.turns %}{{ ui.assistant_turn(t, ap.business, loop.last, 'pop', ap.help_url) }}
+    {% endfor %}
+    <p class="hint assistant-pop-empty" {{ 'hidden' if ap.turns }}>Ask how to do something
+      {%- if menu_switched_on(ap.business) %}, or for a menu change: “raise the large to $24”.
+      It saves menu changes as drafts for you to publish{% endif %}.</p>
+  </div>
+  <form method="POST" action="{{ url_for('admin.help_ask') }}" class="assistant-ask" data-assistant-form>
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    {% if ap.page %}<input type="hidden" name="from" value="{{ ap.page }}">{% endif %}
+    <label for="assistant-pop-question" class="sr-only">Your question</label>
+    <input type="text" id="assistant-pop-question" name="question" maxlength="{{ ap.max_question }}"
+           placeholder="Ask how to do something" autocomplete="off" required>
+    <button class="btn btn-primary" type="submit">Ask</button>
+  </form>
+  <div class="assistant-pop-foot">
+    <a href="{{ ap.help_url }}#support">Ask a person instead</a>
+  </div>
+</section>
