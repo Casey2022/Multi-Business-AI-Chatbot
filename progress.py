@@ -1,7 +1,8 @@
 """A progress bar for the long-running evals, and a print that won't break it.
 
-Used by rag_eval.py and conversation_eval.py, which run for minutes. The
-static test suites finish in seconds and don't need one.
+Used by every eval that calls the API (rag, journey, qa, conversation,
+upload, assistant, judge_test) and by run_tests.py, which runs the offline
+test files one after another under a single bar.
 
 Optional by design: if tqdm isn't installed, or output isn't going to a
 terminal (piped to a file, run by CI), there is no bar and `say` is plain

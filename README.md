@@ -209,6 +209,19 @@ URLs worth knowing:
 original address, back when "demo" meant the chat page rather than the
 sandbox.)
 
+### Tests and evals
+
+```bash
+python3 run_tests.py            # every offline test file, one progress bar (~20s, no API calls)
+python3 run_tests.py menu       # just the files whose name matches
+```
+
+The evals call the API and have their own progress bars: `rag_eval.py`,
+`journey_eval.py`, `qa_eval.py`, `conversation_eval.py`, `upload_eval.py`,
+`assistant_eval.py` (`--repeat=3` for three runs each), and `judge_test.py`.
+The bars need `pip install tqdm`; without it everything runs the same,
+just without a bar.
+
 ## Project structure
 
 ```

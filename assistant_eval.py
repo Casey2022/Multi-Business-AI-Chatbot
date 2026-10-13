@@ -17,6 +17,8 @@ words) and whether it offered to pass the question to support. Read a
 failing reply before believing the failure.
 """
 
+import progress
+from progress import say
 import re
 import shutil
 import sys
@@ -176,28 +178,30 @@ def main():
     llm._create = counting
 
     failed, n = 0, 0
-    for case in chosen:
-        results = []
-        for _ in range(repeat):
-            n += 1
-            results.append(run(case, n))
-        clean = sum(1 for _, p in results if not p)
-        out, problems = next(((o, p) for o, p in results if p), results[0])
-        mark = "FAIL" if problems else "pass"
-        print(f"{mark}  {case['name']}" + (f"  [{clean}/{repeat} clean]" if repeat > 1 else ""))
-        if problems or verbose:
-            print(f"      owner  {case['ask']}")
-            if out:
-                for line in out["reply"].splitlines():
-                    print(f"      bot    {line}")
-                if out["handoff"]:
-                    print(f"      support: {out['handoff']}")
-                for a in out["actions"]:
-                    for l in a["lines"]:
-                        print(f"      draft: {l}")
-            for p in problems:
-                print(f"      ✗ {p}")
-        failed += bool(problems)
+    with progress.bar(len(chosen) * repeat, "assistant", unit="question") as bar:
+        for case in chosen:
+            results = []
+            for _ in range(repeat):
+                n += 1
+                results.append(run(case, n))
+                bar.update()
+            clean = sum(1 for _, p in results if not p)
+            out, problems = next(((o, p) for o, p in results if p), results[0])
+            mark = "FAIL" if problems else "pass"
+            say(f"{mark}  {case['name']}" + (f"  [{clean}/{repeat} clean]" if repeat > 1 else ""))
+            if problems or verbose:
+                say(f"      owner  {case['ask']}")
+                if out:
+                    for line in out["reply"].splitlines():
+                        say(f"      bot    {line}")
+                    if out["handoff"]:
+                        say(f"      support: {out['handoff']}")
+                    for a in out["actions"]:
+                        for l in a["lines"]:
+                            say(f"      draft: {l}")
+                for p in problems:
+                    say(f"      ✗ {p}")
+            failed += bool(problems)
 
     cost = ((usage["in"] + usage["cache_write"] * 1.25 + usage["cache_read"] * 0.1)
             / 1e6 * llm.PRICE_IN_PER_MTOK + usage["out"] / 1e6 * llm.PRICE_OUT_PER_MTOK)

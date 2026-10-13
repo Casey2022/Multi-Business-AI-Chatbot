@@ -8,6 +8,8 @@ Costs a few cents (one judge call per case). Run it after any change to
 judge.py, rubrics.py or JUDGE_MODEL:  python3 judge_test.py
 """
 
+import progress
+from progress import say
 import os
 import sys
 
@@ -215,27 +217,29 @@ def main():
         return 1
     print(f"Judge: {judge.JUDGE_MODEL}\n")
     wrong = 0
-    for label, question, rubric, reply, should_pass in CASES:
-        passed, reason = judge.judge(question, reply, rubric)
-        if judge.is_error(reason):
-            # A failed call is not a FAIL verdict. Counting it as one let a
-            # run with zero successful calls report 17/27: every case whose
-            # known answer is FAIL "agreed". Stop at the first error. The
-            # usual causes (usage limit, bad model name, no network) fail
-            # every call, and the rest would cost time and prove nothing.
-            print(f"ERROR · {label}\n      {reason}")
-            print(f"\nStopped: the judge didn't return a verdict, so this run "
-                  f"says nothing about it. Fix the error and re-run.")
-            return 2
-        ok = passed == should_pass
-        wrong += not ok
-        print(f"{'ok  ' if ok else 'WRONG'} expected {'PASS' if should_pass else 'FAIL'}, "
-              f"judged {'PASS' if passed else 'FAIL'} · {label}"
-              # An evaluation model's only "reason" is its probability, and
-              # how close a right answer came to the line matters too.
-              + (f"  [{reason}]" if judge.is_evaluation_model() else ""))
-        if not ok:
-            print(f"      judge said: {reason}")
+    with progress.bar(len(CASES), "judge", unit="case") as bar:
+        for label, question, rubric, reply, should_pass in CASES:
+            passed, reason = judge.judge(question, reply, rubric)
+            bar.update()
+            if judge.is_error(reason):
+                # A failed call is not a FAIL verdict. Counting it as one let a
+                # run with zero successful calls report 17/27: every case whose
+                # known answer is FAIL "agreed". Stop at the first error. The
+                # usual causes (usage limit, bad model name, no network) fail
+                # every call, and the rest would cost time and prove nothing.
+                say(f"ERROR · {label}\n      {reason}")
+                say(f"\nStopped: the judge didn't return a verdict, so this run "
+                      f"says nothing about it. Fix the error and re-run.")
+                return 2
+            ok = passed == should_pass
+            wrong += not ok
+            say(f"{'ok  ' if ok else 'WRONG'} expected {'PASS' if should_pass else 'FAIL'}, "
+                  f"judged {'PASS' if passed else 'FAIL'} · {label}"
+                  # An evaluation model's only "reason" is its probability, and
+                  # how close a right answer came to the line matters too.
+                  + (f"  [{reason}]" if judge.is_evaluation_model() else ""))
+            if not ok:
+                say(f"      judge said: {reason}")
     print(f"\n{len(CASES) - wrong}/{len(CASES)} verdicts agree with the known answer.")
     print(judge.cost_summary() or "Judge: no successful calls.")
     return 1 if wrong else 0

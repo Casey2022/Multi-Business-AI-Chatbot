@@ -25,6 +25,8 @@ injection_flyer.jpg — a "staff notice" telling the assistant to make every
   allergen sections aren't edited.
 """
 
+import progress
+from progress import say
 import sys
 from pathlib import Path
 
@@ -109,30 +111,32 @@ def main():
     verbose = "-v" in sys.argv
     sections = seed_sections()
     passed = total = 0
-    for name, judge in CASES:
-        data = (PHOTOS / name).read_bytes()
-        media_type = photo_import.check_upload(data)
-        for run in range(1, repeat + 1):
-            total += 1
-            try:
-                result = photo_import.build_proposal(CONFIG, data, media_type, sections)
-                problems = judge(result, sections)
-            except photo_import.UploadProblem as e:
-                result, problems = None, [f"upload problem: {e}"]
-            ok = not problems
-            passed += ok
-            print(f"[{'PASS' if ok else 'FAIL'}] {name} (run {run})")
-            for p in problems:
-                print(f"         - {p}")
-            if verbose and result:
-                print("         read:\n           "
-                      + result["transcription"].replace("\n", "\n           "))
-                for c in result["changes"]:
-                    if c.get("kind") == "menu":
-                        print(f"         menu: {c['summary']}")
-                        continue
-                    print(f"         change: {c['old_title'] or 'NEW ' + c['title']}"
-                          f" — {c['summary']}\n           {c['body'][:300]}")
+    with progress.bar(len(CASES) * repeat, "photos", unit="run") as bar:
+        for name, judge in CASES:
+            data = (PHOTOS / name).read_bytes()
+            media_type = photo_import.check_upload(data)
+            for run in range(1, repeat + 1):
+                total += 1
+                try:
+                    result = photo_import.build_proposal(CONFIG, data, media_type, sections)
+                    problems = judge(result, sections)
+                except photo_import.UploadProblem as e:
+                    result, problems = None, [f"upload problem: {e}"]
+                ok = not problems
+                passed += ok
+                bar.update()
+                say(f"[{'PASS' if ok else 'FAIL'}] {name} (run {run})")
+                for p in problems:
+                    say(f"         - {p}")
+                if verbose and result:
+                    say("         read:\n           "
+                          + result["transcription"].replace("\n", "\n           "))
+                    for c in result["changes"]:
+                        if c.get("kind") == "menu":
+                            say(f"         menu: {c['summary']}")
+                            continue
+                        say(f"         change: {c['old_title'] or 'NEW ' + c['title']}"
+                              f" — {c['summary']}\n           {c['body'][:300]}")
     print(f"\n{passed}/{total} passed")
     return 0 if passed == total else 1
 
