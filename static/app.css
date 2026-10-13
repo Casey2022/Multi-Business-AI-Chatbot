@@ -1102,3 +1102,94 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   .assistant-pop:not([hidden]) { animation: fadeUp .25s ease both; }
 }
 .assistant-pop-empty { margin: auto 0; text-align: center; }
+
+/* ---------------------------------------------------------------------- *
+ * The text-message simulator (templates/text.html, /textsim)
+ * ---------------------------------------------------------------------- *
+ * A phone, drawn in CSS: the SMS channel as a customer meets it. Outgoing
+ * texts are text-message green (deep enough to carry white text at AA);
+ * incoming are the grey a phone uses in dark mode.
+ */
+.textwrap {
+  flex: 1; width: 100%; max-width: 980px; margin: 0 auto;
+  padding: var(--s5) var(--s4);
+  display: flex; gap: var(--s5); align-items: flex-start; justify-content: center;
+}
+.phone {
+  width: 360px; flex-shrink: 0; height: min(740px, calc(100vh - 110px)); min-height: 520px;
+  display: flex; flex-direction: column;
+  background: #05070C; border-radius: 46px;
+  border: 10px solid #151B26;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 24px 70px rgba(0,0,0,.55);
+  overflow: hidden; position: relative;
+}
+.phone-status {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 24px 4px; font-size: 13px; font-weight: 600; color: #fff;
+}
+.phone-clock { font-variant-numeric: tabular-nums; }
+.phone-icons { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+.phone-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
+.phone-bars i { display: block; width: 3px; background: #fff; border-radius: 1px; }
+.phone-bars i:nth-child(1) { height: 4px; } .phone-bars i:nth-child(2) { height: 6px; }
+.phone-bars i:nth-child(3) { height: 8px; } .phone-bars i:nth-child(4) { height: 10px; }
+.phone-battery { width: 22px; height: 11px; border: 1.5px solid #fff; border-radius: 3px;
+                 position: relative; }
+.phone-battery::after { content: ""; position: absolute; inset: 1.5px; right: 5px;
+                        background: #fff; border-radius: 1px; }
+.phone-head {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: var(--s2) var(--s3) var(--s3);
+  border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03);
+}
+.phone-avatar {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 20px; font-weight: 600; color: #fff;
+  background: linear-gradient(135deg, #5B6B82, #36404F);
+}
+.phone-name { font-size: 13px; font-weight: 600; color: #fff; margin-top: 2px; }
+.phone-kind { font-size: 10.5px; color: rgba(255,255,255,.6); }
+.phone-thread {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px; padding: var(--s3) var(--s3) var(--s2);
+}
+.sms { display: flex; flex-direction: column; }
+.sms-in  { align-items: flex-start; }
+.sms-out { align-items: flex-end; }
+.sms-bubble {
+  max-width: 78%; padding: 8px 12px; font-size: 14px; line-height: 1.38;
+  white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 18px;
+}
+.sms-in .sms-bubble  { background: #2A2C31; color: #F2F3F5; border-bottom-left-radius: 5px; }
+.sms-out .sms-bubble { background: #1F8A4C; color: #fff; border-bottom-right-radius: 5px; }
+.sms-meta { font-size: 10.5px; color: rgba(255,255,255,.6); margin: 2px 6px 4px; }
+.sms-typing { color: rgba(255,255,255,.6); font-style: italic; }
+.sms-notice { border-left: 3px solid #1F8A4C; }
+.sms-failed { border: 1px solid var(--refused); }
+.phone-compose {
+  display: flex; gap: var(--s2); align-items: center;
+  padding: var(--s2) var(--s3) var(--s4);
+}
+.phone-compose input {
+  flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px;
+  background: #13161C; border: 1px solid rgba(255,255,255,.18); color: #fff; font-size: 14px;
+}
+.phone-compose button {
+  width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer; flex-shrink: 0;
+  background: #1F8A4C; color: #fff; font-size: 18px; font-weight: 700; line-height: 1;
+}
+.phone-compose button:disabled { opacity: .5; cursor: default; }
+.textside { max-width: 420px; }
+.textside li { margin-bottom: var(--s2); }
+.textcost {
+  margin-top: var(--s3); padding: var(--s2) var(--s3); border-radius: var(--radius-sm);
+  background: var(--pen-wash); color: var(--ink); font-variant-numeric: tabular-nums;
+}
+@media (max-width: 860px) {
+  .textwrap { flex-direction: column; align-items: center; padding: var(--s3); }
+  .textside { max-width: 100%; }
+}
+@media (max-width: 420px) {
+  /* On a real phone, the drawn phone would be a phone inside a phone. */
+  .phone { width: 100%; height: calc(100vh - 140px); border-radius: 24px; border-width: 6px; }
+}

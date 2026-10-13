@@ -42,6 +42,7 @@ SESSION_KEY = "csrf_token"
 EXEMPT = {
     "sms_reply",      # Twilio posts this; verified by request signature
     "webchat_reply",  # JSON from the chat widget; rate-limited per session and IP
+    "textsim_reply",  # the same, for the text-message simulator on the demo page
 }
 
 # demo_start is deliberately NOT exempt. It's public, but it signs the

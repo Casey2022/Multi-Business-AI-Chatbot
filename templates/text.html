@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ business.name }} — text message</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="chatpage">
+
+<nav class="topnav">
+  <a class="wordmark" href="{{ url_for('demo_picker') }}">Simon<em> Says</em></a>
+  <span class="nav-links">
+    <a class="nav-link" href="{{ url_for('chat_page', slug=business.slug) }}">Web chat</a>
+    {% if is_demo %}
+      <a class="btn btn-primary" href="{{ url_for('admin.settings', business_id=business.id) }}">Open the owner&rsquo;s portal</a>
+      <a class="nav-link" href="{{ url_for('demo_picker') }}">Try a different business</a>
+    {% endif %}
+  </span>
+</nav>
+
+<div class="textwrap">
+  <div class="phone" aria-label="A phone texting {{ business.name }}">
+    <div class="phone-status" aria-hidden="true">
+      <span class="phone-clock" id="phoneClock">9:41</span>
+      <span class="phone-icons"><span class="phone-bars"><i></i><i></i><i></i><i></i></span>5G<span class="phone-battery"></span></span>
+    </div>
+    <div class="phone-head">
+      <span class="phone-avatar" aria-hidden="true">{{ business.name[:1] }}</span>
+      <span class="phone-name">{{ business.name }}</span>
+      <span class="phone-kind">Text Message</span>
+    </div>
+    <div class="phone-thread" id="textBody" aria-live="polite">
+      <div class="sms sms-in"><div class="sms-bubble">{{ greeting }}</div></div>
+    </div>
+    <form class="phone-compose" id="textForm">
+      <label class="sr-only" for="textInput">Your text</label>
+      <input id="textInput" type="text" placeholder="Text Message" autocomplete="off" maxlength="1000" autofocus>
+      <button id="textSend" type="submit" aria-label="Send">&uarr;</button>
+    </form>
+  </div>
+
+  <div class="card textside">
+    <div class="card-title">The same assistant, by text</div>
+    <div class="card-pad guidance">
+      <p>This is the text-message channel: the same assistant, knowledge and
+        booking as the <a href="{{ url_for('chat_page', slug=business.slug) }}">web chat</a>,
+        with replies kept to a text's length.</p>
+      <ul>
+        <li>Texts are billed per segment: 160 characters, or 70 once one character
+          isn't in the basic texting alphabet (an emoji, say). Curly quotes and dashes
+          are swapped for plain ones so a reply stays in the cheaper one.</li>
+        <li>Each reply shows how many segments it took. Prices are estimates from
+          Twilio's US rates: about {{ cost_out }}¢ a segment out, {{ cost_in }}¢ in.</li>
+        <li>Nothing is sent anywhere. You're texting from an invented number,
+          <strong id="simNumber">…</strong>, which is what the business sees in its
+          portal. Real texting needs a Twilio number.</li>
+      </ul>
+      <div class="textcost" id="textCost">This conversation: 0 texts · ≈0¢</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // An invented number in 555, the range kept for fiction; plays the role
+  // the session id plays in the web chat. The server only accepts this shape.
+  const phone = "+1555" + String(Math.floor(Math.random() * 1e7)).padStart(7, "0");
+  const slug = {{ business.slug | tojson }};
+  const COST_OUT = {{ cost_out | tojson }}, COST_IN = {{ cost_in | tojson }};
+  let inFlight = false, segOut = 0, segIn = 0;
+
+  const body = document.getElementById("textBody");
+  const input = document.getElementById("textInput");
+  const btn = document.getElementById("textSend");
+  document.getElementById("simNumber").textContent =
+    "(" + phone.slice(2, 5) + ") " + phone.slice(5, 8) + "-" + phone.slice(8);
+  const now = new Date();
+  document.getElementById("phoneClock").textContent =
+    now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M$/i, "");
+
+  function cents(n) { return n < 10 ? n.toFixed(1) : Math.round(n).toString(); }
+
+  function tally() {
+    const total = segOut * COST_OUT + segIn * COST_IN;
+    document.getElementById("textCost").textContent =
+      "This conversation: " + (segOut + segIn) + " text segment" + (segOut + segIn === 1 ? "" : "s") +
+      " (" + segIn + " in, " + segOut + " out) · ≈" + cents(total) + "¢";
+  }
+
+  // textContent, never markup: a reply is shown exactly as it would arrive.
+  function addText(text, who, meta, extraClass) {
+    const row = document.createElement("div");
+    row.className = "sms sms-" + who;
+    const bubble = document.createElement("div");
+    bubble.className = "sms-bubble" + (extraClass ? " " + extraClass : "");
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    if (meta) {
+      const m = document.createElement("div");
+      m.className = "sms-meta";
+      m.textContent = meta;
+      row.appendChild(m);
+    }
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+    return row;
+  }
+
+  function describe(seg) {
+    if (!seg || !seg.segments) return "";
+    let s = seg.segments + " segment" + (seg.segments === 1 ? "" : "s");
+    if (seg.encoding === "Unicode") s += " · Unicode" + (seg.because ? " (because of " + seg.because + ")" : "");
+    return s + " · ≈" + cents(seg.segments * COST_OUT) + "¢";
+  }
+
+  async function send() {
+    if (inFlight) return;
+    const text = input.value.trim();
+    if (!text) return;
+    inFlight = true;
+    input.value = "";
+    btn.disabled = true;
+    addText(text, "out");
+    const typing = addText("…", "in", "", "sms-typing");
+    try {
+      const res = await fetch(`/textsim/${slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, phone: phone }),
+      });
+      const data = await res.json();
+      typing.remove();
+      if (data.in) segIn += data.in.segments;
+      if (data.out) segOut += data.out.segments;
+      addText(data.reply || data.error || "Something went wrong.", "in", describe(data.out));
+      tally();
+    } catch (err) {
+      typing.remove();
+      addText("Not delivered. Check your connection and try again.", "in", "", "sms-failed");
+    } finally {
+      inFlight = false;
+      btn.disabled = false;
+      input.focus();
+    }
+  }
+
+  document.getElementById("textForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    send();
+  });
+
+  // Texts the business sends unasked (the owner moved or cancelled this
+  // customer's appointment), picked up every 10 seconds while visible.
+  async function checkForUpdates() {
+    if (document.hidden) return;
+    try {
+      const res = await fetch(`/textsim/${slug}/updates?phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.messages || []).forEach((m) => {
+        if (m.out) segOut += m.out.segments;
+        addText(m.text, "in", describe(m.out), "sms-notice");
+        tally();
+      });
+    } catch (err) { /* offline for a moment; the next check picks it up */ }
+  }
+  setInterval(checkForUpdates, 10000);
+</script>
+
+</body>
+</html>

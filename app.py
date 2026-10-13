@@ -412,31 +412,40 @@ def sms_reply():
     from_number  = normalize_phone(request.form.get("From", "unknown"))
     to_number    = normalize_phone(request.form.get("To",   "unknown"))
 
-    new_turn()      # every line logged for this message shares one id
-    log.info("Incoming SMS for %s from %s (%s)", business["name"],
-             from_number, scrub(incoming_msg))
-    log.debug("SMS content from %s: %r", from_number, incoming_msg)
-
-     # Identify which business this webhook is for.
+    # Identify which business this webhook is for. Before anything logs its
+    # name: this used to log business["name"] first, a NameError on every
+    # real text that nothing caught because no real text had arrived yet
+    # (found 2026-10-12 while building the simulator on this same path).
     business = get_business_by_number(to_number)
     if not business:
         log.warning(f"No business registered for {to_number}")
         return "Forbidden", 404
 
-    config      = load_config(business["config_path"], business["id"])
-    business_id = business["id"]
-
-    log.info(f"Serving: {business['name']} (id={business_id})")
-
-    # Run the message through the channel-agnostic brain.
-    reply_text = safe_process_message(
-        incoming_msg, from_number, business_id, config, channel="sms"
-    )
+    reply_text = sms_turn(business, from_number, incoming_msg)
 
     # Format the reply as TwiML XML for Twilio.
     resp = MessagingResponse()
     resp.message(reply_text)
     return str(resp)
+
+
+def sms_turn(business, from_number, incoming_msg):
+    """One text in, one text out: the SMS channel, shared by the Twilio
+    webhook and the simulator on the demo page (/textsim), so what the
+    simulator shows is what a phone would get."""
+    import sms
+    new_turn()      # every line logged for this message shares one id
+    log.info("Incoming SMS for %s from %s (%s)", business["name"],
+             from_number, scrub(incoming_msg))
+    log.debug("SMS content from %s: %r", from_number, incoming_msg)
+    config = load_config(business["config_path"], business["id"])
+    log.info(f"Serving: {business['name']} (id={business['id']})")
+    # The channel-agnostic brain, with the SMS channel's instructions.
+    reply_text = safe_process_message(
+        incoming_msg, from_number, business["id"], config, channel="sms")
+    # Curly quotes and dashes would turn the whole text into Unicode and
+    # double its segments; a phone shows the plain ones just as well.
+    return sms.for_sms(reply_text)
 
 @app.route("/webchat/<slug>", methods=["POST"])
 def webchat_reply(slug):
@@ -534,6 +543,82 @@ def webchat_updates(slug):
     if notes:
         log_web.info("Delivered %d notice(s) to %s", len(notes), session_id)
     return {"messages": [n["body"] for n in notes]}
+
+
+# ---------------------------------------------------------------------------
+# The text-message simulator: the SMS channel without Twilio
+# ---------------------------------------------------------------------------
+
+_SIM_NUMBER = re.compile(r"\+1555\d{7}")
+
+
+@app.route("/chat/<slug>/text", methods=["GET"])
+def text_page(slug):
+    """The same assistant, as a text conversation on a phone.
+
+    Runs the real SMS path (sms_turn: the SMS channel's instructions, plain
+    punctuation, segments) with an invented 555 number standing in for the
+    customer's phone. Nothing is sent anywhere; real texting is a Twilio
+    number away (see notes/future_directions.md and the status doc)."""
+    business = get_business_by_slug(slug)
+    if not business:
+        return "Unknown business", 404
+    import sms
+    config = load_config(business["config_path"], business["id"])
+    return render_template(
+        "text.html", business=business, is_demo=bool(business.get("is_demo")),
+        cost_out=sms.COST_OUT_CENTS, cost_in=sms.COST_IN_CENTS,
+        greeting=f"Hi! This is {config['business']['name']}. Text us a question "
+                 f"or to book.")
+
+
+@app.route("/textsim/<slug>", methods=["POST"])
+def textsim_reply(slug):
+    """JSON {"message", "phone"} -> {"reply", "out": segments, "in": segments}.
+
+    `phone` is the simulator's invented number (+1555 and seven digits),
+    made by the page the way the web chat makes its session id. Limited
+    exactly like /webchat: every message is a model call."""
+    import ratelimit
+    import sms
+    business = get_business_by_slug(slug)
+    if not business:
+        return {"error": "Unknown business"}, 404
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    if not message or not _SIM_NUMBER.fullmatch(phone):
+        return {"error": "message and a simulated phone number are required"}, 400
+    if len(message) > 1000:
+        return {"error": "Message too long"}, 400
+    allowed, wait = ratelimit.webchat(slug, phone, _client_ip())
+    if not allowed:
+        return {"reply": "You're texting faster than I can keep up with. Give me "
+                         "a moment and try again.", "retry_after": wait}, 429
+    reply = sms_turn(business, phone, message)
+    return {"reply": reply, "out": sms.segments(reply), "in": sms.segments(message)}
+
+
+@app.route("/textsim/<slug>/updates", methods=["GET"])
+def textsim_updates(slug):
+    """Texts the business sent this simulated phone unasked (a moved or
+    cancelled appointment): the web chat's pickup, keyed by the number."""
+    import clock
+    import sms
+    from db import collect_notifications
+    business = get_business_by_slug(slug)
+    if not business:
+        return {"error": "Unknown business"}, 404
+    phone = (request.args.get("phone") or "").strip()
+    if not _SIM_NUMBER.fullmatch(phone):
+        return {"error": "phone is required"}, 400
+    from reconcile import maybe_reconcile
+    maybe_reconcile(business, min_interval=60)
+    config = load_config(business["config_path"], business["id"])
+    delivered_at = clock.business_now(config).isoformat(timespec="seconds")
+    notes = collect_notifications(business["id"], phone, delivered_at)
+    return {"messages": [{"text": sms.for_sms(n["body"]),
+                          "out": sms.segments(sms.for_sms(n["body"]))} for n in notes]}
 
 
 @app.route("/demo", methods=["GET"])

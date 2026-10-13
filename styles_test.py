@@ -38,6 +38,8 @@ ADDED_BY_SCRIPT = {
     "is-error",           # assistant-pop.js, a turn saying something failed
     "is-open",            # assistant-pop.js, the corner button while the panel is open
     "assistant-refresh",  # assistant-pop.js, "Refreshing the page…" / unsaved-edits note
+    "sms", "sms-in", "sms-out", "sms-bubble", "sms-meta",   # text.html's script, per text
+    "sms-typing", "sms-notice", "sms-failed",
 }
 
 PASSED, FAILED = [], []

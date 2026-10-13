@@ -36,6 +36,12 @@ def channel_for(recipient):
     recipient = recipient or ""
     if recipient.startswith("web_"):
         return "webchat", None
+    # The demo's text-message simulator: its phone picks notices up the way
+    # the web chat does. Checked before real phone numbers, so an invented
+    # 555 number is never texted once real SMS exists.
+    import sms
+    if sms.is_simulated(recipient):
+        return "textsim", None
     if _PHONE.match(recipient):
         return "sms", "SMS isn't set up yet"
     return "none", "no way to reach this customer"
@@ -95,7 +101,7 @@ def notify_change(appt, config, kind, new_datetime=None):
             channel, reason = channel, "the appointment had already passed"
 
         body = message_for(appt, config, kind, new_datetime)
-        status = "pending" if (channel == "webchat" and not reason) else "not_sent"
+        status = "pending" if (channel in ("webchat", "textsim") and not reason) else "not_sent"
         add_notification(appt["business_id"], appt["id"], recipient, channel,
                          kind, body, status, created, reason=reason)
         # No names or message text in the log: the notice quotes both.

@@ -32,7 +32,8 @@
   <div class="card chatcard">
     <div class="card-title chathead">
       {{ business.name }}
-      <span class="chathead-sub">Ask a question or start a booking</span>
+      <span class="chathead-sub">Ask a question or start a booking ·
+        <a href="{{ url_for('text_page', slug=business.slug) }}">try it as a text message</a></span>
     </div>
 
     <div class="thread" id="chatBody">

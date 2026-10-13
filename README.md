@@ -197,6 +197,7 @@ URLs worth knowing:
 | path | what it is |
 |---|---|
 | `/chat/<slug>` | the chat page a customer sees, for any business |
+| `/chat/<slug>/text` | the same assistant as a text conversation on a drawn phone: the real SMS path with an invented 555 number, segment counts and an estimated cost per text (`sms.py`); nothing is sent |
 | `/demo` | the sandbox: pick a business and get your own copy |
 | `/demo/start` | mints that copy and signs you in as its owner |
 | `/admin` | the owner's portal |

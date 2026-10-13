@@ -319,9 +319,16 @@ def test_endpoint_safety_net():
     tree = ast.parse(source)
     funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
 
-    for endpoint in ("webchat_reply", "sms_reply"):
-        calls = {c.func.id for c in ast.walk(funcs[endpoint])
-                 if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+    def calls_of(name):
+        return {c.func.id for c in ast.walk(funcs[name])
+                if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+
+    # Text messages (Twilio's and the demo's simulator) share sms_turn, so
+    # what sms_turn calls counts for every SMS endpoint (2026-10-12).
+    for endpoint in ("webchat_reply", "sms_reply", "textsim_reply"):
+        calls = calls_of(endpoint)
+        if "sms_turn" in calls:
+            calls |= calls_of("sms_turn")
         check(f"{endpoint} calls safe_process_message",
               "safe_process_message" in calls and "process_message" not in calls,
               f"calls {sorted(calls & {'process_message', 'safe_process_message'})}")
