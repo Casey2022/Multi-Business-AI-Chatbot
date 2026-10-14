@@ -126,14 +126,16 @@
     <div class="eyebrow card-pad">Blocked time coming up</div>
     {% for b in blocks %}
       <div class="block-row">
+        {# Remove on the left: the right-hand end of the last row sits under
+           the "Ask the assistant" button (2026-10-14). #}
+        <form method="POST" action="{{ url_for('admin.calendar_block_remove', business_id=business.id, block_id=b.id) }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm" type="submit" aria-label="Remove the block on {{ b.label }}">Remove</button>
+        </form>
         <div>
           <div class="cell-strong">{{ b.label }}</div>
           {% if b.note %}<div class="cell-sub">{{ b.note }}</div>{% endif %}
         </div>
-        <form method="POST" action="{{ url_for('admin.calendar_block_remove', business_id=business.id, block_id=b.id) }}">
-          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn-sm" type="submit">Remove</button>
-        </form>
       </div>
     {% endfor %}
   </div>

@@ -1056,6 +1056,9 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-family: var(--b
 .assistant-fab:hover { color: #fff; }
 .assistant-fab-dot { width: 8px; height: 8px; border-radius: 50%; background: #9FF0D6;
                      box-shadow: 0 0 8px #6FD3C0; }
+/* Room under the last thing on a page, so it can always be scrolled clear of
+   the corner button (it covered the Calendar's last "Remove", 2026-10-14). */
+body:has(.assistant-fab) .page { padding-bottom: 96px; }
 /* Clear of a page's sticky Save bar (Settings), whose button sits bottom-right. */
 body:has(.savebar) .assistant-fab { bottom: 88px; }
 
@@ -1209,7 +1212,7 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 .block-list { border-top: 1px solid var(--rule); }
 .block-list .eyebrow { padding-bottom: 0; }
 .block-row {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--s4);
   padding: var(--s3) var(--s4); border-top: 1px solid var(--rule);
 }
 .block-list .eyebrow + .block-row { border-top: 0; }
