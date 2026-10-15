@@ -373,6 +373,8 @@ def init_db():
     # answers. See notes/debugging_lessons.md.
     # How an upload was read: photo, pdf_text, pdf_scan (photo_import).
     _add_column_if_missing(conn, "upload_proposals", "source", "TEXT DEFAULT 'photo'")
+    # Text in a PDF nobody can see, set aside (JSON list; photo_import.page_runs).
+    _add_column_if_missing(conn, "upload_proposals", "hidden", "TEXT")
 
     _add_column_if_missing(conn, "conversation_state", "revision",
                            "INTEGER NOT NULL DEFAULT 0")
@@ -1255,7 +1257,7 @@ def unpublished_changes(business):
 
 
 def save_upload_proposal(business_id, transcription, changes, created_by=None,
-                         source="photo"):
+                         source="photo", hidden=()):
     """Keep a photo's (or PDF's) proposed changes for review, replacing any
     earlier set. source: how it was read (photo_import.read_upload)."""
     import json as _json
@@ -1263,12 +1265,12 @@ def save_upload_proposal(business_id, transcription, changes, created_by=None,
     conn = get_connection()
     conn.execute(
         "INSERT INTO upload_proposals (business_id, created_at, created_by, "
-        "transcription, changes, source) VALUES (?, ?, ?, ?, ?, ?) "
+        "transcription, changes, source, hidden) VALUES (?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(business_id) DO UPDATE SET created_at = excluded.created_at, "
         "created_by = excluded.created_by, transcription = excluded.transcription, "
-        "changes = excluded.changes, source = excluded.source",
+        "changes = excluded.changes, source = excluded.source, hidden = excluded.hidden",
         (business_id, _dt.now().isoformat(), created_by, transcription,
-         _json.dumps(changes), source))
+         _json.dumps(changes), source, _json.dumps(list(hidden or []))))
     conn.commit()
     conn.close()
 
@@ -1285,7 +1287,8 @@ def get_upload_proposal(business_id):
     return {"transcription": row["transcription"],
             "changes": _json.loads(row["changes"]),
             "created_at": row["created_at"], "created_by": row["created_by"],
-            "source": row["source"] or "photo"}
+            "source": row["source"] or "photo",
+            "hidden": _json.loads(row["hidden"]) if row["hidden"] else []}
 
 
 def delete_upload_proposal(business_id):

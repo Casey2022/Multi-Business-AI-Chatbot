@@ -738,6 +738,11 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   display: flex; flex-direction: column; gap: 3px;
 }
 
+/* Text in an uploaded PDF that can't be seen on the page (knowledge_upload). */
+.hidden-text { margin-bottom: var(--s4); }
+.hidden-text-list { margin: var(--s2) 0 0 18px; color: var(--ink); font-size: var(--text-sm);
+  display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+
 /* A section save refused because the section changed under it (the
    assistant, or another tab): the owner's text beside the saved one. */
 .section-conflict { flex-direction: column; align-items: stretch; margin-bottom: var(--s3); }

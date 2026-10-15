@@ -23,6 +23,19 @@
   </div>
 </div>
 
+{% if proposal.hidden %}
+<div class="banner hidden-text" role="note">
+  <div><strong>Your PDF has text that can't be seen on the page.</strong> It wasn't
+    used for these suggestions. Text like this is white on a white page, too small
+    to read, or in invisible ink: scanners add it to make a scan searchable, and
+    it can also be used to slip instructions past you. If any of it is something
+    you meant customers to know, add it to a section yourself.
+    <ul class="hidden-text-list">{% for run in proposal.hidden[:20] %}<li>{{ run }}</li>{% endfor %}</ul>
+    {% if proposal.hidden | length > 20 %}<div class="cell-sub">…and {{ proposal.hidden | length - 20 }} more.</div>{% endif %}
+  </div>
+</div>
+{% endif %}
+
 <form method="POST" action="{{ url_for('admin.knowledge_upload_apply', business_id=business.id) }}">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
@@ -122,9 +135,10 @@
   <details class="card-pad">
     {% if proposal.source == 'pdf_text' %}
     <summary>The text in your PDF</summary>
-    <p class="hint mt-3">Taken straight from the file, so it includes any text
-      that's on the page but hard to see (white on white, tiny, or under a
-      picture). Anything here you didn't write is worth a second look.</p>
+    <p class="hint mt-3">Taken straight from the file's text, leaving out what
+      can't be seen on the page (listed at the top, if there was any). Text
+      covered by a picture can't be told apart, so anything here you didn't
+      write is worth a second look.</p>
     {% else %}
     <summary>What the assistant read from your {{ word or 'photo' }}</summary>
     {% endif %}

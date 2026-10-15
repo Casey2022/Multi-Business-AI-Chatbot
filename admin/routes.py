@@ -846,7 +846,8 @@ def knowledge_upload(business_id):
         return back
 
     save_upload_proposal(business_id, result["transcription"], result["changes"],
-                         created_by=current_user()["email"], source=result["source"])
+                         created_by=current_user()["email"], source=result["source"],
+                         hidden=result.get("hidden") or [])
     return redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
 
 

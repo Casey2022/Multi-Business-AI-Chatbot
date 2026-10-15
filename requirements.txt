@@ -23,6 +23,10 @@ httplib2==0.32.0
 # Reads the text out of an uploaded PDF menu (photo_import.pdf_text). Pure
 # Python. Without it, PDFs still work: the model reads them as scans.
 pypdf==6.18.0
+# Takes the page pictures out of a scanned PDF (photo_import.page_images), so
+# the model reads what's visible, not the PDF's text layer. Arrives with
+# chromadb anyway; named because we import it ourselves.
+Pillow==12.3.0
 
 # Security floors on transitive dependencies. Neither is imported by our
 # code; both arrive underneath twilio, voyageai and chromadb, and the
