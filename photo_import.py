@@ -826,6 +826,42 @@ def _merge(segments):
 # The whole thing
 # ---------------------------------------------------------------------------
 
+def suggest(config, transcription, sections, word="photo"):
+    """The checked changes for a transcription: from a fresh read, or from
+    the owner's corrected text ("Suggest again from this text", 2026-10-15),
+    in which case the number check compares against their correction."""
+    return [check_menu_change(c, transcription) if c.get("kind") == "menu"
+            else check_change(c, transcription)
+            for c in propose_changes(config, transcription, sections, word)]
+
+
+def edited_menu_prices(changes, form_prices):
+    """(changes with the owner's typed prices, errors). form_prices: {index:
+    text} from the review page's price boxes. A price is read the way the
+    Menu page reads one (menu_form.parse_price_text): "26", "from 110",
+    "20 to 60"; a typo like "2O" is an error, and nothing is saved."""
+    import menu_form
+    out, errors = [dict(c) for c in changes], []
+    for i, text in form_prices.items():
+        c = out[i] if 0 <= i < len(out) else None
+        if c is None or c.get("kind") != "menu":
+            continue
+        text = " ".join((text or "").split())
+        if not text or text == menu.money(c["price"]):
+            continue
+        value, error = menu_form.parse_price_text(text)
+        if error or value is None:
+            errors.append(f"{c['item']} ({c.get('add_on') or c['option']}): "
+                          + (error or "a price is needed"))
+            continue
+        if isinstance(value, dict) and value.get("quote"):
+            errors.append(f"{c['item']} ({c.get('add_on') or c['option']}): "
+                          f"“{text}” isn't a price (try 26, from 110, or 20 to 60)")
+            continue
+        c["price"], c["edited"] = value, True
+    return out, errors
+
+
 def build_proposal(config, data, media_type, sections):
     """{"transcription", "changes", "source"} for one photo or PDF. source
     says how it was read (read_upload). Raises UploadProblem when there's
@@ -837,9 +873,7 @@ def build_proposal(config, data, media_type, sections):
             "Couldn't find any text in that PDF." if word == "PDF" else
             "Couldn't find any text in that photo. Try a closer, well-lit shot "
             "of the menu or price list.")
-    changes = [check_menu_change(c, transcription) if c.get("kind") == "menu"
-               else check_change(c, transcription)
-               for c in propose_changes(config, transcription, sections, word)]
+    changes = suggest(config, transcription, sections, word)
     log.info("Upload (%s): %d characters read, %d hidden runs set aside, %d changes "
              "proposed (%d flagged)", source, len(transcription), len(hidden),
              len(changes), sum(c["flagged"] for c in changes))

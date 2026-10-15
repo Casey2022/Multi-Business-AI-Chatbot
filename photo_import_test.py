@@ -299,13 +299,73 @@ def main():
                            "knowledge_upload_apply", "knowledge_upload_cancel")))
     check("flagged changes start unticked",
           '{% if not c.flagged %}checked{% endif %}' in review)
-    check("the review page has CSRF tokens on both forms", review.count("csrf_token()") == 2)
+    check("every form on the review page carries a CSRF token",
+          review.count("<form") == review.count("csrf_token()") >= 3)
     check("base.html loads the photo script", "photo-upload.js" in base)
     check("both renders of the knowledge page pass the waiting upload",
           routes.count("pending_upload = get_upload_proposal(business_id)") == 2)
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1
+
+
+def editing_checks(pi, llm, config, sections):
+    """Fixing what was read wrong (Casey, 2026-10-15): a menu change's price
+    box on the review page, and the read text with "Suggest again"."""
+    heading("fixing what was read wrong")
+    menu_change = {"kind": "menu", "op": "set_price", "item": "pizza", "option": "18-inch large",
+                   "add_on": None, "price": 26, "old_price": 22, "summary": "", "flagged": False}
+    section_change = {"section_id": 1, "title": "T", "body": "B"}
+    changes = [section_change, menu_change]
+    out, errors = pi.edited_menu_prices(changes, {1: "25"})
+    check("a typed price replaces the one that was read", out[1]["price"] == 25
+          and out[1]["edited"] and not errors and changes[1]["price"] == 26, out[1])
+    out, errors = pi.edited_menu_prices(changes, {1: "from 110"})
+    check("…read the way the Menu page reads one (a starting price)", out[1]["price"] == {"from": 110})
+    out, errors = pi.edited_menu_prices(changes, {1: "$26"})
+    check("…and the price left as shown changes nothing", "edited" not in out[1] and not errors)
+    for typed in ("2O", "after a trial", ""):
+        out, errors = pi.edited_menu_prices(changes, {1: typed})
+        if typed:
+            check(f"“{typed}” is refused in words", errors and "pizza" in errors[0], errors)
+        else:
+            check("an empty box keeps the price that was read", out[1]["price"] == 26 and not errors)
+    out, errors = pi.edited_menu_prices(changes, {0: "99"})
+    check("a section change has no price to edit", out[0] == section_change and not errors)
+
+    corrected = 'Large 18" $25'
+    model_says = {"changes": [], "menu_changes": [
+        {"item": "pizza", "option": "18-inch large", "add_on": None, "price": 25}]}
+    import menu as menu_mod
+    real_items, real_create = menu_mod.items, llm._create
+    calls = []
+    llm._create = lambda **c: (calls.append(c), reply(json.dumps(model_says)))[1]
+    try:
+        cfg = __import__("config").load_config("config/crosstown_pizza.yaml")
+        result = pi.suggest(cfg, corrected, sections, "PDF")
+    finally:
+        llm._create = real_create
+    prompt = calls[0]["messages"][0]["content"] if calls else ""
+    check("Suggest again sends the corrected text to the proposer, without reading the file again",
+          len(calls) == 1 and corrected in prompt and isinstance(prompt, str))
+    check("…and the number check compares against the correction ($25 isn't flagged)",
+          result and result[0].get("kind") == "menu" and not result[0]["flagged"], result)
+
+    routes = (ROOT / "admin" / "routes.py").read_text()
+    again = routes.split("def knowledge_upload_resuggest(")[1].split("\n@admin_bp")[0]
+    apply_src = routes.split("def knowledge_upload_apply(")[1].split("\n@admin_bp")[0]
+    check("Suggest again checks access, is rate limited, caps the text, keeps the set-aside text",
+          "require_business_access(business_id)" in again[:300]
+          and "ratelimit.knowledge_upload(business_id)" in again
+          and "MAX_TRANSCRIPTION" in again and "hidden=proposal[\"hidden\"]" in again)
+    check("saving reads the price boxes, and a bad one saves nothing",
+          "photo_import.edited_menu_prices(" in apply_src
+          and apply_src.index("if price_errors:") < apply_src.index("apply_changes(")
+          and "business_id, changes, choices" in apply_src)
+    review = (ROOT / "admin" / "templates" / "admin" / "knowledge_upload.html").read_text()
+    check("the review page has a price box per menu change, and the read text as a form",
+          'name="price_{{ i }}"' in review and "knowledge_upload_resuggest" in review
+          and 'name="transcription"' in review and "Suggest again from this text" in review)
 
 
 def hidden_checks(pi, llm, config):
@@ -451,6 +511,7 @@ def pdf_checks(pi, llm, config, sections):
 
     if have_pypdf:
         hidden_checks(pi, llm, config)
+    editing_checks(pi, llm, config, sections)
 
     prompt = pi.proposal_prompt(config, "A photo of the shop front is $5", sections, word="PDF")
     check("the proposal says it's a PDF, without rewriting the uploaded text",

@@ -738,6 +738,11 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   display: flex; flex-direction: column; gap: 3px;
 }
 
+/* The review page: a menu change's price box, and the read text as a box. */
+.price-edit input { max-width: 14rem; }
+.read-text { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-sm); line-height: 1.5; }
+
 /* Text in an uploaded PDF that can't be seen on the page (knowledge_upload). */
 .hidden-text { margin-bottom: var(--s4); }
 .hidden-text-list { margin: var(--s2) 0 0 18px; color: var(--ink); font-size: var(--text-sm);

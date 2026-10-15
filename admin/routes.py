@@ -896,16 +896,25 @@ def knowledge_upload_apply(business_id):
         return redirect(url_for("admin.knowledge", business_id=business_id))
 
     import photo_import
-    choices = {}
+    choices, prices = {}, {}
     for i in range(len(proposal["changes"])):
         if request.form.get(f"apply_{i}") == "yes":
             choices[i] = (clean_section_text(request.form.get(f"title_{i}")),
                           clean_section_text(request.form.get(f"body_{i}")))
+            if request.form.get(f"price_{i}") is not None:
+                prices[i] = request.form.get(f"price_{i}")
+    # A menu price the owner corrected on the review page, read the way the
+    # Menu page reads one. A typo saves nothing: back to the page to fix it.
+    changes, price_errors = photo_import.edited_menu_prices(proposal["changes"], prices)
+    if price_errors:
+        flash("Nothing was saved. Fix " + ("this price" if len(price_errors) == 1
+              else "these prices") + ": " + "; ".join(price_errors) + ".", "error")
+        return redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
     business = get_business_by_id(business_id)
     config = load_config(business["config_path"], business_id) if business else None
     word = photo_import.source_word(proposal["source"])
     applied, skipped_stale = photo_import.apply_changes(
-        business_id, proposal["changes"], choices,
+        business_id, changes, choices,
         updated_by=f"{current_user()['email']} (from a {word})", config=config)
 
     delete_upload_proposal(business_id)
@@ -918,6 +927,55 @@ def knowledge_upload_apply(business_id):
     elif not skipped_stale:
         flash("No changes were applied.", "success")
     return redirect(url_for("admin.knowledge", business_id=business_id))
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/upload/resuggest", methods=["POST"])
+@login_required
+def knowledge_upload_resuggest(business_id):
+    """New suggestions from the text as the owner corrected it (a scan that
+    read $25 as $26, say): the suggestion step again, without reading the
+    file again. Fixing the text once fixes every suggestion built from it."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import ratelimit
+    import photo_import
+    from db import get_documents, get_upload_proposal, save_upload_proposal
+    from admin.auth import current_user
+
+    review = redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
+    proposal = get_upload_proposal(business_id)
+    if proposal is None:
+        flash("Those changes are no longer waiting. Upload the file again.", "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+    text = clean_section_text(request.form.get("transcription"))
+    if not text:
+        flash("The text is empty, so there's nothing to suggest from.", "error")
+        return review
+    if len(text) > photo_import.MAX_TRANSCRIPTION:
+        flash(f"That's too long: keep it under {photo_import.MAX_TRANSCRIPTION} characters.", "error")
+        return review
+    if text == proposal["transcription"]:
+        flash("The text hasn't changed, so the suggestions are the same.", "info")
+        return review
+    allowed, wait = ratelimit.knowledge_upload(business_id)
+    if not allowed:
+        flash(f"That's limited to a few a minute. Try again in {max(wait, 1)} seconds.", "error")
+        return review
+    config = load_config(business["config_path"], business_id)
+    word = photo_import.source_word(proposal["source"])
+    try:
+        changes = photo_import.suggest(config, text, get_documents(business_id), word)
+    except Exception as e:
+        log.exception("Re-suggesting from corrected text failed for business %s", business_id)
+        flash(f"Couldn't make new suggestions just now: {type(e).__name__}. The earlier "
+              f"ones are still here.", "error")
+        return review
+    save_upload_proposal(business_id, text, changes, created_by=current_user()["email"],
+                         source=proposal["source"], hidden=proposal["hidden"])
+    flash("New suggestions from your corrected text. Check them before saving.", "success")
+    return review
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/upload/cancel", methods=["POST"])

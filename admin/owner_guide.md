@@ -125,8 +125,15 @@ file itself isn't kept.
 - A password-protected PDF can't be read: save a copy without the password.
 - iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
   a screenshot and upload that.
-- The review page shows what was read. For a PDF that includes any text
-  that's hard to see on the page, so check anything there you didn't write.
+- Something read wrong? On the review page you can type the right price
+  into a menu change's **Price to save** box, and fix a section change's
+  wording under "Edit the wording before saving". If the reading itself is
+  wrong (a $25 read as $26), open the text that was read at the bottom, fix
+  it, and press **Suggest again from this text**: the suggestions are made
+  again from your version.
+- Text in a PDF that can't be seen on the page (white on white, tiny, or
+  invisible) isn't used. The review page lists it at the top, so you can
+  see what was left out.
 
 ## Menu
 

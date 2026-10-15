@@ -55,6 +55,12 @@
         {% if c.old_price_text %}<del class="word-removed">{{ c.old_price_text }}</del> →{% else %}new:{% endif %}
         <mark class="fact-change">{{ c.price_text }}</mark>
       </p>
+      <div class="field flush no-rule price-edit">
+        <label for="price-{{ i }}">Price to save</label>
+        <input type="text" id="price-{{ i }}" name="price_{{ i }}" value="{{ c.price_text }}"
+               inputmode="decimal" autocomplete="off">
+        <span class="hint">Read wrong? Type the right price (26, from 110, or 20 to 60).</span>
+      </div>
       {% if c.unsupported %}
       <p class="hint-blocked mt-3">{{ c.unsupported | join(", ") }} isn't in your {{ word or 'photo' }}. Check it before saving.</p>
       {% endif %}
@@ -131,7 +137,7 @@
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 </form>
 
-<div class="card mt-4">
+<div class="card mt-4" id="read-text">
   <details class="card-pad">
     {% if proposal.source == 'pdf_text' %}
     <summary>The text in your PDF</summary>
@@ -142,7 +148,18 @@
     {% else %}
     <summary>What the assistant read from your {{ word or 'photo' }}</summary>
     {% endif %}
-    <div class="prose mt-3">{{ proposal.transcription }}</div>
+    <form method="POST" class="mt-3"
+          action="{{ url_for('admin.knowledge_upload_resuggest', business_id=business.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <label class="sr-only" for="transcription">The text that was read</label>
+      <textarea id="transcription" name="transcription" rows="12"
+                class="read-text">{{ proposal.transcription }}</textarea>
+      <p class="hint mt-2">Something read wrong? Fix it here and press
+        <strong>Suggest again from this text</strong>: the suggestions above are
+        made again from your version (your edits to them are replaced). Nothing is
+        saved until you tick changes and save them.</p>
+      <button class="btn mt-2" type="submit" data-busy-label="Suggesting…">Suggest again from this text</button>
+    </form>
   </details>
 </div>
 {% endblock %}
