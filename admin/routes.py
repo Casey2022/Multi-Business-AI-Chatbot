@@ -427,18 +427,26 @@ def knowledge(business_id):
     business = get_business_by_id(business_id)
     if not business:
         abort(404)
+    return _knowledge_page(business)
 
+
+def _knowledge_page(business, conflict=None, status=200):
+    """The Knowledge base page. `conflict` is an edit that wasn't saved
+    because the section changed under it (knowledge_update): {"id",
+    "title", "body"}, shown beside the saved version."""
     from db import get_documents, unpublished_changes, get_upload_proposal
+    business_id = business["id"]
     return render_template(
         "admin/knowledge.html",
         business = business,
+        conflict = conflict,
         sections = get_documents(business_id),
         changes = unpublished_changes(business),
         pending_upload = get_upload_proposal(business_id),
         price_lines = section_price_lines(business, get_documents(business_id)),
         menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
-    )
+    ), status
 
 
 # Where Publish and Discard send you back to: the page you pressed them on.
@@ -987,8 +995,8 @@ def knowledge_update(document_id):
 
     # Derive the business from the section rather than trusting the URL.
     conn = get_connection()
-    row  = conn.execute("SELECT business_id, title, body FROM documents WHERE id = ?",
-                        (document_id,)).fetchone()
+    row  = conn.execute("SELECT business_id, title, body, updated_at FROM documents "
+                        "WHERE id = ?", (document_id,)).fetchone()
     current = row
     conn.close()
     if not row:
@@ -997,6 +1005,18 @@ def knowledge_update(document_id):
 
     title = clean_section_text(request.form.get("title"))
     body  = clean_section_text(request.form.get("body"))
+
+    # The section changed after this page was loaded: the owner assistant
+    # edited it (its pop-out leaves a page with unsaved typing alone), or
+    # another tab saved it. Saving would quietly undo that, so nothing is
+    # saved and the page shows both versions (2026-10-15).
+    loaded_at = request.form.get("loaded_at")
+    if (loaded_at is not None and loaded_at != (current["updated_at"] or "")
+            and title and body
+            and not (same_text(title, current["title"]) and same_text(body, current["body"]))):
+        business = get_business_by_id(row["business_id"])
+        return _knowledge_page(business, conflict={"id": document_id, "title": title,
+                                                   "body": body}, status=409)
 
     if not title or not body:
         flash("A section needs both a title and content.", "error")

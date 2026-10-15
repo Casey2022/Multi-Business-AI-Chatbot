@@ -738,6 +738,16 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   display: flex; flex-direction: column; gap: 3px;
 }
 
+/* A section save refused because the section changed under it (the
+   assistant, or another tab): the owner's text beside the saved one. */
+.section-conflict { flex-direction: column; align-items: stretch; margin-bottom: var(--s3); }
+.section-conflict form { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.conflict-text {
+  width: 100%; font: inherit; font-size: var(--text-sm); color: var(--ink);
+  background: rgba(0,0,0,.25); border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm); padding: var(--s2) var(--s3); resize: vertical;
+}
+
 /* Discard beside Publish; side by side, wrapping under the text on a phone. */
 .banner-actions { display: flex; gap: var(--s2); flex-wrap: wrap; }
 

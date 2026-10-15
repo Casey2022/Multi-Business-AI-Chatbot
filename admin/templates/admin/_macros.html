@@ -86,8 +86,12 @@
     <div class="assistant-actions">
       <div class="assistant-actions-title">Saved as a draft</div>
       <ul>{% for a in t.actions %}{% for line in a.lines %}<li>{{ line }}</li>{% endfor %}{% endfor %}</ul>
+      {# A section change says page "knowledge" (assistant_knowledge.run);
+         menu changes, from before there were any others, say nothing. #}
+      {% set pages = t.actions | map(attribute='page', default='menu') | unique | list %}
       <div>Customers see it once you press “Publish changes”.
-        {% if business %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
+        {% if business and 'knowledge' in pages %}<a href="{{ url_for('admin.knowledge', business_id=business.id) }}">See it on the Knowledge base page</a>{% endif %}
+        {% if business and 'menu' in pages %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
     </div>
     {% endif %}
     {% if t.handoff and is_last %}

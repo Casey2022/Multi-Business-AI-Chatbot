@@ -119,9 +119,29 @@
 
 {% for s in sections %}
 <div class="card" id="section-{{ s.id }}">
+  {% if conflict and conflict.id == s.id %}
+  <div class="banner section-conflict" role="alert">
+    <div><strong>Not saved: this section changed after you opened the page</strong>
+      (saved {{ s.updated_at | friendly_time }}{% if s.updated_by %} by {{ s.updated_by }}{% endif %}).
+      Nothing was overwritten. The boxes below show it as saved now; this is what you'd written:</div>
+    <label class="sr-only" for="conflict-{{ s.id }}">Your unsaved version</label>
+    <textarea class="conflict-text" id="conflict-{{ s.id }}" rows="6" readonly>{{ conflict.title }}
+
+{{ conflict.body }}</textarea>
+    <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="loaded_at" value="{{ s.updated_at or '' }}">
+      <input type="hidden" name="title" value="{{ conflict.title }}">
+      <input type="hidden" name="body" value="{{ conflict.body }}">
+      <button class="btn btn-primary" type="submit">Keep my version</button>
+      <span class="cell-sub">or edit the section below and press Save.</span>
+    </form>
+  </div>
+  {% endif %}
   <form method="POST" action="{{ url_for('admin.knowledge_update', document_id=s.id) }}"
         data-track-edits>
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="loaded_at" value="{{ s.updated_at or '' }}">
     <div class="section-status">
       {% if s.id in changes.new %}<span class="chip chip-pending">New since publish</span>
       {% elif s.id in changes.edited %}<span class="chip chip-pending">Changed since publish</span>{% endif %}

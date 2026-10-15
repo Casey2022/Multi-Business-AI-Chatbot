@@ -90,6 +90,9 @@ Anything not here, it says it doesn't know.
 - To edit a section: change its title or text and press **Save**. Save stays grey until something has really changed. A section you've saved but not published is marked "Changed since publish" or "New since publish".
 - **History** shows what a section says now and every earlier version. Nothing is overwritten without being kept.
 - **Delete section** removes a section. Previous versions are kept.
+- If a section changed after you opened the page (the assistant changed it, or you saved it in another tab), pressing **Save** saves nothing and shows you both versions: the section as saved now, and what you'd written. Press **Keep my version** to save yours, or edit the section and press **Save**.
+
+The assistant can also make these changes for you; see Help below.
 
 What makes the assistant answer well:
 
@@ -179,18 +182,29 @@ The same assistant is on every page, behind the **Ask the assistant**
 button in the bottom corner: it opens a panel over the page you're on,
 with the same conversation as the Help page, and stays open as you move
 from page to page. Press **Close** (or Esc) to put it away. When it
-changes your menu, the page refreshes to show the change, unless you have
+changes something, the page refreshes to show the change, unless you have
 unsaved edits on it, in which case it tells you instead.
 
-If you have a Menu tab, the assistant can also change your menu for you:
-ask it ("raise the large pizza to $24", "add a calzone at $12", "take the
-gluten-free crust off"). It changes prices, options, extras and items,
-and saves each change as a draft, exactly as if you'd made it on the Menu
-page: it's listed under "Saved as a draft" and in the banner, and
-customers don't see it until you press **Publish changes**. To undo it,
-ask the assistant to change it back, or press **Discard menu changes** on
-the Menu page. It doesn't change anything else (knowledge-base sections,
-settings or appointments); for those it tells you where to go.
+The assistant can change your knowledge base for you: ask it ("we now
+close at 6 on Saturdays", "add that we take Apple Pay", "add a section
+about gift cards", "delete the drywall section"). It changes only the
+words that need changing and leaves the rest of the section as it was.
+It won't write a number you didn't give it, and it won't put menu prices
+or cancellation rules in a section: menu prices belong on the Menu, and
+cancellation rules are set by your operator.
+
+If you have a Menu tab, it can change your menu too ("raise the large
+pizza to $24", "add a calzone at $12", "take the gluten-free crust off"):
+prices, options, extras and items.
+
+Every change it makes is a draft, exactly as if you'd made it yourself:
+it's listed under "Saved as a draft" with the words before and after, the
+banner lists it, and customers don't see it until you press
+**Publish changes**. Check it with **Preview answers** first if you like. To undo
+it, ask the assistant to change it back, use the section's **History**,
+or press **Discard all changes** (or **Discard menu changes** on the Menu
+page). It doesn't change settings or appointments; for those it tells you
+where to go.
 The support message carries the page you were on and the version of the
 app, never your customers' conversations or appointments, and you'll see
 the reply on the Help page.
