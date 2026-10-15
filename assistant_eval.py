@@ -99,7 +99,7 @@ CASES = [
      "must_not": [r"(?<!what )\bJim (asked|wanted|said|was asking)\b"], "handoff": False},
     {"name": "update from a photo (Sunrise)", "slug": "sunrise_bakery_and_cafe",
      "ask": "Can I use a photo of my new menu board to update my prices?",
-     "must": [r"read photo|update from a photo", r"publish"], "handoff": False},
+     "must": [r"read file|read photo|update from a photo", r"publish"], "handoff": False},
     {"name": "cancellation policy (Sunrise)", "slug": "sunrise_bakery_and_cafe",
      "ask": "How do I change my cancellation policy?",
      "must": [r"operator|support"], "handoff": True},

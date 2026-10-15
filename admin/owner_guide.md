@@ -109,17 +109,24 @@ about the sections you've changed. "Facts change" means a price, time,
 condition or yes/no answer differs; "Same facts" means only the wording
 changed.
 
-### Update from a photo
+### Update from a photo or PDF
 
-Take a photo of your menu, price list or flyer and upload it under
-**Update from a photo** (JPEG, PNG or WebP, up to 5MB), then press
-**Read photo**. The assistant reads it and suggests changes to your
-sections (and, if you have a menu, to your prices). On the review page,
-tick the changes to keep (you can edit the wording first), then press
-**Save ticked changes**, or **Discard all** to keep nothing. Saved changes
-still need publishing. The photo itself isn't kept. iPhone HEIC photos
-can't be read yet: share the photo as a JPEG, or take a screenshot and
-upload that.
+Take a photo of your menu, price list or flyer, or use the PDF of it, and
+upload it under **Update from a photo or PDF** (a JPEG, PNG or WebP photo,
+or a PDF of up to 10 pages, each up to 5MB), then press **Read file**. The
+assistant reads it and suggests changes to your sections (and, if you have
+a menu, to your prices). On the review page, tick the changes to keep (you
+can edit the wording first), then press **Save ticked changes**, or
+**Discard all** to keep nothing. Saved changes still need publishing. The
+file itself isn't kept.
+
+- A PDF made on a computer is read exactly, straight from its text. A
+  scanned PDF is read like a photo.
+- A password-protected PDF can't be read: save a copy without the password.
+- iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
+  a screenshot and upload that.
+- The review page shows what was read. For a PDF that includes any text
+  that's hard to see on the page, so check anything there you didn't write.
 
 ## Menu
 

@@ -1,23 +1,23 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Changes from your photo — {{ business.name }}{% endblock %}
+{% block title %}Changes from your {{ word or 'photo' }} — {{ business.name }}{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
   <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
   <a href="{{ url_for('admin.knowledge', business_id=business.id) }}">{{ business.name }}</a> ›
-  Changes from your photo
+  Changes from your {{ word or 'photo' }}
 </div>
 
 <div class="page-header">
-  <h1>Changes from your photo</h1>
+  <h1>Changes from your {{ word or 'photo' }}</h1>
   <div class="subtitle">
     {% if proposal.changes %}
-    The assistant read your photo and suggests {{ proposal.changes | length }}
+    The assistant read your {{ word or 'photo' }} and suggests {{ proposal.changes | length }}
     change{{ '' if proposal.changes | length == 1 else 's' }}. Tick the ones to keep;
     you can edit the wording first. Saved changes still need publishing.
     {% else %}
-    The assistant read your photo and found nothing that differs from your
+    The assistant read your {{ word or 'photo' }} and found nothing that differs from your
     knowledge base.
     {% endif %}
   </div>
@@ -43,7 +43,7 @@
         <mark class="fact-change">{{ c.price_text }}</mark>
       </p>
       {% if c.unsupported %}
-      <p class="hint-blocked mt-3">{{ c.unsupported | join(", ") }} isn't in your photo. Check it before saving.</p>
+      <p class="hint-blocked mt-3">{{ c.unsupported | join(", ") }} isn't in your {{ word or 'photo' }}. Check it before saving.</p>
       {% endif %}
       <label class="chip-check mt-3">
         <input type="checkbox" name="apply_{{ i }}" value="yes" {% if not c.flagged %}checked{% endif %}>
@@ -62,12 +62,12 @@
     <div class="card-pad">
       {% if c.summary %}<p class="cell-strong">{{ c.summary }}</p>{% endif %}
       {% if c.unsupported %}
-      <p class="hint-blocked mt-3">Not in your photo or the current section:
+      <p class="hint-blocked mt-3">Not in your {{ word or 'photo' }} or the current section:
         {{ c.unsupported | join(", ") }}. Check these before saving.</p>
       {% endif %}
       {% if c.dropped %}
       <p class="hint-blocked mt-3">This change removes {{ c.dropped | join(", ") }},
-        which your photo doesn't mention. A menu leaving something out doesn't
+        which your {{ word or 'photo' }} doesn't mention. A menu leaving something out doesn't
         always mean it changed.</p>
       {% endif %}
 
@@ -109,18 +109,25 @@
     {% if proposal.changes %}
     <button class="btn btn-primary" type="submit">Save ticked changes</button>
     {% endif %}
-    <button class="btn" type="submit" form="cancel-photo">
+    <button class="btn" type="submit" form="cancel-upload">
       {% if proposal.changes %}Discard all{% else %}Done{% endif %}</button>
   </div>
 </form>
-<form id="cancel-photo" method="POST"
+<form id="cancel-upload" method="POST"
       action="{{ url_for('admin.knowledge_upload_cancel', business_id=business.id) }}">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 </form>
 
 <div class="card mt-4">
   <details class="card-pad">
-    <summary>What the assistant read from your photo</summary>
+    {% if proposal.source == 'pdf_text' %}
+    <summary>The text in your PDF</summary>
+    <p class="hint mt-3">Taken straight from the file, so it includes any text
+      that's on the page but hard to see (white on white, tiny, or under a
+      picture). Anything here you didn't write is worth a second look.</p>
+    {% else %}
+    <summary>What the assistant read from your {{ word or 'photo' }}</summary>
+    {% endif %}
     <div class="prose mt-3">{{ proposal.transcription }}</div>
   </details>
 </div>

@@ -10,6 +10,9 @@
 // on a phone connection. So anything over MAX_BYTES or MAX_SIDE is redrawn
 // to fit MAX_SIDE and re-encoded as JPEG.
 //
+// A PDF is sent as it is (the server reads its text); one over the server's
+// 5MB limit is pointed out straight away rather than after the upload.
+//
 // An enhancement: without it (or where the browser can't decode the file,
 // e.g. HEIC outside Safari) the original is sent, and the server explains
 // what's wrong with it if anything is.
@@ -20,6 +23,7 @@
   var MAX_SIDE = 2000;
   var MAX_BYTES = 1.5 * 1024 * 1024;
   var QUALITY = 0.85;
+  var MAX_PDF_BYTES = 5 * 1024 * 1024;
 
   function say(form, text) {
     var status = form.querySelector("[data-photo-status]");
@@ -56,6 +60,12 @@
         var file = input.files && input.files[0];
         say(form, "");
         if (!file) return;
+        if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+          if (file.size > MAX_PDF_BYTES) {
+            say(form, "This PDF is " + mb(file.size) + "; the limit is 5MB. Upload just the pages with your prices, or a photo of them.");
+          }
+          return;
+        }
         if (/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) {
           say(form, "This is an iPhone HEIC photo. If it can't be read, share it as a JPEG or take a screenshot.");
         }

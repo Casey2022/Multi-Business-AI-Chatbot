@@ -803,9 +803,9 @@ def menu_discard(business_id):
 @admin_bp.route("/business/<int:business_id>/knowledge/upload", methods=["POST"])
 @login_required
 def knowledge_upload(business_id):
-    """Read an owner's photo of a menu or price list and propose the section
-    changes it implies. Nothing is saved to the knowledge base here: the
-    proposals wait on the review page for the owner to accept or skip."""
+    """Read an owner's photo or PDF of a menu or price list and propose the
+    section changes it implies. Nothing is saved to the knowledge base here:
+    the proposals wait on the review page for the owner to accept or skip."""
     require_business_access(business_id)
     business = get_business_by_id(business_id)
     if not business:
@@ -818,7 +818,7 @@ def knowledge_upload(business_id):
 
     back = redirect(url_for("admin.knowledge", business_id=business_id) + "#photo")
     upload = request.files.get("photo")
-    data = upload.read(photo_import.MAX_IMAGE_BYTES + 1) if upload else b""
+    data = upload.read(photo_import.MAX_UPLOAD_BYTES + 1) if upload else b""
     try:
         media_type = photo_import.check_upload(data)
     except photo_import.UploadProblem as e:
@@ -827,7 +827,7 @@ def knowledge_upload(business_id):
 
     allowed, wait = ratelimit.knowledge_upload(business_id)
     if not allowed:
-        flash(f"Photo uploads are limited to a few a minute. Try again in "
+        flash(f"Uploads are limited to a few a minute. Try again in "
               f"{max(wait, 1)} seconds.", "error")
         return back
 
@@ -839,13 +839,14 @@ def knowledge_upload(business_id):
         flash(str(e), "error")
         return back
     except Exception as e:
-        log.exception("Photo import failed for business %s", business_id)
-        flash(f"Couldn't read that photo just now: {type(e).__name__}. "
+        log.exception("Upload import failed for business %s", business_id)
+        what = "PDF" if media_type == photo_import.PDF else "photo"
+        flash(f"Couldn't read that {what} just now: {type(e).__name__}. "
               f"Nothing was changed.", "error")
         return back
 
     save_upload_proposal(business_id, result["transcription"], result["changes"],
-                         created_by=current_user()["email"])
+                         created_by=current_user()["email"], source=result["source"])
     return redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
 
 
@@ -863,7 +864,7 @@ def knowledge_upload_review(business_id):
     from db import get_upload_proposal
     proposal = get_upload_proposal(business_id)
     if proposal is None:
-        flash("There are no photo changes waiting. Upload a photo to start.", "error")
+        flash("There are no changes waiting. Upload a photo or PDF to start.", "error")
         return redirect(url_for("admin.knowledge", business_id=business_id))
     import menu
     for c in proposal["changes"]:
@@ -875,7 +876,8 @@ def knowledge_upload_review(business_id):
         c["old_segments"], c["new_segments"] = photo_import.word_diff(
             c["old_body"], c["body"])
     return render_template("admin/knowledge_upload.html",
-                           business=business, proposal=proposal)
+                           business=business, proposal=proposal,
+                           word=photo_import.source_word(proposal["source"]))
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/upload/apply", methods=["POST"])
@@ -889,7 +891,7 @@ def knowledge_upload_apply(business_id):
 
     proposal = get_upload_proposal(business_id)
     if proposal is None:
-        flash("Those photo changes are no longer waiting.", "error")
+        flash("Those changes are no longer waiting.", "error")
         return redirect(url_for("admin.knowledge", business_id=business_id))
 
     import photo_import
@@ -900,16 +902,17 @@ def knowledge_upload_apply(business_id):
                           clean_section_text(request.form.get(f"body_{i}")))
     business = get_business_by_id(business_id)
     config = load_config(business["config_path"], business_id) if business else None
+    word = photo_import.source_word(proposal["source"])
     applied, skipped_stale = photo_import.apply_changes(
         business_id, proposal["changes"], choices,
-        updated_by=f"{current_user()['email']} (from a photo)", config=config)
+        updated_by=f"{current_user()['email']} (from a {word})", config=config)
 
     delete_upload_proposal(business_id)
     if skipped_stale:
-        flash("Not applied, because the section changed after the photo was "
+        flash(f"Not applied, because the section changed after the {word} was "
               "read: " + ", ".join(skipped_stale) + ".", "error")
     if applied:
-        flash(f"{applied} change{'' if applied == 1 else 's'} from your photo "
+        flash(f"{applied} change{'' if applied == 1 else 's'} from your {word} "
               f"saved. Preview the answers, then publish.", "success")
     elif not skipped_stale:
         flash("No changes were applied.", "success")
@@ -922,7 +925,7 @@ def knowledge_upload_cancel(business_id):
     require_business_access(business_id)
     from db import delete_upload_proposal
     delete_upload_proposal(business_id)
-    flash("Photo changes discarded. Nothing was changed.", "success")
+    flash("Proposed changes discarded. Nothing was changed.", "success")
     return redirect(url_for("admin.knowledge", business_id=business_id))
 
 
@@ -930,7 +933,7 @@ def knowledge_upload_cancel(business_id):
 def upload_too_large(e):
     """A request over MAX_CONTENT_LENGTH: in practice, a photo the browser
     didn't shrink."""
-    flash("That file is too large. Upload a photo under 5MB.", "error")
+    flash("That file is too large. Upload a photo or PDF under 5MB.", "error")
     # Not request.referrer: a redirect target the request supplies is an
     # open redirect.
     business_id = (request.view_args or {}).get("business_id")
