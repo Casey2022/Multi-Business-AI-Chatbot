@@ -73,7 +73,12 @@ CASES = [
     {"name": "no menu: the price is in a section (Bob's)", "slug": "bobs_plumbing",
      "ask": "Raise my drain cleaning price to $175.",
      "actions": [r"^Drain Cleaning: “[^”]*\$150[^”]*” → “[^”]*\$175[^”]*”$"],
-     "actions_not": [r"\$75|\$400"], "must": [r"publish"], "handoff": False},
+     # Wrong = $75 or $400 in the before and gone from the after. Not "$75
+     # anywhere": the model rightly copies the whole sentence, "$75 per
+     # additional hour" unchanged on both sides (eval 2026-10-15, 0/3 on a
+     # right answer).
+     "actions_not": [r"\$75\b[^”]*” → “(?![^”]*\$75\b)", r"\$400\b[^”]*” → “(?![^”]*\$400\b)"],
+     "must": [r"publish"], "handoff": False},
     {"name": "old price still showing (Crosstown)", "slug": "crosstown_pizza",
      "ask": "I changed a price on the menu but customers are still getting the old one. Why?",
      "must": [r"publish"]},
