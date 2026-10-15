@@ -1170,6 +1170,9 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 .sms-typing { color: rgba(255,255,255,.6); font-style: italic; }
 .sms-notice { border-left: 3px solid #1F8A4C; }
 .sms-failed { border: 1px solid var(--refused); }
+/* "Start a new one" when a demo copy was cleared under an open tab. */
+.bubble a, .sms-bubble a { color: inherit; font-weight: 500; text-decoration: underline;
+  text-underline-offset: 2px; }
 .phone-compose {
   display: flex; gap: var(--s2); align-items: center;
   padding: var(--s2) var(--s3) var(--s4);

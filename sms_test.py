@@ -124,6 +124,21 @@ def main():
           and "phone: phone" in page)
     check("the web chat links to it", "url_for('text_page'" in (ROOT / "templates" / "demo.html").read_text())
 
+    # A demo copy can be cleared under an open tab (an hour idle, or a server
+    # restart). The page used to ask for updates every 10 seconds forever,
+    # a 404 in the log each time (2026-10-15). Both chat pages now stop.
+    for name in ("demo.html", "text.html"):
+        src = (ROOT / "templates" / name).read_text()
+        check(f"{name}: a 404 on the update check stops the checking",
+              "const updatesTimer = setInterval(checkForUpdates, 10000);" in src
+              and "clearInterval(updatesTimer);" in src
+              and src.count("if (res.status === 404) {") == 2)
+        check(f"{name}: it says so once, links to a new demo and closes the input",
+              "if (ended) return;" in src and "url_for('demo_picker')" in src
+              and "input.disabled = true;" in src and "if (inFlight || ended) return;" in src)
+        check(f"{name}: the link is built as an element, not markup",
+              'document.createElement("a")' in src and ".innerHTML =" not in src)
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1
 

@@ -116,8 +116,27 @@
     return s + " · ≈" + cents(seg.segments * COST_OUT) + "¢";
   }
 
+
+  // The business can disappear under an open tab: demo copies are cleared
+  // after an hour idle and whenever the server restarts. Without this the
+  // page asked every 10 seconds forever, a 404 each time (2026-10-15).
+  let ended = false;
+  function businessGone() {
+    if (ended) return;
+    ended = true;
+    clearInterval(updatesTimer);
+    const row = addText({{ ('This demo copy has been cleared: they\'re removed after an hour idle, or when the server restarts. ' if is_demo else 'This chat isn\'t available any more. ') | tojson }}, "in", "", "sms-notice");
+    const link = document.createElement("a");
+    link.href = {{ url_for('demo_picker') | tojson }};
+    link.textContent = {{ ('Start a new one' if is_demo else 'Pick a business') | tojson }};
+    row.querySelector(".sms-bubble").appendChild(link);
+    input.disabled = true;
+    btn.disabled = true;
+    input.placeholder = "This chat has ended";
+  }
+
   async function send() {
-    if (inFlight) return;
+    if (inFlight || ended) return;
     const text = input.value.trim();
     if (!text) return;
     inFlight = true;
@@ -131,6 +150,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, phone: phone }),
       });
+      if (res.status === 404) { typing.remove(); businessGone(); return; }
       const data = await res.json();
       typing.remove();
       if (data.in) segIn += data.in.segments;
@@ -142,8 +162,10 @@
       addText("Not delivered. Check your connection and try again.", "in", "", "sms-failed");
     } finally {
       inFlight = false;
-      btn.disabled = false;
-      input.focus();
+      if (!ended) {
+        btn.disabled = false;
+        input.focus();
+      }
     }
   }
 
@@ -158,6 +180,7 @@
     if (document.hidden) return;
     try {
       const res = await fetch(`/textsim/${slug}/updates?phone=${encodeURIComponent(phone)}`);
+      if (res.status === 404) { businessGone(); return; }
       if (!res.ok) return;
       const data = await res.json();
       (data.messages || []).forEach((m) => {
@@ -167,7 +190,7 @@
       });
     } catch (err) { /* offline for a moment; the next check picks it up */ }
   }
-  setInterval(checkForUpdates, 10000);
+  const updatesTimer = setInterval(checkForUpdates, 10000);
 </script>
 
 </body>
