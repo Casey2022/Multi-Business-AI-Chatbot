@@ -462,6 +462,19 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     if upper is not None and 0 <= hours < upper and upper - hours <= max(3, upper * 0.15):
         say += (f" {span(hours)[0].upper() + span(hours)[1:]} is less than "
                 f"{span(upper)}, so this is inside that window, not on the edge of it.")
+    # The better outcome's deadline, worked out here. Left to the model it
+    # said "to avoid the charge, cancel before 9am tomorrow" (the appointment
+    # itself) when the line was 9am TODAY (journey_eval 2026-10-15, 1 in 3).
+    if upper is not None and hours >= 0:
+        k0 = kind or asked[0]
+        better = outcome_text(_outcome_for(windows[index - 1], k0), policy, k0)
+        if starts_at is not None:
+            deadline = _parse_local(starts_at) - timedelta(hours=upper)
+            say += (f" With at least {span(upper)} of notice (by {when(deadline)}), "
+                    f"{better}; that time has already passed, so it can't apply now. "
+                    f"Don't name any later time as a way to avoid this.")
+        else:
+            say += f" With at least {span(upper)} of notice, {better}."
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):

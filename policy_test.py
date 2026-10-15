@@ -275,6 +275,14 @@ def main():
     check("23 hours is said to be inside the window, not on its edge (journey 2026-10-15)",
           "23 hours is less than 24 hours, so this is inside that window, not on the edge" in r["say"],
           r["say"])
+    check("the deadline for no charge is worked out, and said to have passed: 9am TODAY, "
+          "not 9am tomorrow (journey 2026-10-15)",
+          "With at least 24 hours of notice (by Tuesday, September 22 at 9:00 AM), there is "
+          "no charge; that time has already passed" in r["say"], r["say"])
+    early = policy.cancellation_outcome(bel, starts_at="2026-09-24T09:00",
+                                        now=datetime(2026, 9, 22, 10, 0))
+    check("…and nothing of the sort in the best window already", "With at least" not in early["say"],
+          early["say"])
     far = policy.cancellation_outcome(bel, hours_before=5)
     check("…but only near the line: 5 hours gets no such sentence",
           "not on the edge" not in far["say"], far["say"])
