@@ -9,8 +9,12 @@
 # Config is passed explicitly per-request so the same module can serve
 # different businesses on different requests.
 
-from config import substitute
+import logging
 import re
+
+from config import substitute
+
+log = logging.getLogger("rules")
 
 # Sentinel value signalling "start the booking flow."
 # Double-underscore prefix marks it as structural/internal, not customer-facing.
@@ -90,7 +94,7 @@ def get_reply(message, config):
                 matched = True
 
         if matched:
-            print(f"[rules] matched rule: {rule['name']}")
+            log.debug("Matched rule %s", rule["name"])
             reply = rule["reply"]
 
             # The booking sentinel is a signal to app.py, not text for the
@@ -102,5 +106,7 @@ def get_reply(message, config):
             # not load time — so dynamic placeholders work correctly.
             return substitute(reply, config)
 
-    print("[rules] no match -> defer to LLM")
+    # A log line, not print(): print wrote through the evals' progress bars
+    # and left "[rules] no match" fragments all over them (2026-10-15).
+    log.debug("No rule matched; deferring to the model")
     return None

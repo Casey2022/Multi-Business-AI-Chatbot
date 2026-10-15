@@ -272,6 +272,12 @@ def main():
                                     now=datetime(2026, 9, 22, 10, 0))
     check("colour at 9am tomorrow, it's 10am: 23 hours, code's sums",
           r["hours_before"] == 23.0, r["hours_before"])
+    check("23 hours is said to be inside the window, not on its edge (journey 2026-10-15)",
+          "23 hours is less than 24 hours, so this is inside that window, not on the edge" in r["say"],
+          r["say"])
+    far = policy.cancellation_outcome(bel, hours_before=5)
+    check("…but only near the line: 5 hours gets no such sentence",
+          "not on the edge" not in far["say"], far["say"])
     check("23 hours: 50% of the service", "50% of the service is charged" in r["say"],
           r["say"])
     check("the rule leads, with 'moving' as well as cancelling",

@@ -454,6 +454,14 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     say = (f"The rule: {acting} {label}, {rule}. "
            f"{acting[0].upper() + acting[1:]} {ahead} falls in that window, so "
            f"that is what applies.")
+    # Close to the line above, say the comparison outright. Given only
+    # "falls in that window", the model wrote "23 hours... you fall just
+    # under that window", which reads as borderline (journey_eval
+    # 2026-10-15, 1 run in 3). It isn't: 23 is less than 24.
+    upper = windows[index - 1]["at_least_hours"] if index else None
+    if upper is not None and 0 <= hours < upper and upper - hours <= max(3, upper * 0.15):
+        say += (f" {span(hours)[0].upper() + span(hours)[1:]} is less than "
+                f"{span(upper)}, so this is inside that window, not on the edge of it.")
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):
