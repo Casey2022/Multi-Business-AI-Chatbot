@@ -27,6 +27,10 @@ pypdf==6.18.0
 # the model reads what's visible, not the PDF's text layer. Arrives with
 # chromadb anyway; named because we import it ourselves.
 Pillow==12.3.0
+# Fetches an owner's web page with the address it checked pinned
+# (web_import._open). Arrives with requests anyway; named because we
+# import it ourselves.
+urllib3==2.7.0
 
 # Security floors on transitive dependencies. Neither is imported by our
 # code; both arrive underneath twilio, voyageai and chromadb, and the

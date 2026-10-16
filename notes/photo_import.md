@@ -78,12 +78,9 @@ every deploy anyway). To keep originals:
 ## Next phases
 
 - **PDFs: built 2026-10-15** (see "PDFs" below).
-- **Web pages** (a menu on the business's own site, which may be updated
-  before the portal is): fetch server-side with a short timeout and size cap,
-  only http(s), refuse private/internal addresses (SSRF), strip to text, then
-  step 2. A scheduled re-check ("your website's menu changed — review?")
-  is the natural follow-on, and the source table above is where the last
-  fetched text would live for comparison.
+- **Web pages: built 2026-10-16** (see "Web pages" below). Still to do: a
+  scheduled re-check ("your website's menu changed — review?"), which
+  needs the last fetched text kept (the source table above).
 
 
 ## With a menu (2026-10-10)
@@ -150,4 +147,44 @@ text drawn first and then covered by a picture.
 Fixtures (`evals/photos/`): crosstown_menu.pdf (the jpg's menu as a text
 PDF, made with reportlab), crosstown_menu_scan.pdf (the jpg inside a PDF,
 no text layer), hidden_text.pdf. `upload_eval.py pdf` runs just those.
+
+
+## Web pages (2026-10-16)
+
+`web_import.py`. The owner pastes a link under "Or a page on your website"
+and presses **Read page**; the result lands on the same review page.
+
+**The fetch is the risky part: a typed URL makes our server send a request
+(SSRF).** In order, every hop:
+1. http/https only, ports 80/443 only, no user:password@.
+2. Resolve the name once; EVERY address must be public (`is_global`, not
+   multicast; IPv4 inside IPv6 forms and NAT64 unwrapped and checked).
+   Literals parsed the way connect() would: "2130706433", "0x7f000001",
+   "127.1" are all 127.0.0.1. "localhost", ".local", ".internal" refused
+   by name too.
+3. Connect to the checked address (urllib3 pool on the IP, Host header and
+   TLS server_hostname/assert_hostname = the name): no DNS rebinding.
+4. Redirects by hand, at most 3, each one back through 1-3.
+5. Connect 5s, read 10s, total 15s; 2MB cap while streaming; no proxies
+   from the environment; certificate checked against the name.
+
+web_import_test.py checks 27 refused addresses for the right reason, the
+redirect-to-metadata case, pinning (against a local server with the check
+bypassed), the size cap, and a self-signed certificate. Each guard is
+mutation-tested; the only one that survives is the IPv6-wrapper unwrap,
+because the stdlib's `is_global` already refuses those forms (kept as a
+second lock: that list has changed between Python versions).
+
+**What comes back is routed by type:** HTML → `page_text` (stdlib
+HTMLParser: scripts/styles skipped, table cells and list items keep an
+item with its price on one line, img alt kept); a PDF or picture link →
+photo_import exactly as an upload. Under 40 letters/digits of text (a
+script-built page, a menu image) → "upload a screenshot or PDF instead".
+
+**Hidden text, again:** display:none, visibility:hidden, the hidden
+attribute, font-size 0, opacity 0, and HTML comments are set aside and
+listed on the review page, never given to the model. aria-hidden is NOT
+hidden (it hides from screen readers, not eyes). Not covered: text hidden
+by a stylesheet class (`.sr-only` in a CSS file), which would need the
+CSS applied. Fixture: `evals/photos/hidden_text.html` (four tricks).
 

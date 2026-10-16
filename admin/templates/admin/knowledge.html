@@ -88,7 +88,7 @@
 {% endif %}
 
 <div class="card" id="photo">
-  <div class="card-title">Update from a photo or PDF</div>
+  <div class="card-title">Update from a photo, PDF or web page</div>
   <div class="card-pad">
     {% if pending_upload %}
     <div class="guidance">
@@ -98,10 +98,11 @@
     </div>
     {% endif %}
     <div class="guidance{% if pending_upload %} mt-3{% endif %}">
-      Take a photo of your menu, price list or flyer, or upload it as a PDF.
-      The assistant reads it and suggests changes to the sections below; you
-      check each one before anything is saved, and nothing reaches customers
-      until you publish. The file itself isn't kept.
+      Take a photo of your menu, price list or flyer, upload it as a PDF, or
+      give the address of the page on your website. The assistant reads it and
+      suggests changes to the sections below; you check each one before
+      anything is saved, and nothing reaches customers until you publish. The
+      file itself isn't kept.
     </div>
     <form method="POST" action="{{ url_for('admin.knowledge_upload', business_id=business.id) }}"
           enctype="multipart/form-data" class="mt-4" data-photo-upload>
@@ -113,6 +114,19 @@
         <span class="hint" data-photo-status></span>
       </div>
       <button class="btn" type="submit" data-busy-label="Reading it…">Read file</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin.knowledge_upload_url', business_id=business.id) }}"
+          class="mt-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="field flush no-rule">
+        <label for="page-url">Or a page on your website</label>
+        <input type="text" id="page-url" name="url" required inputmode="url"
+               autocomplete="url" spellcheck="false" maxlength="2000"
+               placeholder="https://yourbusiness.com/menu">
+        <span class="hint">Read once, when you press the button. A page that needs a
+          login, or shows its menu as a picture, can't be read: upload a screenshot instead.</span>
+      </div>
+      <button class="btn" type="submit" data-busy-label="Reading the page…">Read page</button>
     </form>
   </div>
 </div>

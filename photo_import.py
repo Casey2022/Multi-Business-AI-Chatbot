@@ -385,7 +385,8 @@ def read_upload(config, data, media_type):
 
 def source_word(how):
     """What the owner uploaded, as the pages say it."""
-    return "PDF" if str(how or "").startswith("pdf") else "photo"
+    how = str(how or "")
+    return "PDF" if how.startswith("pdf") else "web page" if how == "web" else "photo"
 
 
 # ---------------------------------------------------------------------------

@@ -109,11 +109,13 @@ about the sections you've changed. "Facts change" means a price, time,
 condition or yes/no answer differs; "Same facts" means only the wording
 changed.
 
-### Update from a photo or PDF
+### Update from a photo, PDF or web page
 
 Take a photo of your menu, price list or flyer, or use the PDF of it, and
-upload it under **Update from a photo or PDF** (a JPEG, PNG or WebP photo,
-or a PDF of up to 10 pages, each up to 5MB), then press **Read file**. The
+upload it under **Update from a photo, PDF or web page** (a JPEG, PNG or
+WebP photo, or a PDF of up to 10 pages, each up to 5MB), then press
+**Read file**. If your menu is on your website, paste the page's address
+instead and press **Read page**. The
 assistant reads it and suggests changes to your sections (and, if you have
 a menu, to your prices). On the review page, tick the changes to keep (you
 can edit the wording first), then press **Save ticked changes**, or
@@ -123,6 +125,10 @@ file itself isn't kept.
 - A PDF made on a computer is read exactly, straight from its text. A
   scanned PDF is read like a photo.
 - A password-protected PDF can't be read: save a copy without the password.
+- A web page is read once, when you press **Read page**. Pages behind a
+  login, pages whose menu is a picture, and pages built entirely by a
+  script can't be read: upload a screenshot or PDF instead. Only public
+  web addresses can be read.
 - iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
   a screenshot and upload that.
 - Something read wrong? On the review page you can type the right price
@@ -131,8 +137,8 @@ file itself isn't kept.
   wrong (a $25 read as $26), open the text that was read at the bottom, fix
   it, and press **Suggest again from this text**: the suggestions are made
   again from your version.
-- Text in a PDF that can't be seen on the page (white on white, tiny, or
-  invisible) isn't used. The review page lists it at the top, so you can
+- Text in a PDF or web page that can't be seen (white on white, tiny,
+  invisible, or hidden by the page) isn't used. The review page lists it at the top, so you can
   see what was left out.
 
 ## Menu

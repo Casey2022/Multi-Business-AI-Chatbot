@@ -929,6 +929,55 @@ def knowledge_upload_apply(business_id):
     return redirect(url_for("admin.knowledge", business_id=business_id))
 
 
+@admin_bp.route("/business/<int:business_id>/knowledge/upload/url", methods=["POST"])
+@login_required
+def knowledge_upload_url(business_id):
+    """Read the business's own web page (its menu, say) and propose the
+    changes it implies, through the same review page as a photo or PDF.
+    web_import does the fetching, and every check that keeps a typed URL
+    from reaching anything but a public web site (SSRF)."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import ratelimit
+    import photo_import
+    import web_import
+    from db import get_documents, save_upload_proposal
+    from admin.auth import current_user
+
+    back = redirect(url_for("admin.knowledge", business_id=business_id) + "#photo")
+    url = (request.form.get("url") or "").strip()
+    try:
+        web_import.check_url(url)          # the cheap checks first, before the rate limit
+    except web_import.WebProblem as e:
+        flash(str(e), "error")
+        return back
+    allowed, wait = ratelimit.knowledge_upload(business_id)
+    if not allowed:
+        flash(f"Uploads are limited to a few a minute. Try again in {max(wait, 1)} seconds.",
+              "error")
+        return back
+    config = load_config(business["config_path"], business_id)
+    try:
+        text, how, hidden, final_url = web_import.read_page(config, url)
+        if not text:
+            raise web_import.WebProblem("Couldn't find any text on that page.")
+        word = photo_import.source_word(how)
+        changes = photo_import.suggest(config, text, get_documents(business_id), word)
+    except (web_import.WebProblem, photo_import.UploadProblem) as e:
+        flash(str(e), "error")
+        return back
+    except Exception as e:
+        log.exception("Web import failed for business %s", business_id)
+        flash(f"Couldn't read that page just now: {type(e).__name__}. Nothing was changed.",
+              "error")
+        return back
+    save_upload_proposal(business_id, text, changes, created_by=current_user()["email"],
+                         source=how, hidden=hidden, origin=final_url)
+    return redirect(url_for("admin.knowledge_upload_review", business_id=business_id))
+
+
 @admin_bp.route("/business/<int:business_id>/knowledge/upload/resuggest", methods=["POST"])
 @login_required
 def knowledge_upload_resuggest(business_id):
@@ -973,7 +1022,8 @@ def knowledge_upload_resuggest(business_id):
               f"ones are still here.", "error")
         return review
     save_upload_proposal(business_id, text, changes, created_by=current_user()["email"],
-                         source=proposal["source"], hidden=proposal["hidden"])
+                         source=proposal["source"], hidden=proposal["hidden"],
+                         origin=proposal.get("origin"))
     flash("New suggestions from your corrected text. Check them before saving.", "success")
     return review
 

@@ -12,6 +12,8 @@
 <div class="page-header">
   <h1>Changes from your {{ word or 'photo' }}</h1>
   <div class="subtitle">
+    {% if proposal.origin %}<div class="cell-sub">Read from
+      <a href="{{ proposal.origin }}" target="_blank" rel="noopener noreferrer nofollow">{{ proposal.origin | truncate(90) }}</a></div>{% endif %}
     {% if proposal.changes %}
     The assistant read your {{ word or 'photo' }} and suggests {{ proposal.changes | length }}
     change{{ '' if proposal.changes | length == 1 else 's' }}. Tick the ones to keep;
@@ -25,10 +27,13 @@
 
 {% if proposal.hidden %}
 <div class="banner hidden-text" role="note">
-  <div><strong>Your PDF has text that can't be seen on the page.</strong> It wasn't
-    used for these suggestions. Text like this is white on a white page, too small
-    to read, or in invisible ink: scanners add it to make a scan searchable, and
-    it can also be used to slip instructions past you. If any of it is something
+  <div><strong>Your {{ word or 'PDF' }} has text that can't be seen on the page.</strong> It wasn't
+    used for these suggestions.
+    {% if proposal.source == 'web' %}The page hides it from visitors (hidden by its code, or
+    in comments in the page source). Sites do that for ordinary reasons, and it can also
+    be used to slip instructions past you.{% else %}Text like this is white on a white page,
+    too small to read, or in invisible ink: scanners add it to make a scan searchable, and
+    it can also be used to slip instructions past you.{% endif %} If any of it is something
     you meant customers to know, add it to a section yourself.
     <ul class="hidden-text-list">{% for run in proposal.hidden[:20] %}<li>{{ run }}</li>{% endfor %}</ul>
     {% if proposal.hidden | length > 20 %}<div class="cell-sub">…and {{ proposal.hidden | length - 20 }} more.</div>{% endif %}
@@ -139,7 +144,13 @@
 
 <div class="card mt-4" id="read-text">
   <details class="card-pad">
-    {% if proposal.source == 'pdf_text' %}
+    {% if proposal.source == 'web' %}
+    <summary>The text on your web page</summary>
+    <p class="hint mt-3">The page's visible text, leaving out what's hidden on it
+      (listed at the top, if there was any). Text a page hides with its style sheet
+      can't always be told apart, so anything here you didn't write is worth a
+      second look.</p>
+    {% elif proposal.source == 'pdf_text' %}
     <summary>The text in your PDF</summary>
     <p class="hint mt-3">Taken straight from the file's text, leaving out what
       can't be seen on the page (listed at the top, if there was any). Text
