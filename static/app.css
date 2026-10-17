@@ -753,15 +753,19 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .inline-fields input[type="text"], .inline-fields select { width: auto; flex: 0 0 auto; }
 .inline-fields input.w-num { width: 5.5rem; }
 .inline-fields input.w-wide { width: 14rem; max-width: 100%; }
-.rule-more summary { cursor: pointer; padding: var(--s3) var(--s4); color: var(--ink-soft);
-  font-size: var(--text-sm); }
-.rule-window { display: flex; flex-direction: column; gap: var(--s2); }
+/* One card per service (rule-cards.js opens it on the tick): a window is
+   one line, "With at least [48] [hours] notice: [No charge] [ ]%". */
+.rule-card[hidden], .rule-line[hidden], .rule-card [hidden] { display: none; }
+.rule-card-title { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s2); }
+.rule-card-body { display: flex; flex-direction: column; gap: var(--s3); }
+.rule-card-body .hint { margin: 0; }
+.rule-add { align-self: flex-start; }
+.rule-last { padding-top: var(--s3); border-top: 1px solid var(--rule); }
 .chip-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
-.outcome-row { padding-left: var(--s3); }
 /* A percentage box only shows for a percentage outcome (field-deps.js
    enables it; the server renders it disabled otherwise). */
-.outcome-row input:disabled, .outcome-row input:disabled + span { visibility: hidden; }
-.outcome-kind { min-width: 11.5rem; }
+.outcome-row input:disabled, .outcome-row input:disabled + span { display: none; }
 .rules-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--s4); }
 .rules-lines { margin: var(--s2) 0 0 18px; display: flex; flex-direction: column; gap: 4px;

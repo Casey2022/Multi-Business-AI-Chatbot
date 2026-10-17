@@ -65,42 +65,26 @@
   </div>
 </div>
 {% else %}
-<form method="POST" class="stack">
+<form method="POST" class="stack" data-rule-cards>
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="save">
 
-  {% if rows.deposits %}
-  <div class="card">
-    <div class="card-title">Deposits</div>
-    {% for d in rows.deposits %}{% set i = loop.index0 %}
-    <div class="field">
-      <label for="dep{{ i }}">{{ d.kind[:1] | upper }}{{ d.kind[1:] }}</label>
-      <div class="inline-fields">
-        <span>{{ 'At least' if d.field == 'min_percent' else '' }}</span>
-        <input type="text" id="dep{{ i }}" name="dep{{ i }}_value" class="w-num" inputmode="decimal"
-               value="{{ posted.get('dep' ~ i ~ '_value', d.value) }}">
-        <span>% of the order price,</span>
-        <input type="text" name="dep{{ i }}_when" aria-label="When it's paid" class="w-wide"
-               value="{{ posted.get('dep' ~ i ~ '_when', d.when) }}" placeholder="paid at ordering">
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {% set ns = namespace(any=false) %}
+  {% for s in rows.choices %}{% if (posted.get('svc_' ~ s.slug) if posted else s.name in rows.services) %}{% set ns.any = true %}{% endif %}{% endfor %}
 
-  {% if service_choices %}
+  {% if rows.choices %}
   <div class="card">
     <div class="card-title">Different rules for some services</div>
     <div class="card-pad">
-      <p class="guidance">Tick a service to give it its own rules, then save: it gets its own
-        line in each window below, starting the same as everything else, so change what
-        should differ and save again. Only that service: a combined one (like a cut and
-        colour) follows its own tick, or the rules for everything else.</p>
+      <p class="guidance">Tick a service to give it its own rules: its box opens below, starting
+        the same as everything else, so change only what should differ. Just that service: a
+        combined one (like a cut and colour) has its own tick.</p>
+      <noscript><p class="hint">Then press Save as draft to open its box.</p></noscript>
       <div class="chip-row mt-3">
-        {% for s in service_choices %}
+        {% for s in rows.choices %}
         <label class="chip-check">
-          <input type="checkbox" name="svc_{{ s.slug }}" value="1"
-                 {% if (posted and posted.get('svc_' ~ s.slug)) or (not posted and s.name in rows.services) %}checked{% endif %}>
+          <input type="checkbox" name="svc_{{ s.slug }}" value="1" data-service-tick="k_{{ s.slug }}"
+                 {% if (posted.get('svc_' ~ s.slug) if posted else s.name in rows.services) %}checked{% endif %}>
           {{ s.name[:1] | upper }}{{ s.name[1:] }}
         </label>
         {% endfor %}
@@ -109,41 +93,63 @@
   </div>
   {% endif %}
 
-  <div class="card">
-    <div class="card-title">How much notice, and what it costs</div>
-    <div class="card-pad guidance">Longest notice first. Leave a row empty to drop it; up to
-      {{ max_windows }} windows, then one for anything shorter.</div>
-    {% set shown = [rows.windows | length, 1] | max %}
-    {% for i in range(max_windows) %}
-    {% set w = rows.windows[i] if i < rows.windows | length else None %}
-    {% if i == shown %}<details class="rule-more"{% if posted.get('w' ~ i ~ '_amount') %} open{% endif %}>
-      <summary>Add a window (up to {{ max_windows }})</summary>{% endif %}
-    <div class="field rule-window">
-      <div class="inline-fields">
-        <label for="w{{ i }}">With at least</label>
-        <input type="text" id="w{{ i }}" name="w{{ i }}_amount" class="w-num" inputmode="numeric"
-               value="{{ posted.get('w' ~ i ~ '_amount', w.amount if w else '') }}">
-        {% set unit = posted.get('w' ~ i ~ '_unit', w.unit if w else 'hours') %}
-        <select name="w{{ i }}_unit" aria-label="Hours or days" class="w-auto">
+  {% for c in rows.cards %}
+  {% set shown = (posted.get('svc_' ~ c.slug) if posted else c.shown) if c.service else true %}
+  <div class="card rule-card" id="card-{{ c.key }}" data-card-key="{{ c.key }}"
+       {% if c.service and not c.shown %}data-fresh{% endif %} {% if not shown %}hidden{% endif %}>
+    <div class="card-title rule-card-title">
+      {% if c.key == 'gen' and rows.choices %}
+      <span data-title-alone="{{ c.title_alone }}" data-title-others="{{ c.title_others }}">{{ c.title_others if ns.any else c.title_alone }}</span>
+      {% else %}<span>{{ c.title }}</span>{% endif %}
+      {% if c.service %}<button type="button" class="btn btn-quiet btn-sm" data-remove-card="{{ c.key }}" hidden>Remove</button>{% endif %}
+    </div>
+    <div class="card-pad rule-card-body">
+      {% if c.service %}<p class="hint">Only {{ c.kind }} {{ rows.what }}s.</p>
+      {% elif c.key == 'gen' and rows.choices %}<p class="hint" data-shows-with-services {% if not ns.any %}hidden{% endif %}>Every service without its own box below.</p>{% endif %}
+
+      {% if c.deposit %}
+      {% set dp = c.key ~ '_dep' %}
+      <div class="inline-fields rule-line">
+        <label for="{{ dp }}">Deposit:</label>
+        <span>{{ 'at least' if c.deposit.field == 'min_percent' else '' }}</span>
+        <input type="text" id="{{ dp }}" name="{{ dp }}_value" class="w-num" inputmode="decimal"
+               value="{{ posted.get(dp ~ '_value', c.deposit.value) }}">
+        <span>% of the order price,</span>
+        <input type="text" name="{{ dp }}_when" aria-label="When the deposit is paid" class="w-wide"
+               value="{{ posted.get(dp ~ '_when', c.deposit.when) }}" placeholder="paid at ordering">
+      </div>
+      {% endif %}
+
+      {% for i in range(max_windows) %}
+      {% set w = c.windows[i] if i < c.windows | length else None %}
+      {% set p = c.key ~ '_w' ~ i %}
+      {% set amount = posted.get(p ~ '_amount', w.amount if w else '') %}
+      <div class="inline-fields rule-line" data-window
+           {% if not amount and i > c.windows | length %}hidden{% endif %}>
+        <label for="{{ p }}">With at least</label>
+        <input type="text" id="{{ p }}" name="{{ p }}_amount" class="w-num" inputmode="numeric" value="{{ amount }}">
+        {% set unit = posted.get(p ~ '_unit', w.unit if w else 'hours') %}
+        <select name="{{ p }}_unit" aria-label="Hours or days" class="w-auto">
           <option value="hours" {% if unit == 'hours' %}selected{% endif %}>hours</option>
           <option value="days" {% if unit == 'days' %}selected{% endif %}>days</option>
         </select>
         <span>notice:</span>
+        {{ outcome(p, w or {'type': 'no_charge', 'percent': ''}, c.title) }}
+        {% if i > 0 %}<button type="button" class="btn btn-quiet btn-sm" data-clear-window hidden
+                aria-label="Remove this window">✕</button>{% endif %}
       </div>
-      {% for base in rows.last.outcomes %}{% set j = loop.index0 %}
-      {% set o = w.outcomes[j] if w else {'type': 'no_charge', 'percent': '', 'slug': base.slug, 'label': base.label} %}
-      {{ outcome(i ~ '', o) }}
       {% endfor %}
-    </div>
-    {% if loop.last and max_windows > shown %}</details>{% endif %}
-    {% endfor %}
-    <div class="field rule-window">
-      <div class="inline-fields"><strong>With less notice than that:</strong></div>
-      {% for o in rows.last.outcomes %}
-      {{ outcome('last', o) }}
-      {% endfor %}
+      <button type="button" class="btn btn-quiet btn-sm rule-add" data-add-window hidden>+ Add a window</button>
+
+      <div class="inline-fields rule-line rule-last">
+        <strong>With less notice than that:</strong>
+        {{ outcome(c.key ~ '_last', c.last, c.title) }}
+      </div>
+      <noscript><p class="hint">Longest notice first, up to {{ max_windows }}. Clear a row's
+        number to drop it.</p></noscript>
     </div>
   </div>
+  {% endfor %}
 
   <div class="card">
     <div class="field no-rule">
@@ -151,7 +157,7 @@
       <textarea id="notes" name="notes" rows="3"
                 placeholder="A no-show is charged the same as cancelling with less than 24 hours' notice.">{{ posted.get('notes', rows.notes) }}</textarea>
       <span class="hint">One per line, up to 5. Said as written, so keep any numbers in step
-        with the windows above.</span>
+        with the rules above.</span>
     </div>
   </div>
 
@@ -171,20 +177,18 @@
 {% endif %}
 {% endblock %}
 
-{% macro outcome(row, o) %}
-{% set prefix = 'w' ~ row ~ '_k_' ~ o.slug %}
+{% macro outcome(prefix, o, title) %}
 {% set kind_type = posted.get(prefix ~ '_type', o.type) %}
-<div class="inline-fields outcome-row">
-  {% if rows.kinds | length > 1 %}<span class="cell-sub outcome-kind">{{ o.label[:1] | upper }}{{ o.label[1:] }}:</span>{% endif %}
-  <select name="{{ prefix }}_type" aria-label="What happens{{ ' for ' ~ o.label if rows.kinds | length > 1 else '' }}" class="w-auto">
+<span class="inline-fields outcome-row">
+  <select name="{{ prefix }}_type" aria-label="What happens ({{ title }})" class="w-auto">
     {% for value, caption in outcomes %}
     <option value="{{ value }}" {% if kind_type == value %}selected{% endif %}>{{ caption }}</option>
     {% endfor %}
   </select>
   <input type="text" name="{{ prefix }}_pct" class="w-num" inputmode="decimal"
-         aria-label="Percentage" value="{{ posted.get(prefix ~ '_pct', o.percent) }}"
+         aria-label="Percentage ({{ title }})" value="{{ posted.get(prefix ~ '_pct', o.percent) }}"
          data-enabled-by="{{ prefix }}_type" data-enabled-when="{{ with_percent }}"
          {% if kind_type not in with_percent.split(' ') %}disabled{% endif %}>
   <span>%</span>
-</div>
+</span>
 {% endmacro %}

@@ -38,18 +38,20 @@ def heading(text):
 
 
 def form_from(rows):
-    """The form the page would post, unedited, for these rows."""
+    """The form the page would post, unedited, for these rows: every card
+    (a hidden one's fields are posted too, as a browser does), and a tick
+    for each service card that's showing."""
     form = {}
-    for i, d in enumerate(rows["deposits"]):
-        form[f"dep{i}_value"], form[f"dep{i}_when"] = d["value"], d["when"]
-    for i, w in enumerate(rows["windows"]):
-        form[f"w{i}_amount"], form[f"w{i}_unit"] = w["amount"], w["unit"]
-        for o in w["outcomes"]:
-            form[f"w{i}_k_{o['slug']}_type"], form[f"w{i}_k_{o['slug']}_pct"] = o["type"], o["percent"]
-    for o in rows["last"]["outcomes"]:
-        form[f"wlast_k_{o['slug']}_type"], form[f"wlast_k_{o['slug']}_pct"] = o["type"], o["percent"]
-    for s in rows.get("services") or []:
-        form[f"svc_{s.replace(' ', '_')}"] = "1"
+    for c in rows["cards"]:
+        k = c["key"]
+        if c["deposit"]:
+            form[f"{k}_dep_value"], form[f"{k}_dep_when"] = c["deposit"]["value"], c["deposit"]["when"]
+        for i, w in enumerate(c["windows"]):
+            form[f"{k}_w{i}_amount"], form[f"{k}_w{i}_unit"] = w["amount"], w["unit"]
+            form[f"{k}_w{i}_type"], form[f"{k}_w{i}_pct"] = w["type"], w["percent"]
+        form[f"{k}_last_type"], form[f"{k}_last_pct"] = c["last"]["type"], c["last"]["percent"]
+        if c["service"] and c["shown"]:
+            form[f"svc_{c['slug']}"] = "1"
     form["notes"] = rows["notes"]
     return form
 
@@ -71,14 +73,14 @@ def main():
     belmont = yaml.safe_load(open(ROOT / "config" / "belmont_hair_studio.yaml"))
     sunrise = yaml.safe_load(open(ROOT / "config" / "sunrise_bakery_and_cafe.yaml"))
     b_rules, s_rules = policy.cancellation(belmont), policy.cancellation(sunrise)
+    def amounts(rules, card=0):
+        return [(w["amount"], w["unit"]) for w in pf.rows(rules)["cards"][card]["windows"]]
     check("24 and 48 hours are shown as hours, a week as 7 days",
-          pf.rows(b_rules)["windows"][0][:2] if False else
-          (pf.rows(b_rules)["windows"][0]["amount"], pf.rows(b_rules)["windows"][0]["unit"]) == ("24", "hours")
-          and [(w["amount"], w["unit"]) for w in pf.rows(s_rules)["windows"]] == [("7", "days"), ("48", "hours")])
+          amounts(b_rules) == [("24", "hours")] and amounts(s_rules) == [("7", "days"), ("48", "hours")])
 
     heading("an edit becomes rules the sums use")
     form = form_from(pf.rows(b_rules))
-    form.update(w0_amount="48", wlast_k_appointment_pct="75")
+    form.update(gen_w0_amount="48", gen_last_pct="75")
     new, errors = pf.parse(form, b_rules)
     edited = {"policies": {"cancellation": new}}
     outcome = policy.cancellation_outcome(edited, hours_before=30)["say"]
@@ -88,37 +90,43 @@ def main():
     check("the operator's words and kinds are copied through untouched",
           all(new[k] == b_rules[k] for k in ("title", "what", "action", "acting", "before", "price")))
     form = form_from(pf.rows(s_rules))
-    form["w1_k_custom_cake_type"], form["w1_k_wedding_cake_type"] = "keep_percent", "keep_percent"
-    form["w1_k_custom_cake_pct"] = form["w1_k_wedding_cake_pct"] = "40"
+    form["k_custom_cake_w1_type"], form["k_wedding_cake_w1_type"] = "keep_percent", "keep_percent"
+    form["k_custom_cake_w1_pct"] = form["k_wedding_cake_w1_pct"] = "40"
     new, errors = pf.parse(form, s_rules)
     middle = next(w for w in new["windows"] if w["at_least_hours"] == 48)
     check("the same outcome for every kind is stored once, as 'any'",
           not errors and middle == {"at_least_hours": 48, "any": {"keep_percent": 40}}, middle)
-    form = form_from(pf.rows(s_rules)); form["dep0_value"] = "60"
+    form = form_from(pf.rows(s_rules)); form["k_custom_cake_dep_value"] = "60"
     new, _ = pf.parse(form, s_rules)
     check("a deposit amount can change; its kind can't",
           new["deposits"]["custom cake"]["percent"] == 60 and set(new["deposits"]) == set(s_rules["deposits"]))
-    form = form_from(pf.rows(b_rules)); form.update(w1_amount="3", w1_unit="days", w1_k_appointment_type="no_charge")
+    form = form_from(pf.rows(b_rules))
+    form.update(gen_w1_amount="3", gen_w1_unit="days", gen_w1_type="no_charge",
+                gen_w0_type="charge_percent", gen_w0_pct="25")
     new, errors = pf.parse(form, b_rules)
     check("a window can be added (3 days), and windows are sorted longest first",
-          not errors and [w["at_least_hours"] for w in new["windows"]] == [72, 24, 0])
+          not errors and [w["at_least_hours"] for w in new["windows"]] == [72, 24, 0], (errors, new))
+    form = form_from(pf.rows(b_rules)); form.update(gen_w1_amount="3", gen_w1_unit="days", gen_w1_type="no_charge")
+    new, errors = pf.parse(form, b_rules)
+    check("…but one that changes nothing (free from 3 days and from 24 hours) is left out",
+          not errors and [w["at_least_hours"] for w in new["windows"]] == [24, 0])
 
     heading("anything the sums can't use is refused, in words")
     def errors_for(**changes):
         form = form_from(pf.rows(b_rules)); form.update(changes)
         return pf.parse(form, b_rules)[1]
     for changes, words, why in (
-            ({"w0_amount": ""}, "at least one window", "no window with notice"),
-            ({"w0_amount": "0"}, "more than 0", "zero notice"),
-            ({"w0_amount": "-5"}, "whole number", "a negative"),
-            ({"w0_amount": "two"}, "whole number", "words"),
-            ({"w0_amount": "400", "w0_unit": "days"}, "more than a year", "over a year"),
-            ({"w1_amount": "24", "w1_unit": "hours", "w1_k_appointment_type": "no_charge"}, "same notice", "24 hours twice"),
-            ({"wlast_k_appointment_pct": "0"}, "between 1 and 100", "0%"),
-            ({"wlast_k_appointment_pct": "150"}, "between 1 and 100", "150%"),
-            ({"wlast_k_appointment_pct": "half"}, "between 1 and 100", "a word for a percentage"),
-            ({"wlast_k_appointment_type": "forfeit_deposit"}, "choose what happens", "a deposit outcome where there are no deposits"),
-            ({"w0_unit": "weeks"}, "whole number", "an unknown unit"),
+            ({"gen_w0_amount": ""}, "at least one window", "no window with notice"),
+            ({"gen_w0_amount": "0"}, "more than 0", "zero notice"),
+            ({"gen_w0_amount": "-5"}, "whole number", "a negative"),
+            ({"gen_w0_amount": "two"}, "whole number", "words"),
+            ({"gen_w0_amount": "400", "gen_w0_unit": "days"}, "more than a year", "over a year"),
+            ({"gen_w1_amount": "24", "gen_w1_unit": "hours", "gen_w1_type": "no_charge"}, "same notice", "24 hours twice"),
+            ({"gen_last_pct": "0"}, "between 1 and 100", "0%"),
+            ({"gen_last_pct": "150"}, "between 1 and 100", "150%"),
+            ({"gen_last_pct": "half"}, "between 1 and 100", "a word for a percentage"),
+            ({"gen_last_type": "forfeit_deposit"}, "choose what happens", "a deposit outcome where there are no deposits"),
+            ({"gen_w0_unit": "weeks"}, "whole number", "an unknown unit"),
             ({"notes": "\n".join(["a note"] * 6)}, "5 notes", "six notes"),
             ({"notes": "x" * 301}, "300 characters", "a long note")):
         errs = errors_for(**changes)
@@ -126,13 +134,22 @@ def main():
     check("Belmont (no deposits) isn't offered deposit outcomes; Sunrise is",
           "forfeit_deposit" not in pf.outcomes_for(b_rules) and "forfeit_deposit" in pf.outcomes_for(s_rules))
 
-    heading("different rules for some services (2026-10-17)")
+    heading("different rules for some services: one card each (2026-10-17)")
     services = pf.service_names(belmont)
     check("the choices are the business's own services",
           services == ["haircut", "blowout", "colour", "cut and colour", "balayage", "kids cut"], services)
     check("…and 'Haircut (45 min)' style names are trimmed",
           pf.service_names({"services": ["Haircut (45 min)", "Colour (2 hours)"]}) == ["haircut", "colour"])
-    form = form_from(pf.rows(b_rules)); form["svc_colour"] = "1"
+    page = pf.rows(b_rules, services)
+    colour_card = next(c for c in page["cards"] if c["kind"] == "colour")
+    check("every service has a card on the page, hidden until ticked, already a copy of everything else",
+          [c["key"] for c in page["cards"]][:2] == ["gen", "k_haircut"] and len(page["cards"]) == 7
+          and not colour_card["shown"] and colour_card["service"]
+          and (colour_card["windows"], colour_card["last"]) == (page["cards"][0]["windows"], page["cards"][0]["last"]))
+    check("everything else is 'Every appointment' alone, 'Every other appointment' beside a service",
+          page["cards"][0]["title"] == "Every appointment"
+          and page["cards"][0]["title_others"] == "Every other appointment")
+    form = form_from(page); form["svc_colour"] = "1"
     step1, errors = pf.parse(form, b_rules, services)
     same = all(policy.cancellation_outcome({"policies": {"cancellation": step1}}, hours_before=h,
                                            kind=k)["outcomes"][k]
@@ -140,34 +157,80 @@ def main():
                for h in (3, 30) for k in ("colour", "appointment"))
     check("ticking colour adds it, starting the same as everything else",
           not errors and step1["services"] == ["colour"] and same, step1)
-    form = form_from(pf.rows(step1))
-    form.update(w0_amount="48", w1_amount="24", w1_unit="hours",
-                w1_k_colour_type="charge_percent", w1_k_colour_pct="50",
-                w1_k_appointment_type="no_charge")
-    step2, errors = pf.parse(form, step1, services)
+    form = form_from(page); form.update(svc_colour="1", k_colour_w0_amount="48")
+    step2, errors = pf.parse(form, b_rules, services)
     rules = {"policies": {"cancellation": step2}}
     colour30 = policy.cancellation_outcome(rules, hours_before=30, kind="colour")["say"]
     hair30 = policy.cancellation_outcome(rules, hours_before=30, kind="appointment")["say"]
-    check("colour now needs 48 hours: 30 hours' notice costs 50%",
+    check("colour's card says 48 hours: 30 hours' notice costs 50%",
           not errors and "50%" in colour30 and "a colour appointment" in colour30, (errors, colour30))
     check("…while any other appointment is free at 30 hours, with no 'better notice' hint",
           "no charge" in hair30 and "With at least" not in hair30, hair30)
+    check("the engine gets one shared list of windows (48, 24, less)",
+          [w["at_least_hours"] for w in step2["windows"]] == [48, 24, 0], step2["windows"])
+    cards = {c["kind"]: c for c in pf.rows(step2, services)["cards"]}
+    check("…and the page splits it back: each card shows only its own windows",
+          [w["amount"] for w in cards["colour"]["windows"]] == ["48"] and cards["colour"]["shown"]
+          and [w["amount"] for w in cards["appointment"]["windows"]] == ["24"]
+          and cards["appointment"]["title"] == "Every other appointment", cards)
     check("both are said in the rules customers are told",
           "a colour appointment, 50% of the service is charged; any other appointment, there is "
           "no charge" in policy.policy_text(rules), policy.policy_text(rules))
     tool = policy.cancellation_tool(rules)["input_schema"]["properties"]["kind"]
     check("the assistant's tool names the exact services, and everything else",
           tool["enum"] == ["colour", "appointment"] and "not one that includes it" in tool["description"])
-    form = form_from(pf.rows(step2)); form.pop("svc_colour")
+
+    form = form_from(page)
+    form.update(svc_colour="1", k_colour_w0_amount="3", k_colour_w0_unit="days",
+                k_colour_w1_amount="48", k_colour_w1_type="charge_percent", k_colour_w1_pct="50",
+                k_colour_last_type="charge_full_price",
+                svc_kids_cut="1", k_kids_cut_w0_amount="12")
+    mixed, errors = pf.parse(form, b_rules, services)
+    sums = {"policies": {"cancellation": mixed}}
+    def says(hours, kind):
+        words = policy.cancellation_outcome(sums, hours_before=hours, kind=kind)["outcomes"][kind]
+        return next((w for w in ("no charge", "50%", "full") if w in words), words)
+    check("cards with different windows (colour 3 days/48h, kids cut 12h, the rest 24h) all hold",
+          not errors
+          and [says(h, "colour") for h in (80, 60, 30)] == ["no charge", "50%", "full"]
+          and [says(h, "kids cut") for h in (30, 15, 5)] == ["no charge", "no charge", "50%"]
+          and [says(h, "appointment") for h in (60, 30, 15)] == ["no charge", "no charge", "50%"],
+          (errors, mixed))
+    check("…and each card comes back exactly as the owner set it",
+          all(pf.split(mixed, k) == own for k, own in (
+              ("colour", ([(72, "no_charge"), (48, {"charge_percent": 50})], "charge_full_price")),
+              ("kids cut", ([(12, "no_charge")], {"charge_percent": 50})),
+              ("appointment", ([(24, "no_charge")], {"charge_percent": 50})))))
+
+    form = form_from(page); form.update(k_haircut_w0_amount="two", k_haircut_last_type="nonsense")
+    check("a hidden (unticked) card's fields are ignored", pf.parse(form, b_rules, services)[1] == [])
+    form = form_from(page); form.update(svc_colour="1", k_colour_w0_amount="two")
+    errs = pf.parse(form, b_rules, services)[1]
+    check("a mistake is named by its card", any(e.startswith("Colour, window 1:") for e in errs), errs)
+    form = {k: v for k, v in form_from(page).items() if not k.startswith("k_colour_")}
+    form["svc_colour"] = "1"
+    new, errors = pf.parse(form, b_rules, services)
+    check("ticked with no card posted (an old page), it copies everything else",
+          not errors and pf.split(new, "colour") == pf.split(b_rules, "appointment"))
+    form = form_from(pf.rows(step2, services)); form.pop("svc_colour")
     step3, errors = pf.parse(form, step2, services)
     check("unticking it drops its rules", not errors and "services" not in step3
-          and pf.kinds(step3) == ["appointment"])
+          and pf.kinds(step3) == ["appointment"] and step3["windows"] == b_rules["windows"], step3)
+    renamed = pf.service_choices({"services": ["Haircut"]}, step2)
+    check("a service renamed since it got rules is still offered, so it isn't dropped unseen",
+          renamed == ["haircut", "colour"])
     many = services + ["perm", "toner"]
-    form = form_from(pf.rows(b_rules))
+    form = form_from(pf.rows(b_rules, many))
     for name in many:
         form[f"svc_{pf.slug(name)}"] = "1"
     check(f"at most {pf.MAX_SERVICES} services", any("at most" in e for e in pf.parse(form, b_rules, many)[1]))
-    form = form_from(pf.rows(s_rules)); form["svc_colour"] = "1"
+
+    heading("Sunrise: one card per cake, deposit and all")
+    cakes = pf.rows(s_rules, pf.service_choices(sunrise, s_rules))
+    check("a card per cake, each with its deposit, nothing to tick or remove",
+          [(c["title"], c["deposit"]["value"], c["service"]) for c in cakes["cards"]]
+          == [("Custom cake", "50", False), ("Wedding cake", "25", False)] and cakes["choices"] == [])
+    form = form_from(cakes); form["svc_colour"] = "1"
     new, errors = pf.parse(form, s_rules, ["colour"])
     check("deposit kinds (Sunrise's cakes) stay the operator's: no services added",
           "services" not in new and pf.kinds(new) == pf.kinds(s_rules) and not pf.can_pick_services(s_rules))
@@ -191,7 +254,7 @@ def main():
                  "(6, 'Belmont', 'belmont', 'config/belmont_hair_studio.yaml')")
     conn.commit(); conn.close()
     path = str(ROOT / "config" / "belmont_hair_studio.yaml")
-    form = form_from(pf.rows(b_rules)); form.update(w0_amount="48")
+    form = form_from(pf.rows(b_rules)); form.update(gen_w0_amount="48")
     new, _ = pf.parse(form, b_rules)
     pf.save_draft(6, new, updated_by="o@x.com")
     live = load_config(path, 6)
@@ -237,6 +300,17 @@ def main():
     check("the percentage box is live only for a percentage outcome (and the server renders it so)",
           'data-enabled-when="{{ with_percent }}"' in template and "disabled{% endif %}" in template
           and 'wanted.split(" ")' in (ROOT / "static" / "field-deps.js").read_text())
+    script = (ROOT / "static" / "rule-cards.js").read_text()
+    check("a ticked service's card opens at once: rendered hidden, shown by rule-cards.js on the tick",
+          "rule-cards.js" in (ROOT / "admin" / "templates" / "admin" / "base.html").read_text()
+          and 'data-service-tick="k_{{ s.slug }}"' in template and "{% if not shown %}hidden{% endif %}" in template
+          and 'tick.addEventListener("change"' in script and "card.hidden = false" in script)
+    check("…copying everything else as it is now, the first time only",
+          "data-fresh" in template and 'copy(general, card)' in script
+          and 'card.removeAttribute("data-fresh")' in script)
+    check("without the script, the page still works (save opens the card; all rows show)",
+          "<noscript>" in template and 'data-add-window hidden' in template
+          and 'data-remove-card="{{ c.key }}" hidden' in template)
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1

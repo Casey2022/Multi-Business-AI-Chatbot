@@ -1087,7 +1087,7 @@ def cancellation_rules(business_id):
             return redirect(url_for("admin.cancellation_rules", business_id=business_id))
         base = current or policy_form.new_policy(live_config)
         new, errors = policy_form.parse(request.form, base,
-                                        policy_form.service_names(live_config))
+                                        policy_form.service_choices(live_config, base))
         if not errors:
             if live and policy.policy_text({"policies": {"cancellation": new}}) == \
                     policy.policy_text(live_config):
@@ -1108,7 +1108,8 @@ def cancellation_rules(business_id):
     after = policy_form.with_draft(live_config, business_id) if pending else None
     return render_template(
         "admin/cancellation.html", business=business, errors=errors, posted=posted,
-        rows=policy_form.rows(editing) if editing else None,
+        rows=(policy_form.rows(editing, policy_form.service_choices(live_config, editing))
+              if editing else None),
         outcomes=[(k, policy_form.OUTCOMES[k]) for k in policy_form.outcomes_for(editing or {})],
         with_percent=" ".join(sorted(policy_form.WITH_PERCENT)),
         max_windows=policy_form.MAX_WINDOWS, is_new=not live and not pending,
@@ -1116,9 +1117,6 @@ def cancellation_rules(business_id):
         after_lines=(policy.policy_text(after).splitlines()[1:] if after and not removed else []),
         removed=removed, has_draft=pending is not None,
         overlapping=policy_form.sections_about_cancelling(get_documents(business_id)),
-        service_choices=([{"name": s, "slug": policy_form.slug(s)}
-                          for s in policy_form.service_names(live_config)]
-                         if editing and policy_form.can_pick_services(editing) else []),
         price_word=(editing or {}).get("price", "the price"))
 
 
