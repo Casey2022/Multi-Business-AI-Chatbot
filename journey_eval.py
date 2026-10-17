@@ -90,6 +90,10 @@ _CHARGED_50 = r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b[^.]*\b(?:
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
 # Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
 # can wait just another 18 hours or so, you'll hit the 48-hour mark").
+# The keyword shortcuts' own replies (config rules: cancel_existing), whole,
+# so a model that adds "to cancel, give us a call" after the answer passes.
+_BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
+_SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
 _WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
                 r"|hit the \d+[- ]hour mark")
 
@@ -212,8 +216,8 @@ JOURNEYS = [
                "before the cancellation rules saw it (fixed 2026-10-17: it steps "
                "aside for charge words).",
         "turns": [{"say": "My appointment is in 10 hours. What's the charge if I cancel my appointment?",
-                   "state": "idle", "must": [r"50\s?%"],
-                   "must_not": [r"give us a call", r"we'?ll sort it out", _WAIT_ADVICE]}],
+                   "state": "idle", "must": [r"50\s?%"], "tool": "cancellation_outcome",
+                   "must_not": [_BELMONT_CANNED, _WAIT_ADVICE]}],
     },
     {
         "name": "shortcut: a charge question with no timing gets the rules (Belmont)",
@@ -222,7 +226,7 @@ JOURNEYS = [
                "ahead are you cancelling?' (live 2026-10-17). The rules are the answer.",
         "turns": [{"say": "What's the charge if I cancel my appointment?",
                    "state": "idle", "must": [r"24[\s-]*hours?", r"50\s?%"],
-                   "must_not": [r"give us a call", r"we'?ll sort it out"]}],
+                   "must_not": [_BELMONT_CANNED]}],
     },
     {
         "name": "shortcut: a deposit question about 'cancel my order' (Sunrise)",
@@ -231,8 +235,8 @@ JOURNEYS = [
         "why": "Sunrise's 'cancel my order' rule gave the phone number instead "
                "of the deposit rules (same fix).",
         "turns": [{"say": "If I cancel my order 3 days before, do I get my deposit back?",
-                   "state": "idle", "must": [DEPOSIT_GONE],
-                   "must_not": [r"please call us at", r"call us at .* and w"]}],
+                   "state": "idle", "must": [DEPOSIT_GONE], "tool": "cancellation_outcome",
+                   "must_not": [_SUNRISE_CANNED]}],
     },
     {
         "name": "a real booking still starts, after a question (Bob's)",
@@ -346,6 +350,13 @@ def run(journey, verbose=False):
         for pattern in turn.get("must_not", []):
             if re.search(pattern, reply, re.I):
                 problems.append((where, f"shouldn't match /{pattern}/"))
+        # "tool": the turn must have gone through this tool, the proof that
+        # a keyword shortcut didn't answer first (a shortcut reply calls
+        # none). Words can't tell: "give us a call" is the canned reply AND
+        # a true thing the model may add after the right answer (2026-10-17).
+        if turn.get("tool") and not any(line.startswith(f"tool {turn['tool']}(")
+                                        for line in TRACE):
+            problems.append((where, f"didn't call {turn['tool']}"))
         for key, pattern in turn.get("not_filed", {}).items():
             value = str((current.get("pending") or {}).get(key, ""))
             if value and re.search(pattern, value, re.I):
