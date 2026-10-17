@@ -86,7 +86,13 @@ _COLOUR_48 = {
                  "appointment": "no_charge"},
                 {"at_least_hours": 0, "any": {"charge_percent": 50}}],
     "notes": []}
-_CHARGED_50 = r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b[^.]*\b(?:be charged|charge|pay)\b[^.]*50\s?%"
+# A sentence charging THIS customer 50%. One about plain colour ("if it were a
+# colour appointment, you'd be charged 50%") is a true comparison, not a leak
+# (eval 2026-10-17, 1 run in 3); "cut and colour" still counts.
+_NOT_COLOUR = r"(?:(?!(?<!and )colou?r)[^.!?])*"
+_CHARGED_50 = (r"(?:^|(?<=[.!?]))\s*" + _NOT_COLOUR
+               + r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b" + _NOT_COLOUR
+               + r"\b(?:be charged|charge|pay)\b" + _NOT_COLOUR + r"50\s?%")
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
 # Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
 # can wait just another 18 hours or so, you'll hit the 48-hour mark").
