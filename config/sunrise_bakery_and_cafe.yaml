@@ -173,7 +173,10 @@ rules:
     reply: "Hi there! 👋 Welcome to {business_name}. How can I help?"
 
   - name: "hours"
-    keywords: ["hours", "you open", "are you closed", "you close"]
+    # Phrases, not the bare word: "hours" alone also matched "my appointment
+    # is in about 30 hours, what happens if I cancel?" and answered with the
+    # opening times (journey_eval, 2026-10-17). rules_hours_test.py checks it.
+    keywords: ["your hours", "opening hours", "business hours", "store hours", "hours of operation", "what are the hours", "you open", "are you closed", "you close"]
     match: "any"
     reply: "We're open {hours}."
 
