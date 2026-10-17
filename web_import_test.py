@@ -187,7 +187,7 @@ def main():
         except w.WebProblem as e:
             said = str(e)
         check(f"bot protection is named as such ({why}), not mistaken for a login",
-              "security service" in said and "login" not in said, said)
+              "security check" in said and "Save as PDF" in said and "login" not in said, said)
 
     heading("the opener's own mechanics, against a local server")
     big = b"x" * (w.MAX_BYTES + 10)

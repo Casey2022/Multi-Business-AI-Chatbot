@@ -266,9 +266,16 @@ def _refused(host, status, headers, body):
     log.info("Web import: %s answered %s (server=%s, cf-mitigated=%s, title=%r)", host, status,
              headers.get("server", "-"), headers.get("cf-mitigated", "-"), _title(body))
     if blocked_by_bot_protection(status, headers, body):
-        raise WebProblem("That site's security service turned the reader away (sites use these "
-                         "to stop automated visits, and it can't tell the reader is acting for "
-                         "you). Upload a screenshot or PDF of the menu instead.")
+        # Seen live: camspizzeria.com behind Cloudflare, "cf-mitigated:
+        # challenge" / "Just a moment..." (2026-10-16). Getting past it
+        # would take a browser that solves the challenge, i.e. defeating a
+        # protection the site turned on, so the reader doesn't try. The
+        # owner's own browser passes it; a PDF saved from there is read
+        # exactly, from its text.
+        raise WebProblem("That site's security check turned the reader away (it stops automated "
+                         "visits, and can't tell the reader is acting for you). Open the page in "
+                         "your browser and save it as a PDF (File → Print → Save as PDF), then "
+                         "upload that above: it's read exactly, straight from its text.")
     if status == 401:
         raise WebProblem("That page needs a login, so it couldn't be read. Upload a screenshot "
                          "or PDF of the menu instead.")

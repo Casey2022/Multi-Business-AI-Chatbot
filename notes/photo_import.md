@@ -194,7 +194,15 @@ included, and SNI was proven to carry the name (local TLS server). So it
 depends on where the request comes from: a security service's rules.
 Refusals are now logged (status, server, cf-mitigated, the error page's
 title), bot protection gets its own message, and Accept-Language is sent.
-We don't impersonate a browser to get past a site's bot protection. aria-hidden is NOT
+We don't impersonate a browser to get past a site's bot protection.
+Retry with logging: `camspizzeria.com answered 403 (server=cloudflare,
+cf-mitigated=challenge, title='Just a moment...')`: Cloudflare's managed
+challenge, shown to Casey's home connection and not to the datacenter
+route. Passing it needs a browser that solves the challenge, i.e.
+defeating the site's own protection, so we don't. The message now sends
+the owner to Save as PDF from their own browser (which passes the
+challenge), and that PDF takes the exact text path. Render's egress may
+or may not be challenged: check after deploy. aria-hidden is NOT
 hidden (it hides from screen readers, not eyes). Not covered: text hidden
 by a stylesheet class (`.sr-only` in a CSS file), which would need the
 CSS applied. Fixture: `evals/photos/hidden_text.html` (four tricks).

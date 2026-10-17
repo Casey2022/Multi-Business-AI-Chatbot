@@ -127,8 +127,10 @@ file itself isn't kept.
 - A password-protected PDF can't be read: save a copy without the password.
 - A web page is read once, when you press **Read page**. Pages behind a
   login, pages whose menu is a picture, and pages built entirely by a
-  script can't be read: upload a screenshot or PDF instead. Only public
-  web addresses can be read.
+  script can't be read, and some sites' security checks turn the reader
+  away. For any of those, open the page in your browser, save it as a PDF
+  (File, Print, Save as PDF) and upload that: a PDF saved that way is read
+  exactly. Only public web addresses can be read.
 - iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
   a screenshot and upload that.
 - Something read wrong? On the review page you can type the right price
