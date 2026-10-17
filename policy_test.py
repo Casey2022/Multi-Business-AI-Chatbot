@@ -286,6 +286,16 @@ def main():
     far = policy.cancellation_outcome(bel, hours_before=5)
     check("…but only near the line: 5 hours gets no such sentence",
           "not on the edge" not in far["say"], far["say"])
+    late = policy.cancellation_outcome(bel, hours_before=20)
+    check("given only the hours, the better outcome is said to be gone, not something to wait for "
+          "(live 2026-10-17: 'if you can wait another 18 hours… no charge')",
+          "With at least 24 hours of notice, there is no charge; that point passed 4 hours ago, "
+          "so it can't apply now" in late["say"]
+          and "don't suggest waiting" in late["say"], late["say"])
+    section = " ".join(policy.prompt_section(bel).split())
+    check("with no timing given, the prompt says to state the rules, not just ask "
+          "(live 2026-10-17: 'how far ahead are you cancelling?' and nothing else)",
+          "With no timing given, don't just ask: state the rules below" in section, section[-600:])
     check("23 hours: 50% of the service", "50% of the service is charged" in r["say"],
           r["say"])
     check("the rule leads, with 'moving' as well as cancelling",

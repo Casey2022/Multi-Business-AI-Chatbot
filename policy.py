@@ -520,7 +520,14 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
                     f"{better}; that time has already passed, so it can't apply now. "
                     f"Don't name any later time as a way to avoid this.")
         else:
-            say += f" With at least {span(upper)} of notice, {better}."
+            # Given only the hours, the model read "with at least 48 hours of
+            # notice, there is no charge" as advice: "if you can wait another
+            # 18 hours or so, you'll hit the 48-hour mark" (live, Belmont,
+            # 2026-10-17). Waiting only ever gives LESS notice, so say so.
+            say += (f" With at least {span(upper)} of notice, {better}; that point "
+                    f"passed {span(upper - hours)} ago, so it can't apply now. Waiting "
+                    f"only means less notice, so don't suggest waiting, or any later "
+                    f"time, as a way to avoid this.")
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):
@@ -848,7 +855,12 @@ def prompt_section(config, which=("notice", "cancellation")):
             + (f"Don't ask which kind of {what} or how much they paid before "
                f"answering. If the result is the same for every {what}, say "
                "so. " if several else "")
-            + "With no timing given, state the rules below.")
+            # "What's the charge if I cancel my appointment?" got only "how
+            # far ahead are you cancelling?" (live, Belmont, 2026-10-17): a
+            # question with no answer in it. The rules ARE the answer.
+            + "With no timing given, don't just ask: state the rules below "
+              "(each window and what it costs, in a sentence or two), then ask "
+              f"how far ahead their {what} is if they want the exact figure.")
         text += "\n\n" + policy_text(config)
     return text
 

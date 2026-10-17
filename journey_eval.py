@@ -88,6 +88,10 @@ _COLOUR_48 = {
     "notes": []}
 _CHARGED_50 = r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b[^.]*\b(?:be charged|charge|pay)\b[^.]*50\s?%"
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
+# Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
+# can wait just another 18 hours or so, you'll hit the 48-hour mark").
+_WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
+                r"|hit the \d+[- ]hour mark")
 
 JOURNEYS = [
     {
@@ -185,7 +189,7 @@ JOURNEYS = [
         "slug": "belmont_hair_studio", "policy": _COLOUR_48,
         "why": "An owner gave colour its own window; 30 hours' notice is inside it.",
         "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
-                   "state": "idle", "must": [r"50\s?%"]}],
+                   "state": "idle", "must": [r"50\s?%"], "must_not": [_WAIT_ADVICE]}],
     },
     {
         "name": "service rules: a haircut at 30 hours is free (Belmont)",
@@ -209,6 +213,15 @@ JOURNEYS = [
                "aside for charge words).",
         "turns": [{"say": "My appointment is in 10 hours. What's the charge if I cancel my appointment?",
                    "state": "idle", "must": [r"50\s?%"],
+                   "must_not": [r"give us a call", r"we'?ll sort it out", _WAIT_ADVICE]}],
+    },
+    {
+        "name": "shortcut: a charge question with no timing gets the rules (Belmont)",
+        "slug": "belmont_hair_studio",
+        "why": "'What's the charge if I cancel my appointment?' got only 'how far "
+               "ahead are you cancelling?' (live 2026-10-17). The rules are the answer.",
+        "turns": [{"say": "What's the charge if I cancel my appointment?",
+                   "state": "idle", "must": [r"24[\s-]*hours?", r"50\s?%"],
                    "must_not": [r"give us a call", r"we'?ll sort it out"]}],
     },
     {
