@@ -493,6 +493,19 @@ def save_message(phone, role, content, business_id, source="unknown"):
     conn.close()
 
 
+def chat_transcript(phone, business_id, limit=40):
+    """The last `limit` messages of one chat, oldest first, for re-showing
+    it after a page reload: [{"role": "user"|"assistant", "content",
+    "notice": True for a message the business sent unasked}]."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT role, content, source FROM messages WHERE phone = ? AND business_id = ? "
+        "ORDER BY id DESC LIMIT ?", (phone, business_id, limit)).fetchall()
+    conn.close()
+    return [{"role": r["role"], "content": r["content"],
+             "notice": r["source"] == "notification"} for r in reversed(rows)]
+
+
 def get_recent_messages(phone, business_id, limit=10):
     """Return the last `limit` turns for this (phone, business) as a list of
     {role, content} dicts — in chronological order, ready for the Claude API.

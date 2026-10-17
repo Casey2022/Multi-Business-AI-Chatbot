@@ -456,7 +456,8 @@ def webchat_reply(slug):
 
     The session_id plays the role the phone number plays for SMS — it's
     the key for history, booking state, and appointments. Generated
-    client-side and held for the life of the browser session.
+    client-side and kept in the browser for 7 days, so a reload carries on
+    the same conversation (webchat_history re-shows it).
     """
     business = get_business_by_slug(slug)
     if not business:
@@ -543,6 +544,39 @@ def webchat_updates(slug):
     if notes:
         log_web.info("Delivered %d notice(s) to %s", len(notes), session_id)
     return {"messages": [n["body"] for n in notes]}
+
+
+# Session ids the page keeps across reloads (2026-10-17): "web_" and 24
+# characters from crypto.getRandomValues, about 120 bits. Holding one means
+# reading that chat back, so only these long ones can: the older 8-character
+# ids came from Math.random and weren't kept, and are too short to be a key.
+_KEPT_SESSION = re.compile(r"web_[a-z0-9]{24,32}")
+HISTORY_MESSAGES = 40
+
+
+@app.route("/webchat/<slug>/history", methods=["GET"])
+def webchat_history(slug):
+    """The chat so far, for a page that was reloaded: the customer's
+    messages, the replies and any notices, oldest first. Returns
+    {"messages": [{"from": "customer"|"bot", "text", "notice"}]}.
+
+    No model call; rate limited per address so session ids can't be tried
+    by the thousand. Notices still waiting are left for /updates, which the
+    page calls straight after."""
+    business = get_business_by_slug(slug)
+    if not business:
+        return {"error": "Unknown business"}, 404
+    session_id = (request.args.get("session_id") or "").strip()
+    if not _KEPT_SESSION.fullmatch(session_id):
+        return {"error": "session_id is required"}, 400
+    import ratelimit
+    allowed, wait = ratelimit.webchat_history(_client_ip())
+    if not allowed:
+        return {"error": "Too many requests", "retry_after": wait}, 429
+    from db import chat_transcript
+    turns = chat_transcript(session_id, business["id"], limit=HISTORY_MESSAGES)
+    return {"messages": [{"from": "customer" if t["role"] == "user" else "bot",
+                          "text": t["content"], "notice": t["notice"]} for t in turns]}
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,8 @@ TEMPLATE_DIRS = [ROOT / "admin" / "templates", ROOT / "templates"]
 ADDED_BY_SCRIPT = {
     "typing",     # demo.html, on the "…" bubble while waiting
     "notice",     # demo.html, on a notice the business sent unprompted
+    "history-mark",  # demo.html, "Earlier in this chat" above a reloaded chat
+    "msg-history",   # demo.html, the row that line sits in
     "picker-hidden",  # date-picker.js, hides the field its button replaces
     "col-grip",   # table-resize.js, the draggable column edge
     "is-thinking",        # assistant-pop.js, the "Thinking…" turn

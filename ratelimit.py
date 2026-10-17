@@ -134,6 +134,20 @@ def webchat(slug, session_id, ip):
     ])
 
 
+# Re-showing a chat after a reload (webchat_history). One call per page
+# load; a script trying session ids would make thousands.
+WEBCHAT_HISTORY_IP_PER_MINUTE = _limit("WEBCHAT_HISTORY_IP_PER_MINUTE", 20)
+WEBCHAT_HISTORY_IP_PER_DAY = _limit("WEBCHAT_HISTORY_IP_PER_DAY", 300)
+
+
+def webchat_history(ip):
+    """Limits for reading a chat back after a page reload."""
+    return check_all([
+        (f"webchat-history-ip:{ip}", WEBCHAT_HISTORY_IP_PER_MINUTE, 60),
+        (f"webchat-history-ip:{ip}", WEBCHAT_HISTORY_IP_PER_DAY, 86400),
+    ])
+
+
 def demo_start(ip):
     """Limits for minting a demo tenant.
 

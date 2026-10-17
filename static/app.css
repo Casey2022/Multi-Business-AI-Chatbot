@@ -743,6 +743,11 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .read-text { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--text-sm); line-height: 1.5; }
 
+/* The web chat after a reload: a quiet line above the conversation so far. */
+.msg-history { justify-content: center; }
+.msg-history .bubble.history-mark { background: none; border: 0; box-shadow: none;
+  color: var(--ink-faint); font-size: var(--text-sm); padding: 2px 0; }
+
 /* Text in an uploaded PDF that can't be seen on the page (knowledge_upload). */
 .hidden-text { margin-bottom: var(--s4); }
 .hidden-text-list { margin: var(--s2) 0 0 18px; color: var(--ink); font-size: var(--text-sm);

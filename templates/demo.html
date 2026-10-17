@@ -33,7 +33,8 @@
     <div class="card-title chathead">
       {{ business.name }}
       <span class="chathead-sub">Ask a question or start a booking ·
-        <a href="{{ url_for('text_page', slug=business.slug) }}">try it as a text message</a></span>
+        <a href="{{ url_for('text_page', slug=business.slug) }}">try it as a text message</a>
+        <span id="newChatWrap" hidden> · <a href="#" id="newChat">start a new chat</a></span></span>
     </div>
 
     <div class="thread" id="chatBody">
@@ -50,9 +51,38 @@
 </div>
 
 <script>
-  // Random session id — plays the role of the phone number for this visit.
-  const sessionId = "web_" + Math.random().toString(36).slice(2, 10);
   const slug = {{ business.slug | tojson }};
+
+  // The session id plays the role of the phone number: the key for this
+  // conversation, its booking and its notices. It's kept in this browser
+  // for KEEP_DAYS, so a reload (or a second tab) carries on the same chat
+  // and re-shows it (2026-10-17; before, a reload started a stranger's
+  // chat and later notices never arrived). Holding the id means reading
+  // the chat back, so it's 24 characters from crypto.getRandomValues
+  // (about 120 bits), not Math.random. Storage can be blocked (private
+  // windows): then it's simply one chat per page, as it used to be.
+  const KEEP_DAYS = 7;
+  const STORE_KEY = "simon-chat:" + slug;
+  function newSessionId() {
+    const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    return "web_" + Array.from(bytes, (b) => alphabet[b % 36]).join("");
+  }
+  function keptSession() {
+    try {
+      const kept = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+      if (kept && /^web_[a-z0-9]{24,32}$/.test(kept.id)
+          && Date.now() - kept.at < KEEP_DAYS * 864e5) return kept.id;
+    } catch (e) { /* blocked or unreadable: start fresh */ }
+    return null;
+  }
+  function keepSession() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ id: sessionId, at: Date.now() })); }
+    catch (e) { /* storage blocked: this page still works */ }
+  }
+  const resumed = keptSession();
+  const sessionId = resumed || newSessionId();
 
   // One request in flight at a time. The Send button was disabled while
   // waiting, but Enter wasn't — so a customer facing a slow reply pressed
@@ -122,6 +152,8 @@
       const data = await res.json();
       typing.remove();
       addMsg(data.reply || data.error || "Something went wrong.", "bot");
+      keepSession();
+      newChatWrap.hidden = false;
     } catch (err) {
       typing.remove();
       addMsg("Sorry — I couldn't reach the assistant just then. Try again?", "bot");
@@ -160,6 +192,34 @@
     }
   }
   const updatesTimer = setInterval(checkForUpdates, 10000);
+
+  // A reloaded page: show the conversation so far under the greeting, then
+  // pick up any notices that arrived while it was closed.
+  const newChatWrap = document.getElementById("newChatWrap");
+  async function showHistory() {
+    try {
+      const res = await fetch(
+        `/webchat/${slug}/history?session_id=${encodeURIComponent(sessionId)}`);
+      if (res.status === 404) { businessGone(); return; }
+      if (!res.ok) return;
+      const data = await res.json();
+      const turns = data.messages || [];
+      if (!turns.length) return;
+      const marker = addMsg("Earlier in this chat", "bot", "history-mark");
+      marker.className = "msg msg-history";
+      turns.forEach((t) => addMsg(t.text, t.from, t.notice ? "notice" : ""));
+      newChatWrap.hidden = false;
+      keepSession();                     // used again: the 7 days start over
+    } catch (err) {
+      // Offline: the chat still works, it just starts without the history.
+    }
+  }
+  document.getElementById("newChat").addEventListener("click", (e) => {
+    e.preventDefault();
+    try { localStorage.removeItem(STORE_KEY); } catch (err) { /* nothing kept */ }
+    window.location.reload();
+  });
+  if (resumed) showHistory().then(checkForUpdates);
 </script>
 
 </body>

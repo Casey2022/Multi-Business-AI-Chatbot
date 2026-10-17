@@ -132,7 +132,7 @@ def main():
         check(f"{name}: a 404 on the update check stops the checking",
               "const updatesTimer = setInterval(checkForUpdates, 10000);" in src
               and "clearInterval(updatesTimer);" in src
-              and src.count("if (res.status === 404) {") == 2)
+              and src.count("if (res.status === 404) {") >= 2)   # demo.html's history too
         check(f"{name}: it says so once, links to a new demo and closes the input",
               "if (ended) return;" in src and "url_for('demo_picker')" in src
               and "input.disabled = true;" in src and "if (inFlight || ended) return;" in src)
