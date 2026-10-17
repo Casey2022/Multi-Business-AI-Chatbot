@@ -861,6 +861,18 @@ def prompt_section(config, which=("notice", "cancellation")):
             + "With no timing given, don't just ask: state the rules below "
               "(each window and what it costs, in a sentence or two), then ask "
               f"how far ahead their {what} is if they want the exact figure.")
+        # Live, Belmont, 2026-10-17, twice: "if you can wait another 6 hours
+        # to get past the 24-hour mark, there'd be no charge". Backwards, and
+        # the tool's own warning wasn't enough: the second time, the chat
+        # (kept across reloads) still held the first wrong answer. A standing
+        # rule, so it holds with or without the tool, and corrects history.
+        text += _rule(
+            f"Time only runs one way: the closer the {what}, the less notice, "
+            "so cancelling or moving later never costs less. Never suggest "
+            "waiting, or cancelling later, as a way to pay less or avoid a "
+            "charge. If a cheaper window has passed, say plainly that it has "
+            "passed. If an earlier reply in this conversation suggested "
+            "waiting, it was wrong: correct it.")
         text += "\n\n" + policy_text(config)
     return text
 

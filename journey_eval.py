@@ -95,7 +95,7 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
 _SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
 _WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
-                r"|hit the \d+[- ]hour mark")
+                r"|(?:hit|get past|reach) the \d+[- ]hour mark")
 
 JOURNEYS = [
     {
@@ -194,6 +194,31 @@ JOURNEYS = [
         "why": "An owner gave colour its own window; 30 hours' notice is inside it.",
         "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
                    "state": "idle", "must": [r"50\s?%"], "must_not": [_WAIT_ADVICE]}],
+    },
+    {
+        "name": "service rules: asked how to avoid the colour charge (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _COLOUR_48,
+        "why": "Invites the backwards advice outright: waiting only gives less notice.",
+        "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [r"50\s?%"], "must_not": [_WAIT_ADVICE]},
+                  {"say": "Is there any way I can avoid that charge?",
+                   "state": "idle", "must_not": [_WAIT_ADVICE]}],
+    },
+    {
+        "name": "service rules: an earlier wrong 'wait' answer is in the chat (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _COLOUR_48,
+        "why": "Live 2026-10-17: the chat, kept across reloads, still held 'wait "
+               "another 18 hours' and the next answer said 'wait another 6 hours'.",
+        "history": [
+            ("user", "My colour appointment is in about 30 hours. What happens if I cancel?"),
+            ("assistant", "If you cancel a colour appointment between 24 and 48 hours before, we "
+                          "charge 50% of the service. Since you're 30 hours out, that's where you "
+                          "fall — but if you can wait just another 18 hours or so, you'll hit the "
+                          "48-hour mark and there's no charge at all."),
+        ],
+        "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [r"50\s?%"], "tool": "cancellation_outcome",
+                   "must_not": [_WAIT_ADVICE]}],
     },
     {
         "name": "service rules: a haircut at 30 hours is free (Belmont)",
@@ -325,6 +350,12 @@ def run(journey, verbose=False):
     conn.execute("DELETE FROM messages WHERE phone = ?", (sender,))
     conn.commit()
     conn.close()
+    # "history": messages already in the chat before the first turn, as
+    # (role, text). The web chat keeps a conversation across reloads, so an
+    # earlier wrong answer can still be there (live 2026-10-17).
+    for role, text in journey.get("history", []):
+        db.save_message(sender, role, text, business_id,
+                        source="customer" if role == "user" else "llm")
 
     transcript, problems = [], []
     previous = None

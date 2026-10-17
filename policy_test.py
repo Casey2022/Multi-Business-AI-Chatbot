@@ -296,6 +296,12 @@ def main():
     check("with no timing given, the prompt says to state the rules, not just ask "
           "(live 2026-10-17: 'how far ahead are you cancelling?' and nothing else)",
           "With no timing given, don't just ask: state the rules below" in section, section[-600:])
+    check("a standing rule: time runs one way, never suggest waiting, correct an earlier reply that did "
+          "(live 2026-10-17, twice: 'wait another 6 hours… no charge')",
+          "cancelling or moving later never costs less" in section
+          and "Never suggest waiting" in section
+          and "If an earlier reply in this conversation suggested waiting, it was wrong" in section,
+          section[-900:])
     check("23 hours: 50% of the service", "50% of the service is charged" in r["say"],
           r["say"])
     check("the rule leads, with 'moving' as well as cancelling",
