@@ -202,6 +202,26 @@ JOURNEYS = [
                    "state": "idle", "must": [_FREE], "must_not": [_CHARGED_50]}],
     },
     {
+        "name": "shortcut: a charge question about 'cancel my appointment' (Belmont)",
+        "slug": "belmont_hair_studio",
+        "why": "The 'cancel my appointment' keyword rule answered 'give us a call' "
+               "before the cancellation rules saw it (fixed 2026-10-17: it steps "
+               "aside for charge words).",
+        "turns": [{"say": "My appointment is in 10 hours. What's the charge if I cancel my appointment?",
+                   "state": "idle", "must": [r"50\s?%"],
+                   "must_not": [r"give us a call", r"we'?ll sort it out"]}],
+    },
+    {
+        "name": "shortcut: a deposit question about 'cancel my order' (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "Sunrise's 'cancel my order' rule gave the phone number instead "
+               "of the deposit rules (same fix).",
+        "turns": [{"say": "If I cancel my order 3 days before, do I get my deposit back?",
+                   "state": "idle", "must": [DEPOSIT_GONE],
+                   "must_not": [r"please call us at", r"call us at .* and w"]}],
+    },
+    {
         "name": "a real booking still starts, after a question (Bob's)",
         "slug": "bobs_plumbing",
         "clock": (2026, 9, 22, 10, 0),
