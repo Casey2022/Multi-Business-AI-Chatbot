@@ -55,6 +55,11 @@ def is_booking_command(text, keywords=BOOKING_RULE["keywords"]):
     return re.match(pattern, text.strip().lower()) is not None
 
 
+def _mentions(text, phrases):
+    """True if any phrase appears in the text as whole words."""
+    return any(re.search(rf"\b{re.escape(p)}\b", text) for p in phrases)
+
+
 def get_reply(message, config):
     """Try to match the message against keyword rules for the given business.
 
@@ -89,9 +94,18 @@ def get_reply(message, config):
             # address a plumbing issue", stealing the question from RAG.
             # Word boundaries stop the substring class of that problem;
             # ambiguous words still need removing from the keyword list.
-            if any(re.search(rf"\b{re.escape(keyword)}\b", text)
-                   for keyword in keywords):
+            if _mentions(text, keywords):
                 matched = True
+
+        # "unless": words that mean the message is asking something the
+        # canned reply doesn't answer, so the model should have it. The
+        # "cancel my appointment" rule says "call us", which is right for
+        # doing it and wrong for "what's the charge if I cancel my
+        # appointment tomorrow?": the cancellation rules answer that
+        # (Casey, 2026-10-17).
+        if matched and _mentions(text, rule.get("unless", [])):
+            log.debug("Rule %s stepped aside (an 'unless' word)", rule["name"])
+            matched = False
 
         if matched:
             log.debug("Matched rule %s", rule["name"])

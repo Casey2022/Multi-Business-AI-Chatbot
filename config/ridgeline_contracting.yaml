@@ -106,7 +106,7 @@ rules:
   - name: "hours"
     # Phrases, not the bare word: "hours" alone also matched "my appointment
     # is in about 30 hours, what happens if I cancel?" and answered with the
-    # opening times (journey_eval, 2026-10-17). rules_hours_test.py checks it.
+    # opening times (journey_eval, 2026-10-17). rules_shortcuts_test.py checks it.
     keywords: ["your hours", "opening hours", "business hours", "store hours", "hours of operation", "what are the hours", "you open", "are you closed"]
     match: "any"
     reply: "Our office hours are {hours}. Leave a message any time and we'll get back to you."
@@ -119,6 +119,8 @@ rules:
   - name: "quote_price"
     keywords: ["how much", "what would it cost", "price for", "ballpark"]
     match: "any"
+    # "How much to cancel my visit?" is about cancelling, not a project price.
+    unless: ["cancel", "cancelling", "canceling", "cancellation", "reschedule"]
     reply: "Every project is priced after an on-site look — no two kitchens are the same. Estimates are free; want me to book one?"
 
   - name: "thanks"
@@ -129,6 +131,11 @@ rules:
   - name: "cancel_existing"
     keywords: ["cancel my appointment", "change my appointment", "reschedule"]
     match: "any"
+    # Steps aside when the customer asks what cancelling costs: the model answers
+    # from the cancellation rules or the knowledge base (rules_shortcuts_test.py).
+    unless: ["charge", "charged", "charges", "fee", "fees", "cost", "costs", "pay",
+             "refund", "refunded", "deposit", "penalty", "how much", "what happens",
+             "notice", "policy", "money back"]
     reply: "To change or cancel a scheduled visit, please call {phone} and we'll take care of it."
 
 booking:

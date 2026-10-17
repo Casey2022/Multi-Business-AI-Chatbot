@@ -176,7 +176,7 @@ rules:
   - name: "hours"
     # Phrases, not the bare word: "hours" alone also matched "my appointment
     # is in about 30 hours, what happens if I cancel?" and answered with the
-    # opening times (journey_eval, 2026-10-17). rules_hours_test.py checks it.
+    # opening times (journey_eval, 2026-10-17). rules_shortcuts_test.py checks it.
     keywords: ["your hours", "opening hours", "business hours", "store hours", "hours of operation", "what are the hours", "you open", "are you closed", "you close"]
     match: "any"
     reply: "We're open {hours}."
@@ -194,6 +194,11 @@ rules:
   - name: "cancel_existing"
     keywords: ["cancel my appointment", "change my appointment", "reschedule"]
     match: "any"
+    # Steps aside when the customer asks what cancelling costs: the model answers
+    # from the cancellation rules or the knowledge base (rules_shortcuts_test.py).
+    unless: ["charge", "charged", "charges", "fee", "fees", "cost", "costs", "pay",
+             "refund", "refunded", "deposit", "penalty", "how much", "what happens",
+             "notice", "policy", "money back"]
     reply: "To change or cancel an appointment, give us a call at {phone} and we'll sort it out."
 
 booking:
