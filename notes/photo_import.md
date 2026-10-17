@@ -182,8 +182,19 @@ photo_import exactly as an upload. Under 40 letters/digits of text (a
 script-built page, a menu image) → "upload a screenshot or PDF instead".
 
 **Hidden text, again:** display:none, visibility:hidden, the hidden
-attribute, font-size 0, opacity 0, and HTML comments are set aside and
-listed on the review page, never given to the model. aria-hidden is NOT
+attribute, font-size 0 and opacity 0 are set aside and listed on the
+review page, never given to the model. HTML comments are dropped without
+listing: on a real site (Cam's Pizzeria, 2026-10-16) they were 20-odd
+plugin notes that buried everything else.
+
+**First live test (2026-10-16, camspizzeria.com from Casey's Mac): 403**
+in under a second, shown as "needs a login" (wrong). From the dev shell
+(datacenter proxy) every client got 200, our user agent and Python's TLS
+included, and SNI was proven to carry the name (local TLS server). So it
+depends on where the request comes from: a security service's rules.
+Refusals are now logged (status, server, cf-mitigated, the error page's
+title), bot protection gets its own message, and Accept-Language is sent.
+We don't impersonate a browser to get past a site's bot protection. aria-hidden is NOT
 hidden (it hides from screen readers, not eyes). Not covered: text hidden
 by a stylesheet class (`.sr-only` in a CSS file), which would need the
 CSS applied. Fixture: `evals/photos/hidden_text.html` (four tricks).

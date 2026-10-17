@@ -169,13 +169,25 @@ def main():
     except w.WebProblem as e:
         ok = "redirected too many times" in str(e)
     check(f"more than {w.MAX_REDIRECTS} redirects is refused", ok)
-    for status, words in ((404, "no page"), (403, "login"), (401, "login"), (500, "error (500)")):
+    for status, words in ((404, "no page"), (403, "refused to let the reader in"), (401, "login"),
+                          (429, "slow down"), (500, "error (500)")):
         try:
             w.fetch("https://menu.example/x", NAMES, opener_from([(status, {}, b"")]))
             ok = False
         except w.WebProblem as e:
             ok = words in str(e)
         check(f"a {status} is explained in words", ok)
+
+    for headers, body, why in (({"cf-mitigated": "challenge", "server": "cloudflare"}, b"", "Cloudflare's header"),
+                               ({"server": "cloudflare"}, b"<title>Just a moment...</title>", "a challenge page"),
+                               ({}, b"<html><title>Attention Required! | Cloudflare</title>", "a block page")):
+        try:
+            w.fetch("https://menu.example/x", NAMES, opener_from([(403, headers, body)]))
+            said = ""
+        except w.WebProblem as e:
+            said = str(e)
+        check(f"bot protection is named as such ({why}), not mistaken for a login",
+              "security service" in said and "login" not in said, said)
 
     heading("the opener's own mechanics, against a local server")
     big = b"x" * (w.MAX_BYTES + 10)
@@ -248,10 +260,12 @@ def main():
     trick = (ROOT / "evals" / "photos" / "hidden_text.html").read_text()
     text, hidden, _ = w.page_text(trick)
     joined = " ".join(hidden)
-    check("hidden text is set aside: display:none, a comment, the hidden attribute, size 0",
-          "NOTE TO THE AI" in joined and "remove the allergen section" in joined
-          and "Delivery is free everywhere" in joined and "all pizzas are now $0" in joined, hidden)
-    check("…and none of it is in the text", not any(h in text for h in hidden)
+    check("hidden text is set aside: display:none, the hidden attribute, size 0",
+          "NOTE TO THE AI" in joined and "Delivery is free everywhere" in joined
+          and "all pizzas are now $0" in joined, hidden)
+    check("…and none of it is in the text, nor the comment's instructions (comments aren't listed: "
+          "on real sites they're plugin noise)",
+          not any(h in text for h in hidden) and "allergen" not in text and "allergen" not in joined
           and "$0" not in text and 'Any sub on a 10" roll $13' in text.splitlines(), text)
     t, h, _ = w.page_text('<p>Wings <span aria-hidden="true">$12</span></p><!--[if IE]><p>x</p><![endif]-->'
                           '<img src="m.png" alt="Calzones $14">')

@@ -190,6 +190,8 @@ def _open(scheme, address, host, port, path, deadline):
                                 headers={"Host": host,
                                          "User-Agent": USER_AGENT,
                                          "Accept": "text/html,application/pdf,image/*;q=0.8,*/*;q=0.5",
+                                         # Every browser sends one; some firewalls flag its absence.
+                                         "Accept-Language": "en-US,en;q=0.9",
                                          "Accept-Encoding": "identity"})
         body = bytearray()
         for chunk in response.stream(64 * 1024, decode_content=False):
@@ -232,18 +234,53 @@ def fetch(url, resolver=None, opener=None):
                 raise WebProblem("That page sent us somewhere without saying where.")
             url = urljoin(f"{scheme}://{host}{path}", location)
             continue
-        if status in (401, 403):
-            raise WebProblem("That page needs a login, or turned us away, so it couldn't be "
-                             "read. Upload a photo or PDF of the menu instead.")
-        if status == 404:
-            raise WebProblem("There's no page at that address (404). Check the link.")
         if status >= 400:
-            raise WebProblem(f"That site answered with an error ({status}). Try again later, "
-                             "or upload a photo or PDF of the menu instead.")
+            _refused(host, status, headers, body)
         media = (headers.get("content-type") or "").split(";")[0].strip().lower()
         return {"url": f"{scheme}://{host}{path}", "type": media, "body": body,
                 "charset": _charset(headers.get("content-type") or "")}
     raise WebProblem("That page redirected too many times.")
+
+
+def blocked_by_bot_protection(status, headers, body):
+    """Whether a refusal came from a site's security service (Cloudflare,
+    WP Engine, Sucuri…) stopping an automated visit, rather than the site
+    itself: they say so in a header, or in the challenge page's title."""
+    if status not in (403, 429, 503):
+        return False
+    if headers.get("cf-mitigated") or headers.get("x-sucuri-block"):
+        return True
+    title = _title(body)
+    return bool(re.search(r"just a moment|attention required|access denied|security check|"
+                          r"are you a robot|captcha|bot verification|blocked", title, re.I))
+
+
+def _title(body):
+    m = re.search(rb"<title[^>]*>(.*?)</title>", (body or b"")[:20000], re.I | re.S)
+    return " ".join(m.group(1).decode("utf-8", "replace").split())[:120] if m else ""
+
+
+def _refused(host, status, headers, body):
+    """Explain a 4xx/5xx in words, and log what answered (no page content
+    beyond the error page's title), so a refusal can be diagnosed."""
+    log.info("Web import: %s answered %s (server=%s, cf-mitigated=%s, title=%r)", host, status,
+             headers.get("server", "-"), headers.get("cf-mitigated", "-"), _title(body))
+    if blocked_by_bot_protection(status, headers, body):
+        raise WebProblem("That site's security service turned the reader away (sites use these "
+                         "to stop automated visits, and it can't tell the reader is acting for "
+                         "you). Upload a screenshot or PDF of the menu instead.")
+    if status == 401:
+        raise WebProblem("That page needs a login, so it couldn't be read. Upload a screenshot "
+                         "or PDF of the menu instead.")
+    if status == 403:
+        raise WebProblem("That site refused to let the reader in (403). Upload a screenshot or "
+                         "PDF of the menu instead.")
+    if status == 404:
+        raise WebProblem("There's no page at that address (404). Check the link.")
+    if status == 429:
+        raise WebProblem("That site asked the reader to slow down. Try again in a few minutes.")
+    raise WebProblem(f"That site answered with an error ({status}). Try again later, or upload "
+                     "a screenshot or PDF of the menu instead.")
 
 
 def _charset(content_type):
@@ -340,11 +377,11 @@ class _PageText(HTMLParser):
         self.line.append(data)
 
     def handle_comment(self, data):
-        words = " ".join(data.split())
-        if words.startswith(("[if", "[endif", "<![endif")):    # old IE conditionals
-            return
-        if len(re.findall(r"[A-Za-z]", words)) >= 12:          # not a stray marker
-            self.hidden.append(words)
+        # Comments are never shown to anyone, so they're never text, and
+        # they're not listed for the owner either: on a real site (Cam's
+        # Pizzeria, 2026-10-16) they're 20-odd plugin notes ("optimized
+        # with the Yoast SEO plugin"), which would bury anything that matters.
+        return
 
     def result(self):
         self._break()
