@@ -26,10 +26,13 @@ Stdlib only, so the tests import it without the app's dependencies.
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta
 
 import clock
+
+log = logging.getLogger("policy")
 
 
 # ---------------------------------------------------------------------------
@@ -714,7 +717,10 @@ _TIME_NAMED = re.compile(
     r"|\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)"
     r"|at (?:\d{1,2}(?::\d{2})?|one|two|three|four|five|six|seven|eight"
     r"|nine|ten|eleven|twelve)\b"
-    r"|in (?:\d+|a|an|one|two|three|four|five|six) (?:hours?|days?|weeks?)"
+    # "in about 30 hours" too (live 2026-10-17: not counted, so the tool
+    # wasn't required).
+    r"|in (?:(?:about|around|roughly|under|over|less than|more than|just|only) )?"
+    r"(?:\d+|a|an|one|two|three|four|five|six) (?:hours?|days?|weeks?)"
     r"|(?:\d+|one|two|three|four|five|six|seven|a) (?:hours?|days?|weeks?|months?) "
     r"(?:before|out|ahead|away|from now))\b", re.I)
 _ABOUT_CANCELLING = re.compile(r"\b(?:cancel\w*|refund\w*|deposits?)\b", re.I)
@@ -803,11 +809,84 @@ def must_apply_cancellation(message, config, history=None):
     and the guardrail "you cannot look up existing orders" won: "call us".
     """
     text = message or ""
-    if not (cancellation(config) and _ABOUT_CANCELLING.search(text)):
+    if not cancellation(config):
         return False
     earlier = [m.get("content", "") for m in (history or [])
                if m.get("role") == "user"][-FOLLOW_UP_TURNS:]
+    # A follow-up about the charge counts as a cancellation question when
+    # the customer was just asking about cancelling: "Is there any way I can
+    # avoid that charge?" names neither, wasn't required to use the tool, and
+    # said "you're within 24 hours" at 30 hours out (journey_eval 2026-10-17).
+    about = (_ABOUT_CANCELLING.search(text)
+             or (_ABOUT_THE_CHARGE.search(text)
+                 and any(_ABOUT_CANCELLING.search(t or "") for t in earlier)))
+    if not about:
+        return False
     return any(_TIME_NAMED.search(t or "") for t in [text, *earlier])
+
+
+_ABOUT_THE_CHARGE = re.compile(
+    r"\b(?:charged?|fees?|costs?|pay|penalty|avoid|refund\w*|money back)\b", re.I)
+
+
+# ---------------------------------------------------------------------------
+# After the reply: no false hope
+# ---------------------------------------------------------------------------
+
+# Sentences that offer a way out the rules don't have, when the tool said a
+# cheaper window has passed. Live, Belmont, 2026-10-17, one after another,
+# each after a prompt fix for the one before: "if you can wait another 18
+# hours… no charge", "wait another 6 hours to get past the 24-hour mark",
+# "the good news is you've still got time", "you've still got a bit of
+# time — if you need to reschedule instead of cancelling, just call us".
+# The prompt says not to; like llm.without_repeated_number, this makes it so.
+_FALSE_HOPE = re.compile(
+    r"\bstill (?:got|have|has)\b[^.!?]{0,25}\btime\b|\bthere'?s still time\b"
+    r"|\bstill time to\b|\bif you (?:can |could )?wait\b"
+    r"|\bwait (?:just )?(?:another|a few|an? |until|\d)"
+    r"|\b(?:hit|get past|reach) the \d+[- ]hour mark", re.I)
+# Rescheduling offered as the way round it, where moving counts the same.
+_RESCHEDULE_INSTEAD = re.compile(
+    r"\b(?:reschedul\w*|move it|moving it|move (?:the|your) \w+)\b[^.!?]*"
+    r"\b(?:instead|rather than|avoid|work something out|see what works|no charge|for free)\b"
+    r"|\b(?:instead of|rather than) cancel\w*[^.!?]*\b(?:reschedul\w*|mov(?:e|ing))\b", re.I)
+
+
+def without_false_hope(reply, results, config):
+    """The reply without sentences that offer a way out of a charge that
+    can't be avoided. `results` are this turn's cancellation_outcome
+    results; this acts only when one of them said a cheaper window has
+    passed ("too late for that now"), so "you still have time to cancel
+    for free" at 3 days out is left alone. Where moving counts the same as
+    cancelling and a "reschedule instead" sentence goes, the reply says
+    so. Never empty: if nothing is left, the rule itself, from the result."""
+    late = [r for r in (results or []) if "too late for that now" in (r.get("say") or "")]
+    policy = cancellation(config)
+    if not reply or not late or not policy:
+        return reply
+    moving = "mov" in _words(policy)[1]
+    kept, dropped, rescheduling = [], False, False
+    for sentence in re.split(r"(?<=[.!?])\s+", reply.strip()):
+        instead = moving and bool(_RESCHEDULE_INSTEAD.search(sentence))
+        if instead or _FALSE_HOPE.search(sentence):
+            dropped = True
+            rescheduling = rescheduling or instead
+            continue
+        kept.append(sentence)
+    if not dropped:
+        return reply
+    if rescheduling:
+        what = policy.get("what", "order")
+        kept.append(f"Moving the {what} counts the same as cancelling, so the same charge applies.")
+    text = " ".join(kept).strip()
+    if not text or (rescheduling and len(kept) == 1):
+        r = late[0]
+        acting = _words(policy)[1]
+        outcome = "; ".join(r.get("outcomes", {}).values())
+        text = f"{acting[0].upper() + acting[1:]} {r.get('window')}: {outcome}." + (
+            f" {kept[-1]}" if rescheduling else "")
+    log.info("Took a false-hope sentence out of a cancellation answer")
+    return text
 
 
 def tools_for(config, which=("notice", "cancellation")):

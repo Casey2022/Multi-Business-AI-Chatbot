@@ -817,7 +817,7 @@ def _as_param(block):
     return fields
 
 
-def _reply_using_tools(call, config, now):
+def _reply_using_tools(call, config, now, results_seen=None):
     """Call the model, run any policy tools it asks for, return its answer.
 
     The model does the reading and the phrasing; policy.run_tool does the
@@ -841,6 +841,8 @@ def _reply_using_tools(call, config, now):
         results = []
         for use in uses:
             result = policy.run_tool(use.name, use.input, config, now)
+            if results_seen is not None and use.name == "cancellation_outcome":
+                results_seen.append(result)
             log.info("Tool %s: %s", use.name,
                      "error" if "error" in result else "ok")
             log.debug("Tool %s(%s) -> %s", use.name, use.input, result)
@@ -979,13 +981,17 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
                 call["tool_choice"] = {"type": "tool", "name": "menu_price"}
         if temperature is not None:
             call["temperature"] = temperature
-        reply = _reply_using_tools(call, config, now)
+        cancellation_results = []
+        reply = _reply_using_tools(call, config, now, cancellation_results)
         if not reply:
             # Every round spent on tool calls and nothing said. Rare, but a
             # blank bubble is worse than an honest "try again".
             log.warning("No reply text after tool use")
             return unavailable_reply(config)
         log.debug(f"Claude replied: {reply!r}")
+        # A charge that can't be avoided gets no "you've still got time"
+        # (policy.without_false_hope: the prompt alone didn't hold).
+        reply = policy.without_false_hope(reply, cancellation_results, config)
         return without_repeated_number(reply, history, message, config)
 
     except Exception as e:

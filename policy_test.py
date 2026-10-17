@@ -11,6 +11,7 @@ bot and the judge read, and the tool loop in llm.get_llm_reply, against a
 fake model. No network, no ChromaDB.
 """
 
+import copy
 import json
 import sys
 import types
@@ -519,6 +520,58 @@ def main():
               "error" in payload and got.startswith("Could you"), payload)
     finally:
         llm._create, llm.retrieve = real
+
+    heading("no false hope once a cheaper window has passed (live 2026-10-17)")
+    colour48 = copy.deepcopy(bel)
+    colour48["policies"]["cancellation"] = dict(
+        bel["policies"]["cancellation"], services=["colour"],
+        windows=[{"at_least_hours": 48, "any": "no_charge"},
+                 {"at_least_hours": 24, "colour": {"charge_percent": 50}, "appointment": "no_charge"},
+                 {"at_least_hours": 0, "any": {"charge_percent": 50}}])
+    late30 = policy.cancellation_outcome(colour48, hours_before=30, kind="colour")
+    hope = policy.without_false_hope
+    live1 = ("If you cancel now, 50% of the service cost will be charged. You're in the 24-48 hour "
+             "window, so that's the rule for colour. The good news is you've still got a bit of time "
+             "— if you need to reschedule instead of cancelling, just call us at (585) 555-0142 and "
+             "the team can work something out with you.")
+    got = hope(live1, [late30], colour48)
+    check("'you've still got a bit of time — reschedule instead' goes, and moving is said to count the same",
+          "still got" not in got and "reschedule" not in got and got.startswith("If you cancel now, 50%")
+          and got.endswith("Moving the appointment counts the same as cancelling, so the same charge applies."),
+          got)
+    live2 = ("Not at this point, the 50% charge applies; the free window has passed. If you want to "
+             "reschedule to a later date instead of cancelling entirely, give us a call and we can see "
+             "what works.")
+    got = hope(live2, [late30], colour48)
+    check("'reschedule instead … we can see what works' goes too",
+          "see what works" not in got and "counts the same as cancelling" in got, got)
+    for text in ("If you can wait another 6 hours to get past the 24-hour mark, there'd be no charge.",
+                 "if you can wait just another 18 hours or so, you'll hit the 48-hour mark"):
+        got = hope("At 30 hours out, 50% of the service is charged. " + text[0].upper() + text[1:],
+                   [late30], colour48)
+        check(f"waiting advice goes: {text[:40]!r}…", got == "At 30 hours out, 50% of the service is charged.",
+              got)
+    got = hope("The good news is you've still got time!", [late30], colour48)
+    check("never empty: with nothing left, the rule itself from the result",
+          got == "Cancelling or moving between 24 hours and 48 hours before the appointment: "
+                 "50% of the service is charged.", got)
+    early = policy.cancellation_outcome(colour48, hours_before=60, kind="colour")
+    fine = "There's no charge if you cancel now. You still have time to cancel for free."
+    check("…but where the free window HASN'T passed, 'you still have time' is true and stays",
+          hope(fine, [early], colour48) == fine)
+    check("…and with no cancellation result this turn, nothing is touched",
+          hope(live1, [], colour48) == live1)
+    follow = [{"role": "user", "content": "My colour appointment is in about 30 hours. What happens if I cancel?"},
+              {"role": "assistant", "content": "50% of the service is charged."}]
+    check("'Is there any way I can avoid that charge?' after a cancelling question requires the tool",
+          policy.must_apply_cancellation("Is there any way I can avoid that charge?", colour48, follow)
+          and not policy.must_apply_cancellation("Is there any way I can avoid that charge?", colour48, []))
+    check("'in about 30 hours' names a time", bool(policy._TIME_NAMED.search("it's in about 30 hours")))
+    llm_src = (ROOT / "llm.py").read_text()
+    check("the reply goes through it, with this turn's cancellation results, before it's sent",
+          "policy.without_false_hope(reply, cancellation_results, config)" in llm_src
+          and 'use.name == "cancellation_outcome"' in llm_src
+          and llm_src.index("without_false_hope(") < llm_src.index("return without_repeated_number("))
 
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()

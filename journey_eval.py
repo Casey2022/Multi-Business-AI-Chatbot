@@ -100,6 +100,10 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 # so a model that adds "to cancel, give us a call" after the answer passes.
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
 _SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
+# Rescheduling offered as the way round it; at Belmont moving counts the
+# same ("cancelled or moved"). Mirrors policy._RESCHEDULE_INSTEAD.
+_RESCHEDULE_INSTEAD = (r"\b(?:reschedul\w*|move it|moving it)\b[^.!?]*\b(?:instead|rather than"
+                       r"|avoid|work something out|see what works|no charge|for free)\b")
 _WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
                 r"|(?:hit|get past|reach) the \d+[- ]hour mark"
                 # …and "the good news is you've still got time — if you cancel
@@ -210,9 +214,13 @@ JOURNEYS = [
         "slug": "belmont_hair_studio", "policy": _COLOUR_48,
         "why": "Invites the backwards advice outright: waiting only gives less notice.",
         "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
-                   "state": "idle", "must": [r"50\s?%"], "must_not": [_WAIT_ADVICE]},
+                   "state": "idle", "must": [r"50\s?%"], "tool": "cancellation_outcome",
+                   "must_not": [_WAIT_ADVICE, _RESCHEDULE_INSTEAD]},
+                  # Live-style follow-up: no "cancel" in it, but the tool is
+                  # required (it said "within 24 hours" at 30 hours without it).
                   {"say": "Is there any way I can avoid that charge?",
-                   "state": "idle", "must_not": [_WAIT_ADVICE]}],
+                   "state": "idle", "tool": "cancellation_outcome",
+                   "must_not": [_WAIT_ADVICE, _RESCHEDULE_INSTEAD, r"within 24 hours"]}],
     },
     {
         "name": "service rules: an earlier wrong 'wait' answer is in the chat (Belmont)",
