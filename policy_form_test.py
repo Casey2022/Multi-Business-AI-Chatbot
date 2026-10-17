@@ -44,10 +44,12 @@ def form_from(rows):
         form[f"dep{i}_value"], form[f"dep{i}_when"] = d["value"], d["when"]
     for i, w in enumerate(rows["windows"]):
         form[f"w{i}_amount"], form[f"w{i}_unit"] = w["amount"], w["unit"]
-        for j, o in enumerate(w["outcomes"]):
-            form[f"w{i}_k{j}_type"], form[f"w{i}_k{j}_pct"] = o["type"], o["percent"]
-    for j, o in enumerate(rows["last"]["outcomes"]):
-        form[f"wlast_k{j}_type"], form[f"wlast_k{j}_pct"] = o["type"], o["percent"]
+        for o in w["outcomes"]:
+            form[f"w{i}_k_{o['slug']}_type"], form[f"w{i}_k_{o['slug']}_pct"] = o["type"], o["percent"]
+    for o in rows["last"]["outcomes"]:
+        form[f"wlast_k_{o['slug']}_type"], form[f"wlast_k_{o['slug']}_pct"] = o["type"], o["percent"]
+    for s in rows.get("services") or []:
+        form[f"svc_{s.replace(' ', '_')}"] = "1"
     form["notes"] = rows["notes"]
     return form
 
@@ -76,7 +78,7 @@ def main():
 
     heading("an edit becomes rules the sums use")
     form = form_from(pf.rows(b_rules))
-    form.update(w0_amount="48", wlast_k0_pct="75")
+    form.update(w0_amount="48", wlast_k_appointment_pct="75")
     new, errors = pf.parse(form, b_rules)
     edited = {"policies": {"cancellation": new}}
     outcome = policy.cancellation_outcome(edited, hours_before=30)["say"]
@@ -86,8 +88,8 @@ def main():
     check("the operator's words and kinds are copied through untouched",
           all(new[k] == b_rules[k] for k in ("title", "what", "action", "acting", "before", "price")))
     form = form_from(pf.rows(s_rules))
-    form["w1_k0_type"], form["w1_k1_type"] = "keep_percent", "keep_percent"
-    form["w1_k0_pct"] = form["w1_k1_pct"] = "40"
+    form["w1_k_custom_cake_type"], form["w1_k_wedding_cake_type"] = "keep_percent", "keep_percent"
+    form["w1_k_custom_cake_pct"] = form["w1_k_wedding_cake_pct"] = "40"
     new, errors = pf.parse(form, s_rules)
     middle = next(w for w in new["windows"] if w["at_least_hours"] == 48)
     check("the same outcome for every kind is stored once, as 'any'",
@@ -96,7 +98,7 @@ def main():
     new, _ = pf.parse(form, s_rules)
     check("a deposit amount can change; its kind can't",
           new["deposits"]["custom cake"]["percent"] == 60 and set(new["deposits"]) == set(s_rules["deposits"]))
-    form = form_from(pf.rows(b_rules)); form.update(w1_amount="3", w1_unit="days", w1_k0_type="no_charge")
+    form = form_from(pf.rows(b_rules)); form.update(w1_amount="3", w1_unit="days", w1_k_appointment_type="no_charge")
     new, errors = pf.parse(form, b_rules)
     check("a window can be added (3 days), and windows are sorted longest first",
           not errors and [w["at_least_hours"] for w in new["windows"]] == [72, 24, 0])
@@ -111,11 +113,11 @@ def main():
             ({"w0_amount": "-5"}, "whole number", "a negative"),
             ({"w0_amount": "two"}, "whole number", "words"),
             ({"w0_amount": "400", "w0_unit": "days"}, "more than a year", "over a year"),
-            ({"w1_amount": "1", "w1_unit": "days", "w1_k0_type": "no_charge"}, "same notice", "24 hours twice"),
-            ({"wlast_k0_pct": "0"}, "between 1 and 100", "0%"),
-            ({"wlast_k0_pct": "150"}, "between 1 and 100", "150%"),
-            ({"wlast_k0_pct": "half"}, "between 1 and 100", "a word for a percentage"),
-            ({"wlast_k0_type": "forfeit_deposit"}, "choose what happens", "a deposit outcome where there are no deposits"),
+            ({"w1_amount": "24", "w1_unit": "hours", "w1_k_appointment_type": "no_charge"}, "same notice", "24 hours twice"),
+            ({"wlast_k_appointment_pct": "0"}, "between 1 and 100", "0%"),
+            ({"wlast_k_appointment_pct": "150"}, "between 1 and 100", "150%"),
+            ({"wlast_k_appointment_pct": "half"}, "between 1 and 100", "a word for a percentage"),
+            ({"wlast_k_appointment_type": "forfeit_deposit"}, "choose what happens", "a deposit outcome where there are no deposits"),
             ({"w0_unit": "weeks"}, "whole number", "an unknown unit"),
             ({"notes": "\n".join(["a note"] * 6)}, "5 notes", "six notes"),
             ({"notes": "x" * 301}, "300 characters", "a long note")):
@@ -123,6 +125,52 @@ def main():
         check(f"refused: {why}", any(words in e for e in errs), errs)
     check("Belmont (no deposits) isn't offered deposit outcomes; Sunrise is",
           "forfeit_deposit" not in pf.outcomes_for(b_rules) and "forfeit_deposit" in pf.outcomes_for(s_rules))
+
+    heading("different rules for some services (2026-10-17)")
+    services = pf.service_names(belmont)
+    check("the choices are the business's own services",
+          services == ["haircut", "blowout", "colour", "cut and colour", "balayage", "kids cut"], services)
+    check("…and 'Haircut (45 min)' style names are trimmed",
+          pf.service_names({"services": ["Haircut (45 min)", "Colour (2 hours)"]}) == ["haircut", "colour"])
+    form = form_from(pf.rows(b_rules)); form["svc_colour"] = "1"
+    step1, errors = pf.parse(form, b_rules, services)
+    same = all(policy.cancellation_outcome({"policies": {"cancellation": step1}}, hours_before=h,
+                                           kind=k)["outcomes"][k]
+               == policy.cancellation_outcome(belmont, hours_before=h)["outcomes"]["appointment"]
+               for h in (3, 30) for k in ("colour", "appointment"))
+    check("ticking colour adds it, starting the same as everything else",
+          not errors and step1["services"] == ["colour"] and same, step1)
+    form = form_from(pf.rows(step1))
+    form.update(w0_amount="48", w1_amount="24", w1_unit="hours",
+                w1_k_colour_type="charge_percent", w1_k_colour_pct="50",
+                w1_k_appointment_type="no_charge")
+    step2, errors = pf.parse(form, step1, services)
+    rules = {"policies": {"cancellation": step2}}
+    colour30 = policy.cancellation_outcome(rules, hours_before=30, kind="colour")["say"]
+    hair30 = policy.cancellation_outcome(rules, hours_before=30, kind="appointment")["say"]
+    check("colour now needs 48 hours: 30 hours' notice costs 50%",
+          not errors and "50%" in colour30 and "a colour appointment" in colour30, (errors, colour30))
+    check("…while any other appointment is free at 30 hours, with no 'better notice' hint",
+          "no charge" in hair30 and "With at least" not in hair30, hair30)
+    check("both are said in the rules customers are told",
+          "a colour appointment, 50% of the service is charged; any other appointment, there is "
+          "no charge" in policy.policy_text(rules), policy.policy_text(rules))
+    tool = policy.cancellation_tool(rules)["input_schema"]["properties"]["kind"]
+    check("the assistant's tool names the exact services, and everything else",
+          tool["enum"] == ["colour", "appointment"] and "not one that includes it" in tool["description"])
+    form = form_from(pf.rows(step2)); form.pop("svc_colour")
+    step3, errors = pf.parse(form, step2, services)
+    check("unticking it drops its rules", not errors and "services" not in step3
+          and pf.kinds(step3) == ["appointment"])
+    many = services + ["perm", "toner"]
+    form = form_from(pf.rows(b_rules))
+    for name in many:
+        form[f"svc_{pf.slug(name)}"] = "1"
+    check(f"at most {pf.MAX_SERVICES} services", any("at most" in e for e in pf.parse(form, b_rules, many)[1]))
+    form = form_from(pf.rows(s_rules)); form["svc_colour"] = "1"
+    new, errors = pf.parse(form, s_rules, ["colour"])
+    check("deposit kinds (Sunrise's cakes) stay the operator's: no services added",
+          "services" not in new and pf.kinds(new) == pf.kinds(s_rules) and not pf.can_pick_services(s_rules))
 
     heading("a business with no rules can create simple ones")
     starter = pf.new_policy({"booking": {"noun": "visit"}})

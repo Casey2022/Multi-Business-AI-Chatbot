@@ -756,11 +756,12 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .rule-more summary { cursor: pointer; padding: var(--s3) var(--s4); color: var(--ink-soft);
   font-size: var(--text-sm); }
 .rule-window { display: flex; flex-direction: column; gap: var(--s2); }
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .outcome-row { padding-left: var(--s3); }
 /* A percentage box only shows for a percentage outcome (field-deps.js
    enables it; the server renders it disabled otherwise). */
 .outcome-row input:disabled, .outcome-row input:disabled + span { visibility: hidden; }
-.outcome-kind { min-width: 7rem; }
+.outcome-kind { min-width: 11.5rem; }
 .rules-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--s4); }
 .rules-lines { margin: var(--s2) 0 0 18px; display: flex; flex-direction: column; gap: 4px;

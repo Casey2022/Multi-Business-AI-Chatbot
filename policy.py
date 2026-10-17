@@ -315,9 +315,49 @@ def cancellation(config):
 
 def _kinds(policy):
     """Kinds of order the rules distinguish (Sunrise: custom and wedding
-    cakes). A business with one rule for everything has one kind."""
+    cakes). A business with one rule for everything has one kind.
+
+    Without deposits, an owner can give particular services their own
+    outcomes (policy["services"], 2026-10-17: "colour needs 48 hours,
+    everything else 24"): those services, then the business's own word
+    ("appointment") for everything else."""
     kinds = list((policy.get("deposits") or {}).keys())
-    return kinds or [policy.get("what", "order")]
+    if kinds:
+        return kinds
+    what = policy.get("what", "order")
+    services = [s for s in (policy.get("services") or []) if s and s != what]
+    return services + [what]
+
+
+def _by_service(policy):
+    """True when the kinds are services (plus "everything else")."""
+    return bool(policy.get("services")) and not policy.get("deposits")
+
+
+def _a(word):
+    return "an" if str(word)[:1].lower() in "aeiou" else "a"
+
+
+def kind_label(policy, kind):
+    """A kind as it's said: "a custom cake"; with services, "a colour
+    appointment" and, for everything else, "any other appointment"."""
+    what = policy.get("what", "order")
+    if _by_service(policy):
+        return f"any other {what}" if kind == what else f"{_a(kind)} {kind} {what}"
+    return f"{_a(kind)} {kind}"
+
+
+def _next_change(windows, index, kind):
+    """(hours, spec) of the nearest longer-notice window whose outcome for
+    this kind differs from this window's, or None. With services sharing
+    windows, the next window up may change nothing for this one (a haircut
+    is free from 24 hours whether or not colour needs 48)."""
+    here = json.dumps(_outcome_for(windows[index], kind), sort_keys=True)
+    for i in range(index - 1, -1, -1):
+        spec = _outcome_for(windows[i], kind)
+        if json.dumps(spec, sort_keys=True) != here:
+            return windows[i]["at_least_hours"], spec
+    return None
 
 
 def _words(policy):
@@ -443,14 +483,14 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     # outcome and dropped the rule: right answer, no reason (rag_eval
     # 2026-10-02, 3/3).
     if kind and len(kinds) > 1:
-        rule = f"for a {kind}, {texts[kind]}"
+        rule = f"for {kind_label(policy, kind)}, {texts[kind]}"
     elif len(kinds) == 1:
         rule = texts[kinds[0]]
     elif same:
-        rule = (f"{texts[kinds[0]]}, for every {what} "
-                f"({' and '.join(kinds)} alike)")
+        rule = (f"{texts[kinds[0]]}, for every {what}"
+                + ("" if _by_service(policy) else f" ({' and '.join(kinds)} alike)"))
     else:
-        rule = "; ".join(f"for a {k}, {t}" for k, t in texts.items())
+        rule = "; ".join(f"for {kind_label(policy, k)}, {t}" for k, t in texts.items())
     say = (f"The rule: {acting} {label}, {rule}. "
            f"{acting[0].upper() + acting[1:]} {ahead} falls in that window, so "
            f"that is what applies.")
@@ -458,16 +498,22 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     # "falls in that window", the model wrote "23 hours... you fall just
     # under that window", which reads as borderline (journey_eval
     # 2026-10-15, 1 run in 3). It isn't: 23 is less than 24.
-    upper = windows[index - 1]["at_least_hours"] if index else None
+    # With services, the line that matters is where THIS service's outcome
+    # changes; for deposit kinds and single rules it's the next window up,
+    # as before (every adjacent window there differs).
+    k0 = kind or asked[0]
+    change = _next_change(windows, index, k0) if (kind or len(kinds) == 1 or not _by_service(policy)) \
+        else None
+    upper = change[0] if change else (None if _by_service(policy) else
+                                      (windows[index - 1]["at_least_hours"] if index else None))
     if upper is not None and 0 <= hours < upper and upper - hours <= max(3, upper * 0.15):
         say += (f" {span(hours)[0].upper() + span(hours)[1:]} is less than "
                 f"{span(upper)}, so this is inside that window, not on the edge of it.")
     # The better outcome's deadline, worked out here. Left to the model it
     # said "to avoid the charge, cancel before 9am tomorrow" (the appointment
     # itself) when the line was 9am TODAY (journey_eval 2026-10-15, 1 in 3).
-    if upper is not None and hours >= 0:
-        k0 = kind or asked[0]
-        better = outcome_text(_outcome_for(windows[index - 1], k0), policy, k0)
+    if upper is not None and hours >= 0 and change:
+        better = outcome_text(change[1], policy, k0)
         if starts_at is not None:
             deadline = _parse_local(starts_at) - timedelta(hours=upper)
             say += (f" With at least {span(upper)} of notice (by {when(deadline)}), "
@@ -513,6 +559,9 @@ def policy_text(config):
         elif len({json.dumps(s, sort_keys=True) for s in specs.values()}) == 1:
             lines.append(f"{head}: {texts[kinds[0]]}, for every "
                          f"{policy.get('what', 'order')}.")
+        elif _by_service(policy):
+            lines.append(f"{head}: " + "; ".join(
+                f"{kind_label(policy, k)}, {t}" for k, t in texts.items()) + ".")
         else:
             lines.append(f"{head}: " + "; ".join(
                 f"{k}, {t}" for k, t in texts.items()) + ".")
@@ -616,10 +665,18 @@ def cancellation_tool(config):
                 # (rag_eval, 2026-09-30, both deposit rows, every run).
                 "kind": {
                     "type": "string", "enum": _kinds(policy),
-                    "description": f"Which kind of {what}, only if the "
-                                   f"customer already said. Leave it out "
-                                   f"otherwise: the result then covers "
-                                   f"every kind."},
+                    "description": (
+                        f"Which service the {what} is for, only if the customer "
+                        f"already said: exactly one of "
+                        + ", ".join(f"“{k}”" for k in kinds[:-1])
+                        + f" (only that service, not one that includes it); for "
+                        f"any other service, “{what}”. Leave it out otherwise: "
+                        f"the result then covers every kind."
+                        if _by_service(policy) else
+                        f"Which kind of {what}, only if the "
+                        f"customer already said. Leave it out "
+                        f"otherwise: the result then covers "
+                        f"every kind.")},
             },
         },
     }

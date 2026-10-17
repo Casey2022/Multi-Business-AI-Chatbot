@@ -88,6 +88,27 @@
   </div>
   {% endif %}
 
+  {% if service_choices %}
+  <div class="card">
+    <div class="card-title">Different rules for some services</div>
+    <div class="card-pad">
+      <p class="guidance">Tick a service to give it its own rules, then save: it gets its own
+        line in each window below, starting the same as everything else, so change what
+        should differ and save again. Only that service: a combined one (like a cut and
+        colour) follows its own tick, or the rules for everything else.</p>
+      <div class="chip-row mt-3">
+        {% for s in service_choices %}
+        <label class="chip-check">
+          <input type="checkbox" name="svc_{{ s.slug }}" value="1"
+                 {% if (posted and posted.get('svc_' ~ s.slug)) or (not posted and s.name in rows.services) %}checked{% endif %}>
+          {{ s.name[:1] | upper }}{{ s.name[1:] }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card">
     <div class="card-title">How much notice, and what it costs</div>
     <div class="card-pad guidance">Longest notice first. Leave a row empty to drop it; up to
@@ -109,17 +130,17 @@
         </select>
         <span>notice:</span>
       </div>
-      {% for kind in rows.kinds %}{% set j = loop.index0 %}
-      {% set o = w.outcomes[j] if w else {'type': 'no_charge', 'percent': ''} %}
-      {{ outcome(i ~ '', j, kind, o) }}
+      {% for base in rows.last.outcomes %}{% set j = loop.index0 %}
+      {% set o = w.outcomes[j] if w else {'type': 'no_charge', 'percent': '', 'slug': base.slug, 'label': base.label} %}
+      {{ outcome(i ~ '', o) }}
       {% endfor %}
     </div>
     {% if loop.last and max_windows > shown %}</details>{% endif %}
     {% endfor %}
     <div class="field rule-window">
       <div class="inline-fields"><strong>With less notice than that:</strong></div>
-      {% for kind in rows.kinds %}{% set j = loop.index0 %}
-      {{ outcome('last', j, kind, rows.last.outcomes[j]) }}
+      {% for o in rows.last.outcomes %}
+      {{ outcome('last', o) }}
       {% endfor %}
     </div>
   </div>
@@ -150,12 +171,12 @@
 {% endif %}
 {% endblock %}
 
-{% macro outcome(row, j, kind, o) %}
-{% set prefix = 'w' ~ row ~ '_k' ~ j %}
+{% macro outcome(row, o) %}
+{% set prefix = 'w' ~ row ~ '_k_' ~ o.slug %}
 {% set kind_type = posted.get(prefix ~ '_type', o.type) %}
 <div class="inline-fields outcome-row">
-  {% if rows.kinds | length > 1 %}<span class="cell-sub outcome-kind">{{ kind }}:</span>{% endif %}
-  <select name="{{ prefix }}_type" aria-label="What happens{{ ' for ' ~ kind if rows.kinds | length > 1 else '' }}" class="w-auto">
+  {% if rows.kinds | length > 1 %}<span class="cell-sub outcome-kind">{{ o.label[:1] | upper }}{{ o.label[1:] }}:</span>{% endif %}
+  <select name="{{ prefix }}_type" aria-label="What happens{{ ' for ' ~ o.label if rows.kinds | length > 1 else '' }}" class="w-auto">
     {% for value, caption in outcomes %}
     <option value="{{ value }}" {% if kind_type == value %}selected{% endif %}>{{ caption }}</option>
     {% endfor %}

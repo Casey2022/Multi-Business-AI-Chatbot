@@ -34,6 +34,7 @@ DRAFT_FIELD = "cancellation_draft"
 LIVE_FIELD = "cancellation"
 REMOVED = {"removed": True}
 MAX_WINDOWS = 5
+MAX_SERVICES = 6
 MAX_NOTES = 5
 MAX_NOTE = 300
 MAX_HOURS = 24 * 365
@@ -156,9 +157,34 @@ def _article(word):
 
 
 def kinds(policy):
-    """The kinds of order the rules tell apart (fixed: operator's)."""
+    """The kinds the rules tell apart: deposit kinds (the operator's), or
+    the services the owner gave their own rules plus everything else."""
     import policy as policy_mod
     return policy_mod._kinds(policy)
+
+
+def slug(kind):
+    """A kind as a form field name part: "cut and colour" → "cut_and_colour".
+    By name, not position, because ticking a service adds a column between
+    showing the form and saving it."""
+    return re.sub(r"[^a-z0-9]+", "_", str(kind).lower()).strip("_") or "x"
+
+
+def service_names(config):
+    """The business's services as they're named (Settings), for the
+    "different rules for" choices: "Haircut (45 min)" → "haircut"."""
+    names = []
+    for s in (config or {}).get("services") or []:
+        name = " ".join(re.sub(r"\s*\(.*?\)", "", str(s)).split()).lower()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def can_pick_services(policy):
+    """Services can have their own rules unless the kinds are deposit
+    kinds (Sunrise's cakes), which are the operator's."""
+    return not (policy or {}).get("deposits")
 
 
 def _spec_row(spec):
@@ -192,7 +218,9 @@ def rows(policy):
 
     def outcomes(window):
         return [dict(zip(("type", "percent"), _spec_row(
-            window.get(k, window.get("any")) if window else "no_charge"))) for k in ks]
+                    window.get(k, window.get("any")) if window else "no_charge")),
+                     kind=k, slug=slug(k), label=policy_mod.kind_label(policy, k))
+                for k in ks]
     deposits = []
     for k in ks:
         d = ((policy.get("deposits") or {}).get(k)) or {}
@@ -202,6 +230,7 @@ def rows(policy):
                              "when": d.get("when", "")})
     return {
         "kinds": ks,
+        "services": list(policy.get("services") or []),
         "deposits": deposits,
         "windows": [{"amount": a, "unit": u, "outcomes": outcomes(w)}
                     for w in explicit for a, u in [_hours_row(w["at_least_hours"])]],
@@ -238,17 +267,31 @@ def _outcome(form, prefix, policy, label, errors):
     return kind_type
 
 
-def parse(form, base):
+def parse(form, base, available_services=()):
     """(new policy, errors) from the posted form. `base` is the rules as
-    they are (the draft, the live ones, or new_policy): its kinds and words
-    are copied through, since owners don't edit those."""
+    they are (the draft, the live ones, or new_policy): its words, and any
+    deposit kinds, are copied through, since owners don't edit those. Where
+    there are no deposits, the services ticked (from available_services,
+    the business's own list) get their own outcomes; a service ticked just
+    now starts with the same outcomes as everything else."""
     errors = []
-    ks = kinds(base)
     policy = {k: copy.deepcopy(v) for k, v in base.items()
-              if k not in ("windows", "notes", "deposits")}
+              if k not in ("windows", "notes", "deposits", "services")}
+    if can_pick_services(base) and available_services:
+        chosen = [s for s in available_services if form.get(f"svc_{slug(s)}")]
+        if len(chosen) > MAX_SERVICES:
+            errors.append(f"Give at most {MAX_SERVICES} services their own rules")
+            chosen = chosen[:MAX_SERVICES]
+        if chosen:
+            policy["services"] = chosen
+    elif base.get("services"):
+        policy["services"] = list(base["services"])
+    # Deposit kinds come from the deposits, which are copied back below.
+    ks = kinds(base) if base.get("deposits") else kinds(policy)
+    known = set(kinds(base))
 
     deposits = copy.deepcopy(base.get("deposits") or {})
-    for i, k in enumerate(ks):
+    for i, k in enumerate(kinds(base) if base.get("deposits") else []):
         d = deposits.get(k)
         if not d or not ("percent" in d or "min_percent" in d):
             continue
@@ -285,10 +328,11 @@ def parse(form, base):
             errors.append(f"{label}: two windows can't have the same notice")
             continue
         seen.add(hours)
-        windows.append(_window(form, f"w{i}", hours, ks, base, label, errors))
+        windows.append(_window(form, f"w{i}", hours, ks, base, label, errors, known))
     if not windows:
         errors.append("Add at least one window with some notice (for example, 24 hours)")
-    windows.append(_window(form, "wlast", 0, ks, base, "With less notice than that", errors))
+    windows.append(_window(form, "wlast", 0, ks, base, "With less notice than that", errors,
+                           known))
     policy["windows"] = sorted((w for w in windows if w), key=lambda w: -w["at_least_hours"])
 
     notes = [" ".join(line.split()) for line in (form.get("notes") or "").splitlines()]
@@ -301,15 +345,22 @@ def parse(form, base):
     return policy, errors
 
 
-def _window(form, prefix, hours, ks, base, label, errors):
-    """One window: the same outcome for every kind is stored once as "any"."""
+def _window(form, prefix, hours, ks, base, label, errors, known=()):
+    """One window: the same outcome for every kind is stored once as "any".
+    A service ticked just now (no column on the page yet) takes the
+    outcome of everything else: the last kind."""
     specs = {}
-    for j, k in enumerate(ks):
-        spec = _outcome(form, f"{prefix}_k{j}", base, label + (f" ({k})" if len(ks) > 1 else ""),
-                        errors)
+    order = ks[-1:] + ks[:-1]                 # everything else first, to copy from
+    for k in order:
+        field = f"{prefix}_k_{slug(k)}"
+        if k not in known and not form.get(f"{field}_type") and k != ks[-1]:
+            specs[k] = specs[ks[-1]]
+            continue
+        spec = _outcome(form, field, base, label + (f" ({k})" if len(ks) > 1 else ""), errors)
         if spec is None:
             return None
         specs[k] = spec
+    specs = {k: specs[k] for k in ks}
     window = {"at_least_hours": hours}
     if len({repr(s) for s in specs.values()}) == 1:
         window["any"] = next(iter(specs.values()))

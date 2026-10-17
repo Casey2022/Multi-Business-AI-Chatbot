@@ -74,6 +74,21 @@ DEPOSIT_GONE = (r"forfeit|won'?t get (it|your deposit|any of it) back|don'?t get
 # "by 9am today" (already gone) is not the wrong "by 9am tomorrow".
 _NOT_TODAY = r"(?!(?::00)?\s*(?:am|a\.m\.)?\s*today)"
 
+# Belmont with colour given its own rules (policy_form, 2026-10-17): colour
+# needs 48 hours' notice, everything else 24. Only plain "colour" is ticked,
+# so a cut and colour follows the rules for everything else.
+_COLOUR_48 = {
+    "title": "Cancelling or moving an appointment", "what": "appointment",
+    "action": "cancelled or moved", "acting": "cancelling or moving",
+    "before": "the appointment", "price": "the service", "services": ["colour"],
+    "windows": [{"at_least_hours": 48, "any": "no_charge"},
+                {"at_least_hours": 24, "colour": {"charge_percent": 50},
+                 "appointment": "no_charge"},
+                {"at_least_hours": 0, "any": {"charge_percent": 50}}],
+    "notes": []}
+_CHARGED_50 = r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b[^.]*\b(?:be charged|charge|pay)\b[^.]*50\s?%"
+_FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
+
 JOURNEYS = [
     {
         "name": "the bakery deposit, four messages (live 2026-10-03)",
@@ -166,6 +181,27 @@ JOURNEYS = [
         ],
     },
     {
+        "name": "service rules: colour needs 48 hours (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _COLOUR_48,
+        "why": "An owner gave colour its own window; 30 hours' notice is inside it.",
+        "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [r"50\s?%"]}],
+    },
+    {
+        "name": "service rules: a haircut at 30 hours is free (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _COLOUR_48,
+        "why": "Colour's 48-hour window must not leak onto other services.",
+        "turns": [{"say": "My haircut is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [_FREE], "must_not": [_CHARGED_50]}],
+    },
+    {
+        "name": "service rules: a cut and colour follows the general rule (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _COLOUR_48,
+        "why": "Only plain colour was ticked; a combined service isn't colour.",
+        "turns": [{"say": "My cut and colour is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [_FREE], "must_not": [_CHARGED_50]}],
+    },
+    {
         "name": "a real booking still starts, after a question (Bob's)",
         "slug": "bobs_plumbing",
         "clock": (2026, 9, 22, 10, 0),
@@ -239,6 +275,9 @@ def _short(value, limit=260):
 
 def run(journey, verbose=False):
     config = prepare(config_for(journey["slug"]))
+    if journey.get("policy"):
+        # Rules an owner set on the Cancellation rules page, for this journey only.
+        config.setdefault("policies", {})["cancellation"] = journey["policy"]
     business_id = config["business"].get("id")
     if business_id is None:
         return [], [("setup", f"{journey['slug']} isn't registered in the database")]

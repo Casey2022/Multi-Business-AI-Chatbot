@@ -1086,7 +1086,8 @@ def cancellation_rules(business_id):
                       "press Publish changes.", "success")
             return redirect(url_for("admin.cancellation_rules", business_id=business_id))
         base = current or policy_form.new_policy(live_config)
-        new, errors = policy_form.parse(request.form, base)
+        new, errors = policy_form.parse(request.form, base,
+                                        policy_form.service_names(live_config))
         if not errors:
             if live and policy.policy_text({"policies": {"cancellation": new}}) == \
                     policy.policy_text(live_config):
@@ -1115,6 +1116,9 @@ def cancellation_rules(business_id):
         after_lines=(policy.policy_text(after).splitlines()[1:] if after and not removed else []),
         removed=removed, has_draft=pending is not None,
         overlapping=policy_form.sections_about_cancelling(get_documents(business_id)),
+        service_choices=([{"name": s, "slug": policy_form.slug(s)}
+                          for s in policy_form.service_names(live_config)]
+                         if editing and policy_form.can_pick_services(editing) else []),
         price_word=(editing or {}).get("price", "the price"))
 
 
