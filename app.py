@@ -771,6 +771,16 @@ def demo_page_legacy(slug):
     return redirect(url_for("chat_page", slug=slug), code=302)
 
 
+@app.route("/version", methods=["GET"])
+def version():
+    """Which commit is running: Render sets RENDER_GIT_COMMIT on each deploy.
+    Answers "is the fix live yet?" in a second (2026-10-17: a fix was pushed,
+    and a live test couldn't tell whether it had deployed). The short hash
+    only; nothing else about the server."""
+    commit = os.environ.get("RENDER_GIT_COMMIT", "")
+    return {"commit": commit[:7] if re.fullmatch(r"[0-9a-f]{7,40}", commit) else "unknown"}
+
+
 @app.route("/", methods=["GET"])
 def index():
     return redirect(url_for("demo_picker"))

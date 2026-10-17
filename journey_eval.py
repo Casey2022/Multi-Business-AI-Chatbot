@@ -95,7 +95,11 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
 _SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
 _WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
-                r"|(?:hit|get past|reach) the \d+[- ]hour mark")
+                r"|(?:hit|get past|reach) the \d+[- ]hour mark"
+                # …and "the good news is you've still got time — if you cancel
+                # more than 48 hours ahead, there's no charge" (live, 30 hours out).
+                r"|still (?:got|have) time|there'?s still time|still time to"
+                r"|good news is")
 
 JOURNEYS = [
     {

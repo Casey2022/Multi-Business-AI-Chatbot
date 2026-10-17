@@ -290,7 +290,8 @@ def main():
     check("given only the hours, the better outcome is said to be gone, not something to wait for "
           "(live 2026-10-17: 'if you can wait another 18 hours… no charge')",
           "With at least 24 hours of notice, there is no charge; that point passed 4 hours ago, "
-          "so it can't apply now" in late["say"]
+          "so it's too late for that now" in late["say"]
+          and "Don't say they still have time for it" in late["say"]
           and "don't suggest waiting" in late["say"], late["say"])
     section = " ".join(policy.prompt_section(bel).split())
     check("with no timing given, the prompt says to state the rules, not just ask "
@@ -299,7 +300,7 @@ def main():
     check("a standing rule: time runs one way, never suggest waiting, correct an earlier reply that did "
           "(live 2026-10-17, twice: 'wait another 6 hours… no charge')",
           "cancelling or moving later never costs less" in section
-          and "Never suggest waiting" in section
+          and "Never suggest waiting" in section and "never that they still have time for it" in section
           and "If an earlier reply in this conversation suggested waiting, it was wrong" in section,
           section[-900:])
     check("23 hours: 50% of the service", "50% of the service is charged" in r["say"],

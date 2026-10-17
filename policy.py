@@ -517,17 +517,21 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
         if starts_at is not None:
             deadline = _parse_local(starts_at) - timedelta(hours=upper)
             say += (f" With at least {span(upper)} of notice (by {when(deadline)}), "
-                    f"{better}; that time has already passed, so it can't apply now. "
-                    f"Don't name any later time as a way to avoid this.")
+                    f"{better}; that time has already passed, so it's too late for "
+                    f"that now. Don't say they still have time for it, and don't name "
+                    f"any later time as a way to avoid this.")
         else:
             # Given only the hours, the model read "with at least 48 hours of
             # notice, there is no charge" as advice: "if you can wait another
             # 18 hours or so, you'll hit the 48-hour mark" (live, Belmont,
             # 2026-10-17). Waiting only ever gives LESS notice, so say so.
+            # Then, after that: "the good news is you've still got time — if
+            # you cancel more than 48 hours ahead, there's no charge" (live,
+            # 30 hours out). So "too late", in those words.
             say += (f" With at least {span(upper)} of notice, {better}; that point "
-                    f"passed {span(upper - hours)} ago, so it can't apply now. Waiting "
-                    f"only means less notice, so don't suggest waiting, or any later "
-                    f"time, as a way to avoid this.")
+                    f"passed {span(upper - hours)} ago, so it's too late for that now. "
+                    f"Don't say they still have time for it, and don't suggest waiting "
+                    f"or any later time (waiting only means less notice).")
     paid = float(amount_paid) if amount_paid is not None else None
     price = float(order_price) if order_price is not None else None
     for k in (asked[:1] if same and not kind else asked):
@@ -870,9 +874,10 @@ def prompt_section(config, which=("notice", "cancellation")):
             f"Time only runs one way: the closer the {what}, the less notice, "
             "so cancelling or moving later never costs less. Never suggest "
             "waiting, or cancelling later, as a way to pay less or avoid a "
-            "charge. If a cheaper window has passed, say plainly that it has "
-            "passed. If an earlier reply in this conversation suggested "
-            "waiting, it was wrong: correct it.")
+            "charge. If a cheaper window has passed, say plainly that it's too "
+            "late for it, and never that they still have time for it. If an "
+            "earlier reply in this conversation suggested waiting, it was "
+            "wrong: correct it.")
         text += "\n\n" + policy_text(config)
     return text
 
