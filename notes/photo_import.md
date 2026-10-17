@@ -207,3 +207,13 @@ hidden (it hides from screen readers, not eyes). Not covered: text hidden
 by a stylesheet class (`.sr-only` in a CSS file), which would need the
 CSS applied. Fixture: `evals/photos/hidden_text.html` (four tricks).
 
+**Save as PDF of a real page (Cam's, 2026-10-17): 1 suggestion from a
+menu with prices.** The browser's PDF ended with a page that was only a
+photo, and "any page is a scan" sent the WHOLE PDF to the model as its
+embedded pictures (logos, food photos), dropping every price on the text
+pages. Now decided page by page (`pdf_contents` → `scan_pages`): text pages
+as text, picture pages read from their pictures and appended (`pdf_mixed`);
+a photo with no words reads as nothing and the text stands. Stray hidden
+letters (icon fonts' "T", "M") aren't listed. Also seen: a browser prints
+only the open tab of a tabbed menu (the guide says to save each tab).
+

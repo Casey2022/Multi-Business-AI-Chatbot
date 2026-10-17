@@ -290,17 +290,29 @@ def _without(layout, hidden, visible):
     return "\n".join(lines)
 
 
+def _worth_listing(run):
+    """A hidden run the owner might care about: not a stray letter ("T",
+    "M") from a browser-printed page's icon fonts."""
+    return len(re.findall(r"[A-Za-z0-9]", run)) >= 3
+
+
 def pdf_contents(data):
-    """{"text": the visible text (tidied), "hidden": hidden runs, "scanned":
-    True when some page's text is in a picture, "reader"}, or None when
-    pypdf isn't installed. A page is a scan when it has an image and fewer
-    than SCANNED_PAGE_CHARS visible letters and digits (an OCR'd scan's
-    text layer is invisible ink, so it counts as hidden, not visible)."""
+    """{"text": the visible text of the text pages (tidied), "hidden":
+    hidden runs worth listing, "scan_pages": indexes of pages whose text is
+    in a picture, "scanned": True when there are any, "reader"}, or None
+    when pypdf isn't installed. A page is a scan when it has an image and
+    fewer than SCANNED_PAGE_CHARS visible letters and digits (an OCR'd
+    scan's text layer is invisible ink, so it counts as hidden).
+
+    Decided page by page (2026-10-17): a browser's "Save as PDF" of a real
+    menu page (Cam's Pizzeria) ended with a page that was only a photo, and
+    the whole PDF was read as a scan, from its pictures, losing every price
+    on the text pages."""
     reader = open_pdf(data)
     if reader is None:
         return None
-    texts, hidden_all, scanned = [], [], False
-    for page in reader.pages:
+    texts, hidden_all, scan_pages = [], [], []
+    for index, page in enumerate(reader.pages):
         try:
             try:
                 layout = page.extract_text(extraction_mode="layout")
@@ -308,20 +320,22 @@ def pdf_contents(data):
                 layout = page.extract_text()
             visible, hidden = page_runs(page)
         except Exception as e:
-            log.info("Couldn't take the text out of a PDF page (%s); reading it as a scan",
-                     type(e).__name__)
-            return {"text": "", "hidden": [], "scanned": True, "reader": reader}
+            log.info("Couldn't take the text out of PDF page %d (%s); reading it as a scan",
+                     index + 1, type(e).__name__)
+            scan_pages.append(index)
+            continue
         text = tidy_pdf_text(_without(layout, hidden, visible))
         try:
             has_image = bool(page.images)
         except Exception:
             has_image = False
         if len(re.findall(r"[A-Za-z0-9]", text)) < SCANNED_PAGE_CHARS and has_image:
-            scanned = True
-        texts.append(text)
-        hidden_all.extend(hidden)
+            scan_pages.append(index)
+        else:
+            texts.append(text)
+        hidden_all.extend(r for r in hidden if _worth_listing(r))
     return {"text": "\n\n".join(t for t in texts if t), "hidden": hidden_all,
-            "scanned": scanned, "reader": reader}
+            "scan_pages": scan_pages, "scanned": bool(scan_pages), "reader": reader}
 
 
 def pdf_text(data):
@@ -335,7 +349,7 @@ def pdf_text(data):
 MAX_SCAN_IMAGES = 20
 
 
-def page_images(reader):
+def page_images(reader, pages=None):
     """The pictures on each page of a scanned PDF, as (bytes, media type)
     for the model to read like photos, or None when they can't be taken out
     (a format Pillow can't decode, too many). Sending the pictures rather
@@ -343,7 +357,9 @@ def page_images(reader):
     model: Claude reads a PDF's text as well as its pages."""
     out = []
     try:
-        for page in reader.pages:
+        for index, page in enumerate(reader.pages):
+            if pages is not None and index not in pages:
+                continue
             for img in page.images:
                 data = img.data
                 media_type = sniff_image(data)
@@ -364,15 +380,26 @@ def page_images(reader):
 
 def read_upload(config, data, media_type):
     """(what the file says, how it was read, hidden text not used). How:
-    "photo", "pdf_text" (the PDF's visible text, no model) or "pdf_scan"
-    (the model read it)."""
+    "photo", "pdf_text" (the PDF's visible text, no model), "pdf_scan" (the
+    model read it) or "pdf_mixed" (text pages as text, picture pages read
+    by the model)."""
     if media_type != PDF:
         return transcribe(config, data, media_type), "photo", []
     c = pdf_contents(data)
     if c is None:                                   # no pypdf: nothing to check with
         return transcribe(config, data, PDF), "pdf_scan", []
-    if not c["scanned"] and len(re.findall(r"[A-Za-z0-9]", c["text"])) >= SCANNED_PAGE_CHARS:
+    has_text = len(re.findall(r"[A-Za-z0-9]", c["text"])) >= SCANNED_PAGE_CHARS
+    if not c["scanned"] and has_text:
         return c["text"][:MAX_TRANSCRIPTION], "pdf_text", c["hidden"]
+    if has_text:
+        # Some pages are text, some are pictures: the text as it is, and
+        # only the picture pages read by the model (from their pictures,
+        # so no text layer reaches it). If those can't be read, the text
+        # pages still stand.
+        images = page_images(c["reader"], set(c["scan_pages"]))
+        read = transcribe_pages(config, images) if images else ""
+        text = c["text"] + (f"\n\n{read}" if read else "")
+        return text[:MAX_TRANSCRIPTION], "pdf_mixed" if read else "pdf_text", c["hidden"]
     if not c["hidden"]:
         return transcribe(config, data, PDF), "pdf_scan", []
     images = page_images(c["reader"])

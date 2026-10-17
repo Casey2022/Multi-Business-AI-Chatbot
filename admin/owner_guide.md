@@ -130,7 +130,9 @@ file itself isn't kept.
   script can't be read, and some sites' security checks turn the reader
   away. For any of those, open the page in your browser, save it as a PDF
   (File, Print, Save as PDF) and upload that: a PDF saved that way is read
-  exactly. Only public web addresses can be read.
+  exactly. A browser saves only what's showing, so if your menu is in tabs
+  (Pizza, Subs, Drinks…), save each tab. Only public web addresses can be
+  read.
 - iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
   a screenshot and upload that.
 - Something read wrong? On the review page you can type the right price

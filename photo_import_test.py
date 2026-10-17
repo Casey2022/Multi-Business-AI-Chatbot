@@ -490,9 +490,21 @@ def pdf_checks(pi, llm, config, sections):
         sent.clear()
         mixed = make_pdf([("text", MENU_LINES), ("image",)])
         if have_pypdf:
-            pi.read_upload(config, mixed, pi.PDF)
-            check("a PDF with any scanned page is read whole by the model (that page's text is in the picture)",
-                  len(sent) == 1)
+            text, how, _hidden = pi.read_upload(config, mixed, pi.PDF)
+            blocks = [b["type"] for b in sent[-1]["messages"][0]["content"]] if sent else []
+            check("text pages and a picture page: the text kept as it is, only the picture page "
+                  "read by the model, from its picture (browser Save as PDF, Cam's, 2026-10-17)",
+                  how == "pdf_mixed" and "$25" in text and "$14" in text and len(sent) == 1
+                  and blocks == ["image", "text"] and PHOTO_TEXT in text, (how, blocks, text[:200]))
+            sent.clear()
+            llm._create = lambda **c: (sent.append(c), reply(pi.NO_TEXT))[1]
+            text, how, _hidden = pi.read_upload(config, mixed, pi.PDF)
+            check("…and a picture page with no words in it (a photo) costs nothing: the text stands",
+                  how == "pdf_text" and "$25" in text and pi.NO_TEXT not in text, (how, text[:120]))
+            llm._create = lambda **c: (sent.append(c), reply(PHOTO_TEXT))[1]
+            c = pi.pdf_contents(make_pdf([("ops", ["1 g BT /F1 12 Tf 72 700 Td (T) Tj ET",
+                                                   "0 g BT /F1 12 Tf 72 650 Td (Large pizza is 22 dollars on the menu) Tj ET"])]))
+            check("a stray hidden letter (an icon font's 'T') isn't listed for the owner", c["hidden"] == [])
         sent.clear()
         real_pypdf = sys.modules.get("pypdf")
         sys.modules["pypdf"] = None                 # import pypdf → ImportError
