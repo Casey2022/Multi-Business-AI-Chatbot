@@ -182,7 +182,20 @@ Changes here take effect as soon as you press **Save settings**.
 - **What you call a booking**: "appointment", "order", "reservation".
 - **Extra booking questions**: up to 5 questions the assistant asks after the service, the address and the date and time. The label is the short name you'll see on the appointment; the question is what the assistant asks. Tick services to ask a question only for those; nothing ticked means every booking. Clear both boxes on a row to drop it.
 - **Prices on a menu?**: whether you have a Menu tab. Choose no if you quote per job. It can't be switched off while the menu still has items: remove them on the Menu page and publish first, so no prices vanish by surprise.
-- Cancellation and deposit rules, if you have them, are shown at the bottom, read-only. The assistant applies them exactly. To change them, ask your operator (the assistant on the Help page drafts the message for you).
+- Cancellation rules are shown near the bottom. To change them, press **Change cancellation rules** (or **Set up cancellation rules** if you don't have any yet); see Cancellation rules below.
+
+### Cancellation rules
+
+What a customer is charged for cancelling, by how much notice they give.
+The assistant works out the timing and the amounts from these itself.
+
+- Each window is "with at least so many hours or days of notice", and what happens then: no charge, a percentage of the price, or the full price (and, if you take deposits, refund the deposit, keep it, or keep a percentage). The last window, "with less notice than that", covers everything shorter, so there's never a gap.
+- Leave a window's notice empty to drop it. You can have up to 5, plus the last one.
+- If you take deposits, you can change how much they are.
+- Notes are said as written ("A no-show is charged the same as cancelling late."), so keep any numbers in them in step with the windows.
+- Press **Save as draft**. Like a menu change, customers keep hearing the current rules until you press **Publish changes**; the page shows what they're told now and after you publish, and **Preview answers** on the Knowledge base page lets you ask the assistant about it first. **Discard all changes** undoes it.
+- **Remove these rules** (also a draft) means the assistant stops quoting any charges for cancelling.
+- If your knowledge base also talks about cancelling, the page names those sections: once your rules are published, take the cancelling part out of them, so customers aren't told two different things.
 
 ## Things only your operator can change
 
@@ -190,7 +203,7 @@ For any of these, ask the assistant on the Help page: it drafts a message
 to support for you to check and send. Or write one yourself under
 **Send to support**.
 
-- Cancellation and deposit rules.
+- The kinds of order your cancellation rules tell apart (for example, custom and wedding cakes).
 - Your texting phone number.
 - Connecting or changing your Google Calendar, and the hours bookings can be made in.
 - Address checking for the service area.
@@ -215,7 +228,7 @@ about gift cards", "delete the drywall section"). It changes only the
 words that need changing and leaves the rest of the section as it was.
 It won't write a number you didn't give it, and it won't put menu prices
 or cancellation rules in a section: menu prices belong on the Menu, and
-cancellation rules are set by your operator.
+cancellation rules on the Cancellation rules page.
 
 If you have a Menu tab, it can change your menu too ("raise the large
 pizza to $24", "add a calzone at $12", "take the gluten-free crust off"):

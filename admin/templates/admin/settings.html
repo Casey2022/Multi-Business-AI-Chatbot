@@ -180,20 +180,22 @@
       base</a>. Add or edit a section there and press Publish.</p>
   </div>
 
-  {% if policy_lines %}
-  <div class="card">
-    <div class="card-title">{{ policy_lines[0].rstrip(':') }}</div>
+  <div class="card" id="cancellation">
+    <div class="card-title">{{ policy_lines[0].rstrip(':') if policy_lines else 'Cancellation rules' }}</div>
     <div class="guidance card-pad">
-      <p>Set up with your operator. The assistant applies these
-        rules exactly, working out the timing itself, so it never has to
-        interpret wording. To change them, ask your operator.</p>
+      {% if policy_lines %}
+      <p>The assistant applies these rules exactly, working out the timing and the
+        amounts itself, so it never has to interpret wording.</p>
       <ul>
         {% for line in policy_lines[1:] %}<li>{{ line }}</li>
         {% endfor %}
       </ul>
+      {% else %}
+      <p>No cancellation rules yet, so the assistant doesn't quote any charges for cancelling.</p>
+      {% endif %}
+      <a class="btn mt-3" href="{{ url_for('admin.cancellation_rules', business_id=business.id) }}">{{ 'Change cancellation rules' if policy_lines else 'Set up cancellation rules' }}</a>
     </div>
   </div>
-  {% endif %}
 
   <div class="card">
     <div class="card-title">Booking</div>

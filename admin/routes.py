@@ -452,7 +452,7 @@ def _knowledge_page(business, conflict=None, status=200):
 # Where Publish and Discard send you back to: the page you pressed them on.
 # Only these named pages, never a URL from the form (an open redirect).
 _BACK_TO = {"knowledge": "admin.knowledge", "menu": "admin.menu_page",
-            "settings": "admin.settings"}
+            "settings": "admin.settings", "cancellation": "admin.cancellation_rules"}
 
 
 def _back_to(business_id):
@@ -539,6 +539,12 @@ def pending_changes(business):
     if changes["deleted"]:
         lines.append("deleted: " + ", ".join(changes["deleted"]))
     lines += [f"menu: {line}" for line in menu_changes_waiting(fresh)]
+    import policy_form
+    try:
+        lines += policy_form.waiting_lines(load_config(fresh["config_path"], fresh["id"]),
+                                           fresh["id"])
+    except Exception:
+        pass
     return lines or ["knowledge-base changes"]
 
 
@@ -1051,6 +1057,67 @@ def upload_too_large(e):
     return redirect(url_for("admin.dashboard"))
 
 
+@admin_bp.route("/business/<int:business_id>/cancellation", methods=["GET", "POST"])
+@login_required
+def cancellation_rules(business_id):
+    """The owner's cancellation rules as a form (policy_form). Saving makes
+    a draft: customers keep hearing the published rules until Publish."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import policy
+    import policy_form
+    from db import get_documents
+    from admin.auth import current_user
+
+    live_config = load_config(business["config_path"], business_id)
+    live = policy.cancellation(live_config)
+    pending = policy_form.draft(business_id)
+    removed = bool(pending and pending.get("removed"))
+    current = None if removed else (pending or live)
+    errors, posted = [], {}
+
+    if request.method == "POST":
+        if request.form.get("action") == "remove":
+            if live or pending:
+                policy_form.save_draft(business_id, None, updated_by=current_user()["email"])
+                flash("Removal saved as a draft. Customers keep the current rules until you "
+                      "press Publish changes.", "success")
+            return redirect(url_for("admin.cancellation_rules", business_id=business_id))
+        base = current or policy_form.new_policy(live_config)
+        new, errors = policy_form.parse(request.form, base)
+        if not errors:
+            if live and policy.policy_text({"policies": {"cancellation": new}}) == \
+                    policy.policy_text(live_config):
+                policy_form.discard_draft(business_id)
+                flash("That's what customers are told now, so there's nothing to publish.",
+                      "info")
+            else:
+                policy_form.save_draft(business_id, new, updated_by=current_user()["email"])
+                flash("Saved as a draft. Customers keep the current rules until you press "
+                      "Publish changes; Preview answers on the Knowledge base page shows how "
+                      "the assistant will answer with the new ones.", "success")
+            return redirect(url_for("admin.cancellation_rules", business_id=business_id))
+        posted = request.form
+        current = base
+
+    editing = current or (policy_form.new_policy(live_config)
+                          if request.args.get("new") or request.method == "POST" else None)
+    after = policy_form.with_draft(live_config, business_id) if pending else None
+    return render_template(
+        "admin/cancellation.html", business=business, errors=errors, posted=posted,
+        rows=policy_form.rows(editing) if editing else None,
+        outcomes=[(k, policy_form.OUTCOMES[k]) for k in policy_form.outcomes_for(editing or {})],
+        with_percent=" ".join(sorted(policy_form.WITH_PERCENT)),
+        max_windows=policy_form.MAX_WINDOWS, is_new=not live and not pending,
+        now_lines=policy.policy_text(live_config).splitlines()[1:] if live else [],
+        after_lines=(policy.policy_text(after).splitlines()[1:] if after and not removed else []),
+        removed=removed, has_draft=pending is not None,
+        overlapping=policy_form.sections_about_cancelling(get_documents(business_id)),
+        price_word=(editing or {}).get("price", "the price"))
+
+
 @admin_bp.route("/business/<int:business_id>/knowledge/discard", methods=["POST"])
 @login_required
 def knowledge_discard(business_id):
@@ -1060,18 +1127,26 @@ def knowledge_discard(business_id):
     if not get_business_by_id(business_id):
         abort(404)
 
-    from db import discard_document_changes
+    from db import discard_document_changes, unpublished_changes, set_documents_clean
     from admin.auth import current_user
 
     import menu
+    import policy_form
     had_menu_draft = menu.draft_menu(business_id) is not None
+    had_rules_draft = policy_form.draft(business_id) is not None
     menu.discard_draft(business_id)
+    policy_form.discard_draft(business_id)
     if discard_document_changes(business_id, updated_by=current_user()["email"]):
-        flash("Changes discarded — the sections and menu are back to what "
-              "customers see. Anything you'd written is still in each "
+        flash("Changes discarded — the sections, menu and cancellation rules are back "
+              "to what customers see. Anything you'd written is still in each "
               "section's History.", "success")
-    elif had_menu_draft:
-        flash("Menu changes discarded.", "success")
+    elif had_menu_draft or had_rules_draft:
+        changes = unpublished_changes(get_business_by_id(business_id))
+        if not (changes["edited"] or changes["new"] or changes["deleted"]):
+            set_documents_clean(business_id)
+        flash(("Menu and cancellation-rule" if had_menu_draft and had_rules_draft else
+               "Menu" if had_menu_draft else "Cancellation-rule") + " changes discarded.",
+              "success")
     else:
         flash("There's no published version saved to go back to yet. Publish "
               "once, and Discard will work from then on.", "error")
@@ -1207,6 +1282,10 @@ def knowledge_publish(business_id):
                                  business_id)
         ingest_documents(config, business_id=business_id)
         menu.publish_draft(business_id)
+        # Cancellation rules aren't in the index (the tool reads them from
+        # config), so they only need promoting, once the rest has worked.
+        import policy_form
+        policy_form.publish_draft(business_id)
         set_documents_clean(business_id)
         flash("Published — your assistant is now using the updated content.",
               "success")

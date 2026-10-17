@@ -618,8 +618,8 @@ def knowledge_checks(assistant, cross, cfg, bob, bob_cfg, Block, llm):
     text, _, error = ak.run("add_to_section", {"section": "Colour Deposits and Lateness",
                             "text": "Cancelling with under 24 hours' notice costs 50%."},
                             belmont, bcfg, "o@x.com", owner_words="24 hours, 50%")
-    check("cancellation wording is refused where the YAML holds the rules (operator's, one copy)",
-          error and "hand_off_to_support" in text and "“Cancelling”" in text, text)
+    check("cancellation wording is refused where there are rules (one copy), pointing to their page",
+          error and "Change cancellation rules" in text and "“Cancelling”" in text, text)
     text, _, error = ak.run("edit_section", {"section": "Colour Deposits and Lateness", "find": "$30",
                             "replace": "$40"}, belmont, bcfg, "o@x.com",
                             owner_words="colour deposit is 40 now")

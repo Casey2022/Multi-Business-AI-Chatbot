@@ -1,0 +1,169 @@
+{% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
+{% block title %}Cancellation rules — {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
+  <a href="{{ url_for('admin.settings', business_id=business.id) }}">{{ business.name }}</a> ›
+  Cancellation rules
+</div>
+
+<div class="page-header">
+  <h1>Cancellation rules</h1>
+  <div class="subtitle">What a customer is charged for cancelling, by how much notice they
+    give. The assistant works out the timing and the amounts from these itself, so it
+    never has to interpret wording. Changes are drafts until you publish them.</div>
+</div>
+
+{{ ui.destinations(business, 'settings') }}
+
+{{ ui.unpublished_banner(business, 'cancellation') }}
+
+{% if errors %}
+<div class="flash flash-error" role="alert">
+  <strong>Not saved.</strong> {{ errors | join('. ') }}.
+</div>
+{% endif %}
+
+{% if now_lines or after_lines or removed %}
+<div class="card">
+  <div class="card-title">What customers are told</div>
+  <div class="card-pad rules-compare">
+    <div>
+      <div class="cell-sub">Now</div>
+      {% if now_lines %}<ul class="rules-lines">{% for line in now_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% else %}<p class="hint">No cancellation rules.</p>{% endif %}
+    </div>
+    {% if has_draft %}
+    <div>
+      <div class="cell-sub">After you publish</div>
+      {% if removed %}<p class="hint">No cancellation rules: the assistant won't quote any charges.</p>
+      {% else %}<ul class="rules-lines">{% for line in after_lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if overlapping and (rows or now_lines) %}
+<div class="banner" role="note">
+  <div><strong>Your knowledge base also talks about cancelling</strong>
+    ({{ overlapping | join(', ') }}). If it says something different from these rules,
+    customers could be told two different things. Once your rules are published, take the
+    cancelling part out of {{ 'that section' if overlapping | length == 1 else 'those sections' }}.</div>
+</div>
+{% endif %}
+
+{% if not rows %}
+<div class="card">
+  <div class="card-pad guidance">
+    <p>You don't have cancellation rules yet, so the assistant doesn't quote any charges for
+      cancelling.</p>
+    <a class="btn btn-primary mt-3" href="{{ url_for('admin.cancellation_rules', business_id=business.id, new=1) }}">Set up cancellation rules</a>
+  </div>
+</div>
+{% else %}
+<form method="POST" class="stack">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="save">
+
+  {% if rows.deposits %}
+  <div class="card">
+    <div class="card-title">Deposits</div>
+    {% for d in rows.deposits %}{% set i = loop.index0 %}
+    <div class="field">
+      <label for="dep{{ i }}">{{ d.kind[:1] | upper }}{{ d.kind[1:] }}</label>
+      <div class="inline-fields">
+        <span>{{ 'At least' if d.field == 'min_percent' else '' }}</span>
+        <input type="text" id="dep{{ i }}" name="dep{{ i }}_value" class="w-num" inputmode="decimal"
+               value="{{ posted.get('dep' ~ i ~ '_value', d.value) }}">
+        <span>% of the order price,</span>
+        <input type="text" name="dep{{ i }}_when" aria-label="When it's paid" class="w-wide"
+               value="{{ posted.get('dep' ~ i ~ '_when', d.when) }}" placeholder="paid at ordering">
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title">How much notice, and what it costs</div>
+    <div class="card-pad guidance">Longest notice first. Leave a row empty to drop it; up to
+      {{ max_windows }} windows, then one for anything shorter.</div>
+    {% set shown = [rows.windows | length, 1] | max %}
+    {% for i in range(max_windows) %}
+    {% set w = rows.windows[i] if i < rows.windows | length else None %}
+    {% if i == shown %}<details class="rule-more"{% if posted.get('w' ~ i ~ '_amount') %} open{% endif %}>
+      <summary>Add a window (up to {{ max_windows }})</summary>{% endif %}
+    <div class="field rule-window">
+      <div class="inline-fields">
+        <label for="w{{ i }}">With at least</label>
+        <input type="text" id="w{{ i }}" name="w{{ i }}_amount" class="w-num" inputmode="numeric"
+               value="{{ posted.get('w' ~ i ~ '_amount', w.amount if w else '') }}">
+        {% set unit = posted.get('w' ~ i ~ '_unit', w.unit if w else 'hours') %}
+        <select name="w{{ i }}_unit" aria-label="Hours or days" class="w-auto">
+          <option value="hours" {% if unit == 'hours' %}selected{% endif %}>hours</option>
+          <option value="days" {% if unit == 'days' %}selected{% endif %}>days</option>
+        </select>
+        <span>notice:</span>
+      </div>
+      {% for kind in rows.kinds %}{% set j = loop.index0 %}
+      {% set o = w.outcomes[j] if w else {'type': 'no_charge', 'percent': ''} %}
+      {{ outcome(i ~ '', j, kind, o) }}
+      {% endfor %}
+    </div>
+    {% if loop.last and max_windows > shown %}</details>{% endif %}
+    {% endfor %}
+    <div class="field rule-window">
+      <div class="inline-fields"><strong>With less notice than that:</strong></div>
+      {% for kind in rows.kinds %}{% set j = loop.index0 %}
+      {{ outcome('last', j, kind, rows.last.outcomes[j]) }}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field no-rule">
+      <label for="notes">Anything else to say (optional)</label>
+      <textarea id="notes" name="notes" rows="3"
+                placeholder="A no-show is charged the same as cancelling with less than 24 hours' notice.">{{ posted.get('notes', rows.notes) }}</textarea>
+      <span class="hint">One per line, up to 5. Said as written, so keep any numbers in step
+        with the windows above.</span>
+    </div>
+  </div>
+
+  <div class="banner-actions">
+    <button class="btn btn-primary" type="submit">Save as draft</button>
+  </div>
+</form>
+
+{% if not is_new and not removed %}
+<form method="POST" class="mt-4"
+      onsubmit="return confirm('Remove your cancellation rules? Customers keep the current ones until you publish.');">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="remove">
+  <button class="btn" type="submit">Remove these rules</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% macro outcome(row, j, kind, o) %}
+{% set prefix = 'w' ~ row ~ '_k' ~ j %}
+{% set kind_type = posted.get(prefix ~ '_type', o.type) %}
+<div class="inline-fields outcome-row">
+  {% if rows.kinds | length > 1 %}<span class="cell-sub outcome-kind">{{ kind }}:</span>{% endif %}
+  <select name="{{ prefix }}_type" aria-label="What happens{{ ' for ' ~ kind if rows.kinds | length > 1 else '' }}" class="w-auto">
+    {% for value, caption in outcomes %}
+    <option value="{{ value }}" {% if kind_type == value %}selected{% endif %}>{{ caption }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="{{ prefix }}_pct" class="w-num" inputmode="decimal"
+         aria-label="Percentage" value="{{ posted.get(prefix ~ '_pct', o.percent) }}"
+         data-enabled-by="{{ prefix }}_type" data-enabled-when="{{ with_percent }}"
+         {% if kind_type not in with_percent.split(' ') %}disabled{% endif %}>
+  <span>%</span>
+</div>
+{% endmacro %}

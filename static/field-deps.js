@@ -10,6 +10,8 @@
 //
 // A checkbox controller is matched by "checked" / "unchecked" (the Calendar
 // page's "Whole day" box hides the start and end times while it's ticked).
+// Several answers can make it live, space-separated: data-enabled-when=
+// "charge_percent keep_percent" (the cancellation rules' percent boxes).
 //
 // Why data attributes rather than a line of code per pair: the rule lives
 // next to the field it governs, in the template, where someone editing that
@@ -39,7 +41,7 @@
 
     var live = controller.type === "checkbox"
       ? (controller.checked ? "checked" : "unchecked") === wanted
-      : controller.value === wanted;
+      : wanted.split(" ").indexOf(controller.value) !== -1;
     field.disabled = !live;
 
     var wrapper = field.closest(".field");

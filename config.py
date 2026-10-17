@@ -341,6 +341,11 @@ def load_config(config_path, business_id=None):
                 # EDITABLE_FIELDS; "menu_draft" is deliberately ignored here:
                 # customers see a menu change only once it's published.
                 config["menu"] = value
+            elif field == "cancellation":
+                # The owner's published cancellation rules (policy_form;
+                # "cancellation_draft" is ignored here the same way).
+                import policy_form
+                policy_form.apply_live(config, value)
 
         # The owner's blocked time (Calendar page), read by scheduling.py
         # beside the weekly blackout. Only blocks that haven't ended: past

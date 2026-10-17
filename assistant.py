@@ -175,8 +175,9 @@ def can_change(menu=False, knowledge=False):
             "Write the way the section does (plain sentences, the business as “we”). Use "
             "the owner's facts and numbers as they gave them; never add a fact, price or "
             "time they didn't give. Something no section covers gets a new section.\n"
-            "- Cancellation, refund and deposit rules set by the operator are not "
-            "section text: hand off."
+            "- Cancellation, refund and deposit rules are not section text: they're on "
+            "the Cancellation rules page (Settings, “Change cancellation rules”), the "
+            "only copy. Tell the owner to change them there."
             + (" Prices of menu items go on the menu, never in a section." if menu else "")
             + "\n")
     text += ("- You can't change settings or appointments: tell them where to do it.\n")

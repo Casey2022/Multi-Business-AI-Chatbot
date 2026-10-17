@@ -203,9 +203,9 @@ def check_text(text, *, owner_words, sections, config, section_title=None):
             raise Refused(
                 f"Not changed: the text mentions “{said.group(0)}”, and this business's "
                 "cancellation rules (" + ("deposits, " if rules.get("deposits") else "")
-                + "cancelling, refunds) are kept in one place that only the operator "
-                "changes, so customers are never told two different things. Tell the "
-                "owner, and offer to pass it to support with hand_off_to_support.")
+                + "cancelling, refunds) are kept in one place, so customers are never told "
+                "two different things: the Cancellation rules page (Settings, “Change "
+                "cancellation rules”). Tell the owner to change them there.")
 
     items = menu.items(config)
     if items and _MONEY.search(text):
@@ -368,7 +368,10 @@ def run(name, args, business, config, user_email, owner_words=""):
     if name not in NAMES:
         return f"Unknown tool {name}.", None, True
     business_id = business["id"]
-    config = menu.with_draft(config or {}, business_id)
+    import policy_form
+    # Draft rules count too: rules an owner has just set up mustn't get a
+    # second copy in a section before they're even published.
+    config = policy_form.with_draft(menu.with_draft(config or {}, business_id), business_id)
     args = {k: (v if isinstance(v, str) or v is None else str(v)) for k, v in (args or {}).items()}
     try:
         if name == "read_section":

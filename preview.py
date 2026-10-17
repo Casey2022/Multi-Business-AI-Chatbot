@@ -265,9 +265,12 @@ def run_preview(config, business_id, questions):
     questions = list(questions)[:MAX_QUESTIONS]
     draft = None
     import menu
+    import policy_form
     try:
-        # "After" uses the draft menu too: the menu tool and the price lines.
-        draft_config = copy.deepcopy(menu.with_draft(config, business_id))
+        # "After" uses the draft menu too (the menu tool and the price lines),
+        # and the draft cancellation rules (the cancellation tool).
+        draft_config = copy.deepcopy(policy_form.with_draft(
+            menu.with_draft(config, business_id), business_id))
         draft = build_draft(draft_config, business_id)
         if draft:
             draft_config.setdefault("business", {})["collection"] = draft
