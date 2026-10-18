@@ -596,9 +596,35 @@ def main():
           and policy.kind_from_words({"kind": "custom cake"}, ["my wedding cake"], yaml_config("sunrise_bakery_and_cafe"))
           == {"kind": "custom cake"})
     check("the tool runs with the corrected kind, from the customer's last few messages",
-          "policy.kind_from_words(dict(arguments or {}), said, config)" in llm_src
+          "policy.arguments_from_words(dict(arguments or {}), said, config)" in llm_src
           and "policy.run_tool(use.name, arguments, config, now)" in llm_src
           and "[:policy.FOLLOW_UP_TURNS + 1]" in llm_src)
+
+    heading("how far ahead: from the customer's words (eval 2026-10-18)")
+    timing = policy.timing_from_words
+    follow_up = ["Is there any way I can avoid that charge?",
+                 "My colour appointment is in about 30 hours. What happens if I cancel?"]
+    check("a follow-up looked up as 0 hours gets the 30 the customer said",
+          timing({"hours_before": 0, "kind": "colour"}, follow_up) == {"hours_before": 30, "kind": "colour"})
+    check("'three days before' is 72 hours (and replaces the model's days_before)",
+          timing({"days_before": 2}, ["I cancelled three days before, do I get my deposit back?"])
+          == {"hours_before": 72})
+    check("'in a week' is 168 hours; 'in 2 days' is 48",
+          policy.hours_said("it's in a week") == 168 and policy.hours_said("in 2 days") == 48)
+    check("'do I need 24 hours' notice?' / 'with 48 hours notice' aren't their timing",
+          policy.hours_said("do I need 24 hours' notice?") is None
+          and policy.hours_said("can I move it with 48 hours notice") is None)
+    check("two timings that disagree: none taken",
+          policy.hours_said("it's in 30 hours, or maybe in 2 days") is None)
+    check("a start time the model worked out is left alone",
+          timing({"starts_at": "2026-09-23T09:00"}, ["it's in about 30 hours"])
+          == {"starts_at": "2026-09-23T09:00"})
+    check("nothing said: the model's timing stands",
+          timing({"hours_before": 20}, ["what happens if I cancel tomorrow?"]) == {"hours_before": 20})
+    check("both corrections together",
+          policy.arguments_from_words({"hours_before": 0, "kind": "colour"},
+                                      ["can I avoid that?", "My cut and colour is in about 30 hours"],
+                                      colour48) == {"hours_before": 30, "kind": "appointment"})
 
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()

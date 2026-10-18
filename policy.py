@@ -878,6 +878,60 @@ def kind_from_words(arguments, texts, config):
     return arguments
 
 
+# How far ahead, from the customer's words. Only the two shapes that say
+# THEIR timing: "in (about) 30 hours" and "3 days before / out / away".
+# Not "do I need 24 hours' notice?", which is a question about the rule.
+_NUMBER_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                 "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+                 "twelve": 12}
+_AMOUNT = r"(\d+(?:\.\d+)?|" + "|".join(_NUMBER_WORDS) + r")"
+_UNIT = r"(hours?|hrs?|days?|weeks?)"
+_TIMING_SAID = re.compile(
+    r"\bin (?:(?:about|around|roughly|under|over|less than|more than|just|only|like) )?"
+    + _AMOUNT + r" " + _UNIT + r"\b"
+    r"|\b" + _AMOUNT + r" " + _UNIT + r" (?:before|out|ahead|away|from now|early)\b", re.I)
+_UNIT_HOURS = {"h": 1, "d": 24, "w": 168}
+
+
+def hours_said(text):
+    """The hours ahead this message says, or None (none said, or two that
+    disagree). "in about 30 hours" -> 30; "three days before" -> 72."""
+    found = set()
+    for m in _TIMING_SAID.finditer(text or ""):
+        amount, unit = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        n = _NUMBER_WORDS.get(amount.lower())
+        n = float(amount) if n is None else n
+        found.add(n * _UNIT_HOURS[unit[0].lower()])
+    return found.pop() if len(found) == 1 else None
+
+
+def timing_from_words(arguments, texts):
+    """cancellation_outcome's arguments with the timing the customer said.
+    journey_eval, 2026-10-18, 1 run in 3: the follow-up "Is there any way
+    I can avoid that charge?" (after "in about 30 hours") was looked up
+    with hours_before 0, and the reply said "within 24 hours". `texts` are
+    the customer's messages, latest first; the first that says how far
+    ahead decides. A start time the model worked out (starts_at, from "9am
+    tomorrow") is left alone, and so is anything when no hours are said."""
+    if arguments.get("starts_at"):
+        return arguments
+    for text in texts:
+        hours = hours_said(text)
+        if hours is not None:
+            if arguments.get("hours_before") != hours or arguments.get("days_before") is not None:
+                log.info("cancellation_outcome timing %r/%r -> %r hours, from the customer's words",
+                         arguments.get("hours_before"), arguments.get("days_before"), hours)
+            out = {k: v for k, v in arguments.items() if k != "days_before"}
+            out["hours_before"] = hours
+            return out
+    return arguments
+
+
+def arguments_from_words(arguments, texts, config):
+    """Both corrections: which service, and how far ahead."""
+    return timing_from_words(kind_from_words(arguments, texts, config), texts)
+
+
 # ---------------------------------------------------------------------------
 # After the reply: no false hope
 # ---------------------------------------------------------------------------

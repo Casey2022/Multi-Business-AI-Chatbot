@@ -848,7 +848,7 @@ def _reply_using_tools(call, config, now, results_seen=None):
         for use in uses:
             arguments = use.input
             if use.name == "cancellation_outcome":
-                arguments = policy.kind_from_words(dict(arguments or {}), said, config)
+                arguments = policy.arguments_from_words(dict(arguments or {}), said, config)
             result = policy.run_tool(use.name, arguments, config, now)
             if results_seen is not None and use.name == "cancellation_outcome":
                 results_seen.append(result)
