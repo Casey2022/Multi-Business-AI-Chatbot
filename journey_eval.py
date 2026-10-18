@@ -86,13 +86,6 @@ _COLOUR_48 = {
                  "appointment": "no_charge"},
                 {"at_least_hours": 0, "any": {"charge_percent": 50}}],
     "notes": []}
-# A sentence charging THIS customer 50%. One about plain colour ("if it were a
-# colour appointment, you'd be charged 50%") is a true comparison, not a leak
-# (eval 2026-10-17, 1 run in 3); "cut and colour" still counts.
-_NOT_COLOUR = r"(?:(?!(?<!and )colou?r)[^.!?])*"
-_CHARGED_50 = (r"(?:^|(?<=[.!?]))\s*" + _NOT_COLOUR
-               + r"\b(?:you(?:'d| would| will)?|we(?:'d| would| will)?)\b" + _NOT_COLOUR
-               + r"\b(?:be charged|charge|pay)\b" + _NOT_COLOUR + r"50\s?%")
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
 # Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
 # can wait just another 18 hours or so, you'll hit the 48-hour mark").
@@ -243,14 +236,16 @@ JOURNEYS = [
         "slug": "belmont_hair_studio", "policy": _COLOUR_48,
         "why": "Colour's 48-hour window must not leak onto other services.",
         "turns": [{"say": "My haircut is in about 30 hours. What happens if I cancel?",
-                   "state": "idle", "must": [_FREE], "must_not": [_CHARGED_50]}],
+                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome",
+                   "rubric": rubrics.SERVICE_RULES_FREE_AT_30}],
     },
     {
         "name": "service rules: a cut and colour follows the general rule (Belmont)",
         "slug": "belmont_hair_studio", "policy": _COLOUR_48,
         "why": "Only plain colour was ticked; a combined service isn't colour.",
         "turns": [{"say": "My cut and colour is in about 30 hours. What happens if I cancel?",
-                   "state": "idle", "must": [_FREE], "must_not": [_CHARGED_50]}],
+                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome",
+                   "rubric": rubrics.SERVICE_RULES_FREE_AT_30}],
     },
     {
         "name": "shortcut: a charge question about 'cancel my appointment' (Belmont)",

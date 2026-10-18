@@ -273,3 +273,21 @@ LEAK_DETECTION_APPLIED = Rubric(
     detection visit. Because the $125 is applied to the repair, they pay $600
     in total ($125 already paid, $475 more). Fails if it says the total is
     $725, or that the $125 is charged on top.""")
+
+
+SERVICE_RULES_FREE_AT_30 = Rubric(
+    # 2026-10-18. journey_eval's Belmont "service rules" policy (colour has
+    # its own 48-hour window). Graded by a judge, not a pattern: a right
+    # answer often adds "under 24 hours you'd be charged 50%", which is true,
+    # and four rounds of regex kept failing it (journey_eval 2026-10-17/18).
+    quote=("Cancelled or moved between 24 hours and 48 hours before the "
+           "appointment: a colour appointment, 50% of the service is charged; "
+           "any other appointment, there is no charge."),
+    criteria="""The customer's service is a haircut or a cut and colour, which
+    is not plain colour, so it follows the rule for any other appointment.
+    Thirty hours is between 24 and 48 hours, so cancelling now has no charge:
+    the reply must say so. Also mentioning that cancelling with less than 24
+    hours' notice costs 50%, or that a plain colour appointment would cost 50%
+    in this window, is correct and fine. Fails if it says this customer would
+    be charged anything for cancelling now, or treats their service as a
+    colour appointment.""")

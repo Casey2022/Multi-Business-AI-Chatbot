@@ -626,6 +626,12 @@ def main():
                                       ["can I avoid that?", "My cut and colour is in about 30 hours"],
                                       colour48) == {"hours_before": 30, "kind": "appointment"})
 
+    import judge
+    import rubrics
+    check("journey_eval's per-service rubric quotes the rule exactly as the bot reads it",
+          judge.flatten(rubrics.SERVICE_RULES_FREE_AT_30.quote)
+          in judge.flatten(policy.policy_text(colour48)), policy.policy_text(colour48))
+
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()
     check("Sunrise's document has no deposits section",
