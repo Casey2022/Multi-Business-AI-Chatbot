@@ -826,6 +826,12 @@ def _reply_using_tools(call, config, now, results_seen=None):
     only the answer written after the result reaches the customer.
     """
     messages = list(call["messages"])
+    # The customer's own words, latest first, for which service they mean
+    # (policy.kind_from_words): the last few messages, so a follow-up
+    # ("can I avoid that?") keeps the service named before it.
+    said = [m["content"] for m in messages
+            if m.get("role") == "user" and isinstance(m.get("content"), str)]
+    said = list(reversed(said))[:policy.FOLLOW_UP_TURNS + 1]
     for round_ in range(MAX_TOOL_ROUNDS + 1):
         call["messages"] = messages
         if round_ == MAX_TOOL_ROUNDS:
@@ -840,7 +846,10 @@ def _reply_using_tools(call, config, now, results_seen=None):
             return text_of(response)
         results = []
         for use in uses:
-            result = policy.run_tool(use.name, use.input, config, now)
+            arguments = use.input
+            if use.name == "cancellation_outcome":
+                arguments = policy.kind_from_words(dict(arguments or {}), said, config)
+            result = policy.run_tool(use.name, arguments, config, now)
             if results_seen is not None and use.name == "cancellation_outcome":
                 results_seen.append(result)
             log.info("Tool %s: %s", use.name,

@@ -573,6 +573,33 @@ def main():
           and 'use.name == "cancellation_outcome"' in llm_src
           and llm_src.index("without_false_hope(") < llm_src.index("return without_repeated_number("))
 
+    heading("which service: from the customer's words (eval 2026-10-17)")
+    kind = lambda args, *texts: policy.kind_from_words(args, list(texts), colour48).get("kind")
+    check("'my cut and colour' looked up as 'colour' becomes everything else (only plain colour ticked)",
+          kind({"hours_before": 30, "kind": "colour"},
+               "My cut and colour is in about 30 hours. What happens if I cancel?") == "appointment")
+    check("'my colour appointment' is colour, even when the model gave no kind",
+          kind({"hours_before": 30}, "My colour appointment is in about 30 hours") == "colour")
+    check("…'color' too", kind({"hours_before": 30}, "my color appointment is tomorrow") == "colour")
+    check("a haircut looked up as colour becomes everything else",
+          kind({"hours_before": 30, "kind": "colour"}, "My haircut is in about 30 hours") == "appointment")
+    check("a follow-up keeps the service named just before it",
+          kind({"hours_before": 30, "kind": "colour"}, "Is there any way I can avoid that charge?",
+               "My cut and colour is in about 30 hours") == "appointment")
+    check("two services named, or none: the model's choice stands",
+          kind({"hours_before": 30, "kind": "colour"}, "I have a haircut and a colour booked") == "colour"
+          and kind({"hours_before": 30, "kind": "colour"}, "what if I cancel in 30 hours?") == "colour")
+    check("the longest name wins: 'cut and colour' doesn't also count as 'colour'",
+          policy.services_named("my cut and colour and a kids cut", colour48) == ["cut and colour", "kids cut"])
+    check("without per-service rules (Belmont as published, Sunrise's cakes) nothing changes",
+          policy.kind_from_words({"kind": "x"}, ["my colour"], bel) == {"kind": "x"}
+          and policy.kind_from_words({"kind": "custom cake"}, ["my wedding cake"], yaml_config("sunrise_bakery_and_cafe"))
+          == {"kind": "custom cake"})
+    check("the tool runs with the corrected kind, from the customer's last few messages",
+          "policy.kind_from_words(dict(arguments or {}), said, config)" in llm_src
+          and "policy.run_tool(use.name, arguments, config, now)" in llm_src
+          and "[:policy.FOLLOW_UP_TURNS + 1]" in llm_src)
+
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()
     check("Sunrise's document has no deposits section",

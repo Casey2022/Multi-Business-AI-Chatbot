@@ -830,6 +830,55 @@ _ABOUT_THE_CHARGE = re.compile(
 
 
 # ---------------------------------------------------------------------------
+# Which service: from the customer's words, not the model's guess
+# ---------------------------------------------------------------------------
+
+def _named(name):
+    """A service name as a pattern: whole words, colour or color."""
+    return re.compile(r"\b" + re.escape(name.lower()).replace("colour", "colou?r") + r"\b", re.I)
+
+
+def services_named(text, config):
+    """The business's services this text names, longest first wins: "my cut
+    and colour" names "cut and colour", not also "colour"."""
+    import policy_form
+    taken, found = [], []
+    for name in sorted(policy_form.service_names(config), key=len, reverse=True):
+        for m in _named(name).finditer(text or ""):
+            if not any(m.start() < b and a < m.end() for a, b in taken):
+                taken.append((m.start(), m.end()))
+                if name not in found:
+                    found.append(name)
+    return found
+
+
+def kind_from_words(arguments, texts, config):
+    """cancellation_outcome's arguments with `kind` set from what the
+    customer said, where services have their own rules. journey_eval,
+    2026-10-17, 1 run in 3: "My cut and colour is in about 30 hours" was
+    looked up as kind "colour" (and charged 50%) though only plain colour
+    was ticked, and the tool's description says "not one that includes
+    it". `texts` are the customer's messages, latest first; the first that
+    names exactly one service decides: a service with its own rules is
+    that kind, any other is everything else. Two services named, or none,
+    and the model's choice stands."""
+    policy = cancellation(config)
+    if not policy or not _by_service(policy):
+        return arguments
+    for text in texts:
+        named = services_named(text, config)
+        if len(named) > 1:
+            return arguments
+        if named:
+            kind = named[0] if named[0] in policy["services"] else policy.get("what", "order")
+            if arguments.get("kind") != kind:
+                log.info("cancellation_outcome kind %r -> %r, from the customer's words",
+                         arguments.get("kind"), kind)
+            return dict(arguments, kind=kind)
+    return arguments
+
+
+# ---------------------------------------------------------------------------
 # After the reply: no false hope
 # ---------------------------------------------------------------------------
 
