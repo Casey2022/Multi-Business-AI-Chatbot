@@ -271,10 +271,12 @@ def _closed_sentence(config, needed, earliest, notice, what):
         say = (f" {name} isn't available on {when(needed)}, so {what} can't be "
                f"collected or delivered then, whatever the notice. Don't give a "
                f"reason."
-               + (f" It's a one-off: they're normally open then, so say this "
-                  f"{day} isn't available, never that they're closed on {day}s."
+               + (f" It's a one-off: they're normally open then. Say \"we're not "
+                  f"available this {day}\", never that they're closed on {day}s."
                   if usual else ""))
+        one_off = day if usual else None
     else:
+        one_off = None
         say = (f" {name} isn't open on {when(needed)}"
                + (f" (hours: {hours})" if hours else "")
                + f", so {what} can't be collected or delivered then, whatever the notice.")
@@ -287,7 +289,7 @@ def _closed_sentence(config, needed, earliest, notice, what):
         say += (f" The nearest times they're open that still give {span(notice)} of "
                 f"notice: {' or '.join(options)}. Offer one of those; don't agree "
                 f"to {clock_time(needed)}.")
-    return say, before, after
+    return say, before, after, one_off
 
 
 def check_notice(needed_by, notice_hours, what, config=None, now=None,
@@ -358,7 +360,9 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
         result["say"] = (f"{when(needed)} has already passed; it's "
                          f"{when(now)} now.")
     elif open_then is False:
-        closed, before, after = _closed_sentence(config, needed, earliest, notice, what)
+        closed, before, after, one_off = _closed_sentence(config, needed, earliest, notice, what)
+        if one_off:
+            result["one_off_unavailable_day"] = one_off
         met = (", which is met" if available >= notice
                else f", so the notice is missed by {span(notice - available)}")
         result["enough_notice"] = False
@@ -1199,6 +1203,25 @@ _RESCHEDULE_INSTEAD = re.compile(
     r"\b(?:reschedul\w*|move it|moving it|move (?:the|your) \w+)\b[^.!?]*"
     r"\b(?:instead|rather than|avoid|work something out|see what works|no charge|for free)\b"
     r"|\b(?:instead of|rather than) cancel\w*[^.!?]*\b(?:reschedul\w*|mov(?:e|ing))\b", re.I)
+
+
+def one_off_said_as_one(reply, results):
+    """A day the owner blocked off once, said as once. journey_eval
+    (2026-10-18, 3 runs in 3, even with the tool saying "never that
+    they're closed on Sundays"): "we're closed Sundays" for one blocked
+    Sunday at a bakery open every Sunday. Where this turn's check_notice
+    flagged a one-off day, "closed (on) Sundays" becomes "not available
+    this Sunday". Nothing else is touched."""
+    for result in results or []:
+        day = result.get("one_off_unavailable_day")
+        if not day or not reply:
+            continue
+        fixed = re.sub(rf"\bclosed (?:on )?{day}s\b", f"not available this {day}",
+                       reply, flags=re.I)
+        if fixed != reply:
+            log.info("Said a one-off blocked %s as one", day)
+            reply = fixed
+    return reply
 
 
 def without_false_hope(reply, results, config):

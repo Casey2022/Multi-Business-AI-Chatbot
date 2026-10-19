@@ -345,7 +345,9 @@ AFTER_CLOSING_MUFFINS = Rubric(
     24 hours' notice is met, but the bakery closes at 3pm, so 5pm pickup isn't
     possible. The reply must say they close at 3pm (or that 5pm is after
     closing) and should offer a time they're open, such as Sunday between 1pm
-    and 3pm (still 24 hours' notice). Fails if it agrees to 5pm.""")
+    and 3pm (still 24 hours' notice). Saying that after 3pm Sunday they aren't
+    open again until Tuesday is correct (they're closed Mondays), as long as
+    it doesn't say Sunday itself is closed. Fails if it agrees to 5pm.""")
 
 EARLIEST_PICKUP_TUESDAY = Rubric(
     quote=("order a dozen with 24 hours' notice to guarantee it.", _SUNRISE_HOURS),

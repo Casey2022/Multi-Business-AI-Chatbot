@@ -344,13 +344,24 @@ def main():
           and "Don't give a reason" in r["say"] and "hours:" not in r["say"], r["say"])
     check("a one-off block in usual hours is said as one: 'this Sunday', never 'closed on Sundays' "
           "(journey_eval 2026-10-18, 2 in 4)",
-          "say this Sunday isn't available, never that they're closed on Sundays" in r["say"], r["say"])
+          "Say \"we're not available this Sunday\", never that they're closed on Sundays" in r["say"], r["say"])
+    check("…and the result flags the day, for the reply check", r.get("one_off_unavailable_day") == "Sunday", r)
+    fix = policy.one_off_said_as_one
+    check("'we're closed Sundays' / 'closed on Sundays' become 'not available this Sunday' (journey 3/3)",
+          fix("Unfortunately we're closed Sundays, so we can't do that.", [r])
+          == "Unfortunately we're not available this Sunday, so we can't do that."
+          and fix("We are closed on Sundays.", [r]) == "We are not available this Sunday.")
+    check("…only where a one-off was flagged, and only that day",
+          fix("We're closed Sundays.", [{"say": "x"}]) == "We're closed Sundays."
+          and fix("We're closed Mondays.", [r]) == "We're closed Mondays.")
+    check("the reply goes through it with every tool result this turn",
+          "policy.one_off_said_as_one(reply, tool_results)" in (ROOT / "llm.py").read_text())
     check("…Saturday is too soon for the notice, Monday's closed: Tuesday from 7am",
           "latest_open_before" not in r and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM", r)
     dentist = blocked(("2026-09-29 10:00", "2026-09-29 12:00"))       # Tuesday, two hours
     r = note(dentist, (2026, 9, 27, 9, 0), needed_by="2026-09-29T11:00", notice_hours=24,
              what="a dozen muffins")
-    check("…and a two-hour block too ('this Tuesday')", "say this Tuesday isn't available" in r["say"], r["say"])
+    check("…and a two-hour block too ('this Tuesday')", "not available this Tuesday" in r["say"], r["say"])
     check("a two-hour block: by its start, or from its end, the same day",
           r["latest_open_before"] == "Tuesday, September 29 at 10:00 AM"
           and r["next_open_after"] == "Tuesday, September 29 at 12:00 PM", r)
@@ -677,7 +688,7 @@ def main():
     check("'in about 30 hours' names a time", bool(policy._TIME_NAMED.search("it's in about 30 hours")))
     llm_src = (ROOT / "llm.py").read_text()
     check("the reply goes through it, with this turn's cancellation results, before it's sent",
-          "policy.without_false_hope(reply, cancellation_results, config)" in llm_src
+          "policy.without_false_hope(reply, tool_results, config)" in llm_src
           and 'use.name == "cancellation_outcome"' in llm_src
           and llm_src.index("without_false_hope(") < llm_src.index("return without_repeated_number("))
 

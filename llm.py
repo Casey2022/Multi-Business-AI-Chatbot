@@ -850,7 +850,7 @@ def _reply_using_tools(call, config, now, results_seen=None):
             if use.name == "cancellation_outcome":
                 arguments = policy.arguments_from_words(dict(arguments or {}), said, config)
             result = policy.run_tool(use.name, arguments, config, now)
-            if results_seen is not None and use.name == "cancellation_outcome":
+            if results_seen is not None:
                 results_seen.append(result)
             log.info("Tool %s: %s", use.name,
                      "error" if "error" in result else "ok")
@@ -990,8 +990,8 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
                 call["tool_choice"] = {"type": "tool", "name": "menu_price"}
         if temperature is not None:
             call["temperature"] = temperature
-        cancellation_results = []
-        reply = _reply_using_tools(call, config, now, cancellation_results)
+        tool_results = []
+        reply = _reply_using_tools(call, config, now, tool_results)
         if not reply:
             # Every round spent on tool calls and nothing said. Rare, but a
             # blank bubble is worse than an honest "try again".
@@ -1000,7 +1000,9 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         log.debug(f"Claude replied: {reply!r}")
         # A charge that can't be avoided gets no "you've still got time"
         # (policy.without_false_hope: the prompt alone didn't hold).
-        reply = policy.without_false_hope(reply, cancellation_results, config)
+        reply = policy.without_false_hope(reply, tool_results, config)
+        # A day blocked off once isn't "closed on Sundays" (policy).
+        reply = policy.one_off_said_as_one(reply, tool_results)
         return without_repeated_number(reply, history, message, config)
 
     except Exception as e:
