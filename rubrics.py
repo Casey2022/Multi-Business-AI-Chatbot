@@ -280,15 +280,21 @@ SERVICE_RULES_FREE_AT_30 = Rubric(
     # its own 48-hour window). Graded by a judge, not a pattern: a right
     # answer often adds "under 24 hours you'd be charged 50%", which is true,
     # and four rounds of regex kept failing it (journey_eval 2026-10-17/18).
-    quote=("Cancelled or moved between 24 hours and 48 hours before the "
+    # All three windows: with only the middle one quoted, the judge read a
+    # true "under 24 hours it's 50%" as the colour rule misapplied (2026-10-18).
+    quote=("Cancelled or moved 48 hours or more before the appointment: there "
+           "is no charge, for every appointment.",
+           "Cancelled or moved between 24 hours and 48 hours before the "
            "appointment: a colour appointment, 50% of the service is charged; "
-           "any other appointment, there is no charge."),
+           "any other appointment, there is no charge.",
+           "Cancelled or moved less than 24 hours before the appointment: 50% "
+           "of the service is charged, for every appointment."),
     criteria="""The customer's service is a haircut or a cut and colour, which
     is not plain colour, so it follows the rule for any other appointment.
     Thirty hours is between 24 and 48 hours, so cancelling now has no charge:
-    the reply must say so. Also mentioning that cancelling with less than 24
-    hours' notice costs 50%, or that a plain colour appointment would cost 50%
-    in this window, is correct and fine. Fails if it says this customer would
+    the reply must say so. With less than 24 hours' notice EVERY appointment,
+    theirs included, is charged 50%, so saying that is correct and fine; so is
+    saying a plain colour appointment would cost 50% in this window. Fails if it says this customer would
     be charged anything for cancelling now, or treats their service as a
     colour appointment.""")
 
@@ -297,14 +303,21 @@ COLOUR_IS_NOT_CUT_AND_COLOUR = Rubric(
     # 2026-10-18, live, Belmont with only "cut and colour" given its own
     # 48-hour window: a colour customer was told (rightly) there's no charge,
     # then "colour appointments get charged differently in that window".
-    quote=("Cancelled or moved between 24 hours and 48 hours before the "
+    quote=("Cancelled or moved 48 hours or more before the appointment: there "
+           "is no charge, for every appointment.",
+           "Cancelled or moved between 24 hours and 48 hours before the "
            "appointment: a cut and colour appointment, 50% of the service is "
-           "charged; any other appointment, there is no charge."),
+           "charged; any other appointment, there is no charge.",
+           "Cancelled or moved less than 24 hours before the appointment: 50% "
+           "of the service is charged, for every appointment."),
     criteria="""The customer has a plain colour appointment. Only a cut and
-    colour has its own rule; plain colour follows the rule for any other
-    appointment, so at 30 hours there is no charge, and the reply must say so.
-    Mentioning that a cut and colour would cost 50% in this window, or that
-    less than 24 hours' notice costs 50%, is correct and fine. Fails if it says
+    colour has its own rule (between 24 and 48 hours); plain colour follows the
+    rule for any other appointment, so at 30 hours there is no charge, and the
+    reply must say so. With less than 24 hours' notice EVERY appointment, plain
+    colour included, is charged 50%: saying their colour appointment would be
+    charged 50% if it gets under 24 hours is correct, not the cut and colour
+    rule misapplied. Mentioning that a cut and colour would cost 50% in the
+    24-48 hour window is also fine. Fails if it says
     this customer is charged anything for cancelling now, or says or implies
     that colour (as opposed to a cut and colour) appointments are charged
     differently.""")

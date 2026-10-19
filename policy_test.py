@@ -654,12 +654,14 @@ def main():
 
     import judge
     import rubrics
-    check("journey_eval's per-service rubric quotes the rule exactly as the bot reads it",
-          judge.flatten(rubrics.SERVICE_RULES_FREE_AT_30.quote)
-          in judge.flatten(policy.policy_text(colour48)), policy.policy_text(colour48))
+    check("journey_eval's per-service rubric quotes the rules exactly as the bot reads them, all windows",
+          len(rubrics.SERVICE_RULES_FREE_AT_30.quotes) == 3
+          and all(judge.flatten(q) in judge.flatten(policy.policy_text(colour48))
+                  for q in rubrics.SERVICE_RULES_FREE_AT_30.quotes), policy.policy_text(colour48))
     check("…and so does the cut-and-colour one",
-          judge.flatten(rubrics.COLOUR_IS_NOT_CUT_AND_COLOUR.quote)
-          in judge.flatten(policy.policy_text(cut48)), policy.policy_text(cut48))
+          len(rubrics.COLOUR_IS_NOT_CUT_AND_COLOUR.quotes) == 3
+          and all(judge.flatten(q) in judge.flatten(policy.policy_text(cut48))
+                  for q in rubrics.COLOUR_IS_NOT_CUT_AND_COLOUR.quotes), policy.policy_text(cut48))
 
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()
