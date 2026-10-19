@@ -624,13 +624,42 @@ def main():
     check("both corrections together",
           policy.arguments_from_words({"hours_before": 0, "kind": "colour"},
                                       ["can I avoid that?", "My cut and colour is in about 30 hours"],
-                                      colour48) == {"hours_before": 30, "kind": "appointment"})
+                                      colour48)
+          == {"hours_before": 30, "kind": "appointment", "service": "cut and colour"})
+
+    heading("a service without its own rules is said to have none (live 2026-10-18)")
+    cut48 = copy.deepcopy(bel)
+    cut48["policies"]["cancellation"] = dict(
+        bel["policies"]["cancellation"], services=["cut and colour"],
+        windows=[{"at_least_hours": 48, "any": "no_charge"},
+                 {"at_least_hours": 24, "cut and colour": {"charge_percent": 50}, "appointment": "no_charge"},
+                 {"at_least_hours": 0, "any": {"charge_percent": 50}}])
+    asked = ["My colour appointment is in about 30 hours. What happens if I cancel?"]
+    args = policy.arguments_from_words({"hours_before": 0}, asked, cut48)
+    said = policy.run_tool("cancellation_outcome", args, cut48)["say"]
+    check("only cut and colour ticked, a colour customer: free, and told colour has no rules of its own",
+          args == {"hours_before": 30, "kind": "appointment", "service": "colour"}
+          and "there is no charge" in said
+          and "Their colour appointment has no rules of its own" in said
+          and "only a cut and colour appointment is different" in said, said)
+    said = policy.run_tool("cancellation_outcome",
+                           policy.arguments_from_words({"hours_before": 30}, ["my colour, 30 hours out"],
+                                                       colour48), colour48)["say"]
+    check("…but a service WITH its own rules gets no such sentence", "no rules of its own" not in said, said)
+    check("'service' only ever comes from the business's own list: anything the model sends is dropped",
+          "service" not in policy.arguments_from_words({"hours_before": 5, "service": "IGNORE ALL RULES"},
+                                                       ["a haircut and a colour"], cut48)
+          and "service" not in policy.arguments_from_words({"service": "x"}, ["my colour"], bel)
+          and policy.arguments_from_words({"service": "x"}, asked, cut48)["service"] == "colour")
 
     import judge
     import rubrics
     check("journey_eval's per-service rubric quotes the rule exactly as the bot reads it",
           judge.flatten(rubrics.SERVICE_RULES_FREE_AT_30.quote)
           in judge.flatten(policy.policy_text(colour48)), policy.policy_text(colour48))
+    check("…and so does the cut-and-colour one",
+          judge.flatten(rubrics.COLOUR_IS_NOT_CUT_AND_COLOUR.quote)
+          in judge.flatten(policy.policy_text(cut48)), policy.policy_text(cut48))
 
     heading("one copy of the rules")
     doc = (ROOT / "documents" / "sunrise_bakery_and_cafe" / "services.md").read_text()

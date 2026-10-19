@@ -291,3 +291,20 @@ SERVICE_RULES_FREE_AT_30 = Rubric(
     in this window, is correct and fine. Fails if it says this customer would
     be charged anything for cancelling now, or treats their service as a
     colour appointment.""")
+
+
+COLOUR_IS_NOT_CUT_AND_COLOUR = Rubric(
+    # 2026-10-18, live, Belmont with only "cut and colour" given its own
+    # 48-hour window: a colour customer was told (rightly) there's no charge,
+    # then "colour appointments get charged differently in that window".
+    quote=("Cancelled or moved between 24 hours and 48 hours before the "
+           "appointment: a cut and colour appointment, 50% of the service is "
+           "charged; any other appointment, there is no charge."),
+    criteria="""The customer has a plain colour appointment. Only a cut and
+    colour has its own rule; plain colour follows the rule for any other
+    appointment, so at 30 hours there is no charge, and the reply must say so.
+    Mentioning that a cut and colour would cost 50% in this window, or that
+    less than 24 hours' notice costs 50%, is correct and fine. Fails if it says
+    this customer is charged anything for cancelling now, or says or implies
+    that colour (as opposed to a cut and colour) appointments are charged
+    differently.""")

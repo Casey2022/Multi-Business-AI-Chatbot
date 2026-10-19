@@ -86,6 +86,11 @@ _COLOUR_48 = {
                  "appointment": "no_charge"},
                 {"at_least_hours": 0, "any": {"charge_percent": 50}}],
     "notes": []}
+# The live Belmont setup on 2026-10-18: only "cut and colour" ticked, 48 hours.
+_CUT_AND_COLOUR_48 = dict(_COLOUR_48, services=["cut and colour"], windows=[
+    {"at_least_hours": 48, "any": "no_charge"},
+    {"at_least_hours": 24, "cut and colour": {"charge_percent": 50}, "appointment": "no_charge"},
+    {"at_least_hours": 0, "any": {"charge_percent": 50}}])
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
 # Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
 # can wait just another 18 hours or so, you'll hit the 48-hour mark").
@@ -230,6 +235,15 @@ JOURNEYS = [
         "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
                    "state": "idle", "must": [r"50\s?%"], "tool": "cancellation_outcome",
                    "must_not": [_WAIT_ADVICE]}],
+    },
+    {
+        "name": "service rules: only cut and colour ticked, plain colour at 30 hours (Belmont)",
+        "slug": "belmont_hair_studio", "policy": _CUT_AND_COLOUR_48,
+        "why": "Live 2026-10-18: right answer (free), then 'colour appointments get "
+               "charged differently', a shortening of 'cut and colour'.",
+        "turns": [{"say": "My colour appointment is in about 30 hours. What happens if I cancel?",
+                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome",
+                   "rubric": rubrics.COLOUR_IS_NOT_CUT_AND_COLOUR}],
     },
     {
         "name": "service rules: a haircut at 30 hours is free (Belmont)",

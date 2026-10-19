@@ -448,7 +448,7 @@ def deposit_text(policy, kind):
 
 def cancellation_outcome(config, hours_before=None, days_before=None,
                          kind=None, amount_paid=None, order_price=None,
-                         starts_at=None, now=None):
+                         starts_at=None, now=None, service=None):
     policy = cancellation(config)
     if not policy:
         raise ValueError("this business has no cancellation policy on file")
@@ -497,6 +497,16 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
     say = (f"The rule: {acting} {label}, {rule}. "
            f"{acting[0].upper() + acting[1:]} {ahead} falls in that window, so "
            f"that is what applies.")
+    # The customer's service has no rules of its own (policy.kind_from_words
+    # decided): say so, naming the ones that do. Live, 2026-10-18, with only
+    # "cut and colour" ticked: a colour customer was told (rightly) there's no
+    # charge, then "colour appointments get charged differently in that
+    # window", the model's shortening of "a cut and colour appointment".
+    if service and _by_service(policy) and kind == what and service not in policy["services"]:
+        own = " and ".join(f"{_a(s)} {s} {what}" for s in policy["services"])
+        say += (f" Their {service} {what} has no rules of its own, so it follows the "
+                f"rules for any other {what}; only {own} is different, and that "
+                f"isn't theirs, so don't say a {service} {what} is charged differently.")
     # Close to the line above, say the comparison outright. Given only
     # "falls in that window", the model wrote "23 hours... you fall just
     # under that window", which reads as borderline (journey_eval
@@ -862,6 +872,9 @@ def kind_from_words(arguments, texts, config):
     names exactly one service decides: a service with its own rules is
     that kind, any other is everything else. Two services named, or none,
     and the model's choice stands."""
+    # "service" is ours, not the model's: only ever a name from the
+    # business's own list, set below. Anything the model sent is dropped.
+    arguments = {k: v for k, v in arguments.items() if k != "service"}
     policy = cancellation(config)
     if not policy or not _by_service(policy):
         return arguments
@@ -874,7 +887,7 @@ def kind_from_words(arguments, texts, config):
             if arguments.get("kind") != kind:
                 log.info("cancellation_outcome kind %r -> %r, from the customer's words",
                          arguments.get("kind"), kind)
-            return dict(arguments, kind=kind)
+            return dict(arguments, kind=kind, service=named[0])
     return arguments
 
 
@@ -1089,7 +1102,8 @@ def run_tool(name, arguments, config, now=None):
                 days_before=arguments.get("days_before"),
                 kind=arguments.get("kind"),
                 amount_paid=arguments.get("amount_paid"),
-                order_price=arguments.get("order_price"))
+                order_price=arguments.get("order_price"),
+                service=arguments.get("service"))
         if name == "menu_price":
             import menu
             if menu.items(config):
