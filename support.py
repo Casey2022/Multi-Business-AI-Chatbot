@@ -169,7 +169,11 @@ def alert_email(row, settings, inbox_url=None):
     ctx = row.get("context") or {}
     who = ("a demo visitor" if row.get("is_demo") else row.get("user_email")) or "someone"
     msg = EmailMessage()
-    msg["Subject"] = f"Help request #{row['id']} from {row.get('business_name') or who}"
+    # A demo visitor's message is feedback from the demo round (2026-10-19):
+    # its own subject, so it can be told apart from an owner's request.
+    msg["Subject"] = (f"Demo feedback #{row['id']} ({row.get('business_name') or 'demo'})"
+                      if row.get("is_demo") else
+                      f"Help request #{row['id']} from {row.get('business_name') or who}")
     msg["From"] = settings["from"]
     msg["To"] = settings["to"]
     reply_to = reply_address(row)

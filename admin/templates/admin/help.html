@@ -10,8 +10,14 @@
 
 <div class="page-header">
   <h1>Help</h1>
+  {% if business and business.is_demo %}
+  <div class="subtitle">Thanks for trying the demo. Tell us what worked, what didn't, or
+    what was confusing, or ask the assistant how to do something. A person reads every
+    message.</div>
+  {% else %}
   <div class="subtitle">Stuck, or something not working the way you expect? Ask the
     assistant how to do it, or write to us. A person reads every message.</div>
+  {% endif %}
 </div>
 
 {% if business %}{{ ui.destinations(business, '') }}
@@ -66,14 +72,14 @@
   {% if page %}<input type="hidden" name="from" value="{{ page }}">{% endif %}
   {% if error_id %}<input type="hidden" name="error" value="{{ error_id }}">{% endif %}
 
-  <div class="card-title">Ask a person</div>
+  <div class="card-title">{{ 'Send feedback, or ask a person' if needs_contact else 'Ask a person' }}</div>
   {% if drafted %}<p class="hint card-pad">Drafted from your conversation with the
     assistant. Change anything you like before sending.</p>{% endif %}
 
   <div class="field">
-    <label for="help-message">What's going on?</label>
+    <label for="help-message">{{ "What worked, what didn't, what was confusing?" if needs_contact else "What's going on?" }}</label>
     <textarea id="help-message" name="message" rows="6" maxlength="{{ max_message }}"
-              placeholder="What you were trying to do, and what happened instead."
+              placeholder="{{ 'Anything at all: a reply that seemed off, a page that was hard to find, an idea.' if needs_contact else 'What you were trying to do, and what happened instead.' }}"
               required>{{ message }}</textarea>
     {% if reply_to and not needs_contact %}<span class="hint">We'll reply to {{ reply_to }}.</span>{% endif %}
   </div>
@@ -101,7 +107,7 @@
   </div>
 
   <div class="toolbar card-pad">
-    <button class="btn btn-primary" type="submit">Send to support</button>
+    <button class="btn btn-primary" type="submit">{{ 'Send' if needs_contact else 'Send to support' }}</button>
     {% if page %}<a class="btn btn-nav" href="{{ page }}">Back to where you were</a>{% endif %}
   </div>
 </form>

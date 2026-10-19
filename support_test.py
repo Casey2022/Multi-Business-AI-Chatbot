@@ -216,6 +216,30 @@ def main():
     check("the nav offers Help to owners and the inbox to operators",
           "admin.help_page" in base and "admin.support_inbox" in base and "open_support_count()" in base)
 
+    heading("the demo feedback round (2026-10-19)")
+    settings = {"to": "ops@example.com", "from": "ops@example.com"}
+    demo_row = {"id": 12, "is_demo": True, "business_name": "Belmont Hair Studio",
+                "message": "The colour answer confused me.", "context": {}, "contact": None}
+    owner_row = {"id": 13, "is_demo": False, "business_name": "Belmont Hair Studio",
+                 "user_email": "owner@belmont.example", "message": "x", "context": {}}
+    check("a demo visitor's message is emailed as feedback, with its own subject",
+          support.alert_email(demo_row, settings)["Subject"] == "Demo feedback #12 (Belmont Hair Studio)")
+    check("an owner's request keeps its subject",
+          support.alert_email(owner_row, settings)["Subject"].startswith("Help request #13"))
+    chat = (ROOT / "templates" / "demo.html").read_text()
+    check("the demo chat page links to it, inside the demo-only part of the nav",
+          "Send feedback</a>" in chat
+          and chat.index("{% if is_demo %}") < chat.index("Send feedback</a>") < chat.index("{% endif %}", chat.index("{% if is_demo %}"))
+          and "'/chat/' ~ business.slug" in chat and "#support" in chat)
+    check("…and its 'from' page is one the Help page accepts", support.clean_page("/chat/demo-belmont-0fe37a") == "/chat/demo-belmont-0fe37a")
+    picker = (ROOT / "templates" / "demo_picker.html").read_text()
+    help_page = (ROOT / "admin" / "templates" / "admin" / "help.html").read_text()
+    check("the picker invites feedback; the portal nav says 'Help & feedback' to demo visitors only",
+          "Send feedback" in picker and "'Help & feedback' if business is defined and business and business.is_demo" in base)
+    check("the Help page asks a demo visitor for feedback, and an owner as before",
+          "'Send feedback, or ask a person' if needs_contact else 'Ask a person'" in help_page
+          and "\"What worked, what didn't, what was confusing?\" if needs_contact" in help_page)
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1
 

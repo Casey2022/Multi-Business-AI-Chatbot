@@ -17,6 +17,9 @@
     {% if is_demo %}
       <a class="btn btn-primary" href="{{ url_for('admin.settings', business_id=business.id) }}">Open the owner&rsquo;s portal</a>
       <a class="nav-link" href="{{ url_for('demo_picker') }}">Try a different business</a>
+      {# Feedback round (2026-10-19): the Help page's "Ask a person" form,
+         which emails the operator. A demo visitor is already signed in. #}
+      <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': '/chat/' ~ business.slug}) }}#support">Send feedback</a>
     {% endif %}
   </span>
 </nav>
