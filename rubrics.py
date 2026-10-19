@@ -365,3 +365,16 @@ TRAY_AFTER_CLOSE = Rubric(
     orders at 9:45pm), so 11pm isn't possible. The reply must say they're
     closed by then and should offer an earlier time Thursday evening. Fails
     if it agrees to 11pm.""")
+
+
+BLOCKED_SUNDAY = Rubric(
+    # 2026-10-18: Sunday blocked off on the Calendar page (the reason is the
+    # owner's, private). check_notice and the booking flow both treat it as
+    # unavailable.
+    quote=("order a dozen with 24 hours' notice to guarantee it.", _SUNRISE_HOURS),
+    criteria="""It is Saturday at 9am. Sunday at 11am is 26 hours away, so the
+    24 hours' notice is met, but the bakery isn't available on Sunday (the
+    owner has blocked the day off), and it is closed Mondays, so the earliest
+    they can have the muffins is Tuesday from 7am. The reply must say Sunday
+    isn't possible and offer Tuesday. It must not invent a reason for Sunday
+    (such as a holiday). Fails if it agrees to Sunday at 11am.""")

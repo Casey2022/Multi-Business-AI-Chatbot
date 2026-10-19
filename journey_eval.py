@@ -331,6 +331,15 @@ JOURNEYS = [
                    "rubric": rubrics.TRAY_AFTER_CLOSE, "rubric_when": "idle"}],
     },
     {
+        "name": "opening hours: a day the owner blocked off (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 26, 9, 0),    # Saturday
+        "blocks": [("2026-09-27 00:00", "2026-09-28 00:00")],              # Sunday
+        "why": "Sunday is blocked off on the Calendar page; notice is met.",
+        "turns": [{"say": "Is it possible to get a dozen muffins tomorrow at 11am?",
+                   "must": [r"tuesday"], "must_not": [r"vacation|holiday|dentist|training"],
+                   "rubric": rubrics.BLOCKED_SUNDAY, "rubric_when": "idle"}],
+    },
+    {
         "name": "a real booking still starts, after a question (Bob's)",
         "slug": "bobs_plumbing",
         "clock": (2026, 9, 22, 10, 0),
@@ -407,6 +416,10 @@ def run(journey, verbose=False):
     if journey.get("policy"):
         # Rules an owner set on the Cancellation rules page, for this journey only.
         config.setdefault("policies", {})["cancellation"] = journey["policy"]
+    if journey.get("blocks"):
+        # Time an owner blocked off on the Calendar page, for this journey only.
+        config.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
+            {"start": a, "end": b} for a, b in journey["blocks"]]
     business_id = config["business"].get("id")
     if business_id is None:
         return [], [("setup", f"{journey['slug']} isn't registered in the database")]

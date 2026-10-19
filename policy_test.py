@@ -331,6 +331,46 @@ def main():
                                                               "order_by_days": None},
                                             sun_cfg, now=datetime(2026, 9, 27, 13, 0))["say"])
 
+    heading("time blocked off on the Calendar page counts too (2026-10-18)")
+    def blocked(*spans):
+        cfg = copy.deepcopy(sun_cfg)
+        cfg["calendar"]["scheduling"]["blocks"] = [{"start": a, "end": b} for a, b in spans]
+        return cfg
+    away = blocked(("2026-09-27 00:00", "2026-09-28 00:00"))          # Sunday, whole day
+    r = note(away, (2026, 9, 26, 9, 0), needed_by="2026-09-27T11:00", notice_hours=24,
+             what="a dozen muffins")
+    check("Sunday blocked off: Sunday 11am 'isn't available' (not 'closed'), no reason given",
+          r["open_at_needed_by"] is False and "isn't available on Sunday, September 27 at 11:00 AM" in r["say"]
+          and "Don't give a reason" in r["say"] and "hours:" not in r["say"], r["say"])
+    check("…Saturday is too soon for the notice, Monday's closed: Tuesday from 7am",
+          "latest_open_before" not in r and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM", r)
+    dentist = blocked(("2026-09-29 10:00", "2026-09-29 12:00"))       # Tuesday, two hours
+    r = note(dentist, (2026, 9, 27, 9, 0), needed_by="2026-09-29T11:00", notice_hours=24,
+             what="a dozen muffins")
+    check("a two-hour block: by its start, or from its end, the same day",
+          r["latest_open_before"] == "Tuesday, September 29 at 10:00 AM"
+          and r["next_open_after"] == "Tuesday, September 29 at 12:00 PM", r)
+    r = note(away, (2026, 9, 26, 9, 0), needed_by=None, notice_hours=24, what="a dozen muffins")
+    check("'how soon?' ready Sunday 9am, blocked: Tuesday 7am (Monday's closed)",
+          r["earliest_they_can_have_it"] == "Tuesday, September 29 at 7:00 AM", r["say"])
+    holiday = blocked(("2026-09-29 00:00", "2026-10-06 00:00"),
+                      ("2026-10-06 00:00", "2026-10-13 00:00"))      # two weeks, two blocks
+    r = note(holiday, (2026, 9, 28, 9, 0), needed_by=None, notice_hours=24, what="a dozen muffins")
+    check("a two-week holiday in two blocks: the first open morning after it",
+          r["earliest_they_can_have_it"] == "Tuesday, October 13 at 7:00 AM", r["say"])
+    r = note(away, (2026, 9, 26, 9, 0), needed_by="2026-09-29T11:00", notice_hours=24,
+             what="a dozen muffins")
+    check("a time outside any block is unaffected", r["open_at_needed_by"] is True and r["enough_notice"], r["say"])
+    blocks_only = copy.deepcopy(away)
+    blocks_only["calendar"]["scheduling"].pop("business_hours")
+    r = note(blocks_only, (2026, 9, 26, 9, 0), needed_by="2026-09-27T11:00", notice_hours=24, what="x")
+    check("no opening hours but a block: the block still counts; the next free time is its end",
+          r["open_at_needed_by"] is False and r["next_open_after"] == "Monday, September 28 at 12:00 AM", r)
+    cfg_src = (ROOT / "config.py").read_text()
+    loader = cfg_src[cfg_src.index("list_time_blocks(business_id"):][:200]
+    check("the owner's private note never reaches the config (only start and end are loaded)",
+          '"start": b["starts_at"], "end": b["ends_at"]' in cfg_src and "note" not in loader, loader)
+
     heading("Belmont: one rule for every appointment, given the appointment time")
     bel = yaml_config("belmont_hair_studio")
     r = policy.cancellation_outcome(bel, starts_at="2026-09-23T09:00",

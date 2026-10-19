@@ -127,7 +127,9 @@ def _cutoff_on(needed, order_by, order_by_days):
 # documents say (whether closed hours count is the business's call, and a
 # guess would be wrong in a new way). Read the way the booking flow reads
 # them (scheduling.settings: weekday keys, Monday 0). No hours set: unknown,
-# and nothing here says anything.
+# and nothing here says anything. Time the owner blocked off on the
+# Calendar page counts too (2026-10-18), as it does for booking: the booking
+# flow never offers it, so the answer doesn't either.
 
 def _opening(config):
     """{weekday: (open, close)} as times; {} when the business has none."""
@@ -145,21 +147,44 @@ def _opening(config):
     return out
 
 
-def is_open(moment, config):
-    """True or False, or None if the hours aren't known. Closing time
-    itself counts as open: "collect by 3pm" at a 3pm close is fine."""
+def _blocked(moment, config):
+    """The owner's block (Calendar: "Block off time") covering `moment`, as
+    (start, end), or None. Read the way the booking flow reads them
+    (scheduling.settings "blocks", [start, end)). Only the times reach the
+    config: the owner's note is private and never loaded."""
+    import scheduling
+    plain = moment.replace(tzinfo=None)
+    for start, end in scheduling.settings(config or {})["blocks"]:
+        if start <= plain < end:
+            return start, end
+    return None
+
+
+def availability(moment, config):
+    """"open", "closed" (outside opening hours), "blocked" (time the owner
+    blocked off), or None when nothing is known (no hours, no block)."""
+    if _blocked(moment, config):
+        return "blocked"
     hours = _opening(config)
     if not hours:
         return None
     pair = hours.get(moment.weekday())
-    return bool(pair) and pair[0] <= moment.time() <= pair[1]
+    # Closing time itself counts as open: "collect by 3pm" at a 3pm close.
+    return "open" if pair and pair[0] <= moment.time() <= pair[1] else "closed"
 
 
-def next_open(moment, config):
-    """The first moment at or after `moment` when the business is open."""
+def is_open(moment, config):
+    """True or False, or None if nothing is known."""
+    state = availability(moment, config)
+    return None if state is None else state == "open"
+
+
+def _next_by_hours(moment, config):
+    """The first moment at or after `moment` inside opening hours (or
+    `moment` itself when no hours are set)."""
     hours = _opening(config)
     if not hours:
-        return None
+        return moment
     for days in range(8):
         day = (moment + timedelta(days=days)).date()
         pair = hours.get(day.weekday())
@@ -173,10 +198,11 @@ def next_open(moment, config):
     return None
 
 
-def last_open_before(moment, config, not_before):
-    """The latest moment at or before `moment` when the business is open,
-    but no earlier than `not_before` (the notice): None if there isn't one."""
+def _last_by_hours(moment, config):
+    """The latest moment at or before `moment` inside opening hours."""
     hours = _opening(config)
+    if not hours:
+        return moment
     for days in range(8):
         day = (moment - timedelta(days=days)).date()
         pair = hours.get(day.weekday())
@@ -185,9 +211,45 @@ def last_open_before(moment, config, not_before):
         opens = datetime.combine(day, pair[0], tzinfo=moment.tzinfo)
         closes = datetime.combine(day, pair[1], tzinfo=moment.tzinfo)
         candidate = min(moment, closes)
-        if candidate < opens:
-            continue
-        return candidate if candidate >= not_before else None
+        if candidate >= opens:
+            return candidate
+    return None
+
+
+def next_open(moment, config):
+    """The first moment at or after `moment` when it's open and not
+    blocked off; None when nothing is known."""
+    if not _opening(config) and not _blocked(moment, config):
+        return None
+    t = moment
+    for _ in range(100):                  # a long holiday is several blocks
+        candidate = _next_by_hours(t, config)
+        if candidate is None:
+            return None
+        block = _blocked(candidate, config)
+        if not block:
+            return candidate
+        t = block[1].replace(tzinfo=moment.tzinfo)
+    return None
+
+
+def last_open_before(moment, config, not_before):
+    """The latest moment at or before `moment` when it's open and not
+    blocked off, no earlier than `not_before` (the notice); None if none.
+    Just before a block, it's "by" the block's start."""
+    t = moment
+    for _ in range(100):
+        candidate = _last_by_hours(t, config)
+        if candidate is None or candidate < not_before:
+            return None
+        block = _blocked(candidate, config)
+        if not block:
+            return candidate
+        start = block[0].replace(tzinfo=moment.tzinfo)
+        just_before = start - timedelta(minutes=1)
+        if start >= not_before and availability(just_before, config) == "open":
+            return start
+        t = just_before
     return None
 
 
@@ -198,9 +260,16 @@ def _closed_sentence(config, needed, earliest, notice, what):
     hours = ((config or {}).get("business") or {}).get("hours")
     before = last_open_before(needed, config, earliest)
     after = next_open(max(needed, earliest), config)
-    say = (f" {name} isn't open on {when(needed)}"
-           + (f" (hours: {hours})" if hours else "")
-           + f", so {what} can't be collected or delivered then, whatever the notice.")
+    if availability(needed, config) == "blocked":
+        # Time the owner blocked off: not "closed" (a 2-hour block isn't),
+        # and never why (the owner's note is private, and not loaded).
+        say = (f" {name} isn't available on {when(needed)}, so {what} can't be "
+               f"collected or delivered then, whatever the notice. Don't give a "
+               f"reason.")
+    else:
+        say = (f" {name} isn't open on {when(needed)}"
+               + (f" (hours: {hours})" if hours else "")
+               + f", so {what} can't be collected or delivered then, whatever the notice.")
     options = []
     if before is not None:
         options.append(f"by {when(before)}")
@@ -245,9 +314,9 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
         if have_it is not None and have_it != earliest:
             name = ((config or {}).get("business") or {}).get("name") or "The business"
             result["earliest_they_can_have_it"] = when(have_it)
-            result["say"] += (f" {name} is closed then, so the earliest they can "
-                              f"collect it or have it delivered is {when(have_it)}. "
-                              f"Say that time, not {when(earliest)}.")
+            result["say"] += (f" {name} isn't open or available then, so the earliest "
+                              f"they can collect it or have it delivered is "
+                              f"{when(have_it)}. Say that time, not {when(earliest)}.")
         return result
     needed = _parse_local(needed_by)
     available = (needed - now).total_seconds() / 3600
@@ -319,8 +388,8 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
                          + ("" if cutoff is not None else
                             f" Ordered now, the earliest it can be ready is "
                             f"{when(earliest)}."
-                            + (f" They're closed then, so the earliest they can "
-                               f"have it is {when(have_it)}."
+                            + (f" They aren't open or available then, so the "
+                               f"earliest they can have it is {when(have_it)}."
                                if have_it is not None and have_it != earliest else "")))
         if cutoff is not None and now > cutoff:
             # Live and in journey_eval (2026-10-03, again 2026-10-11): with
