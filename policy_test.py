@@ -342,11 +342,15 @@ def main():
     check("Sunday blocked off: Sunday 11am 'isn't available' (not 'closed'), no reason given",
           r["open_at_needed_by"] is False and "isn't available on Sunday, September 27 at 11:00 AM" in r["say"]
           and "Don't give a reason" in r["say"] and "hours:" not in r["say"], r["say"])
+    check("a one-off block in usual hours is said as one: 'this Sunday', never 'closed on Sundays' "
+          "(journey_eval 2026-10-18, 2 in 4)",
+          "say this Sunday isn't available, never that they're closed on Sundays" in r["say"], r["say"])
     check("…Saturday is too soon for the notice, Monday's closed: Tuesday from 7am",
           "latest_open_before" not in r and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM", r)
     dentist = blocked(("2026-09-29 10:00", "2026-09-29 12:00"))       # Tuesday, two hours
     r = note(dentist, (2026, 9, 27, 9, 0), needed_by="2026-09-29T11:00", notice_hours=24,
              what="a dozen muffins")
+    check("…and a two-hour block too ('this Tuesday')", "say this Tuesday isn't available" in r["say"], r["say"])
     check("a two-hour block: by its start, or from its end, the same day",
           r["latest_open_before"] == "Tuesday, September 29 at 10:00 AM"
           and r["next_open_after"] == "Tuesday, September 29 at 12:00 PM", r)
@@ -382,8 +386,8 @@ def main():
           r["say"])
     check("the deadline for no charge is worked out, and said to have passed: 9am TODAY, "
           "not 9am tomorrow (journey 2026-10-15)",
-          "With at least 24 hours of notice (by Tuesday, September 22 at 9:00 AM), there is "
-          "no charge; that time has already passed" in r["say"], r["say"])
+          "With at least 24 hours of notice (by 9am today, Tuesday, September 22 at 9:00 AM), "
+          "there is no charge; that time has already passed" in r["say"], r["say"])
     early = policy.cancellation_outcome(bel, starts_at="2026-09-24T09:00",
                                         now=datetime(2026, 9, 22, 10, 0))
     check("…and nothing of the sort in the best window already", "With at least" not in early["say"],

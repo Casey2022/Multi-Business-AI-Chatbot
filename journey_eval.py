@@ -336,7 +336,8 @@ JOURNEYS = [
         "blocks": [("2026-09-27 00:00", "2026-09-28 00:00")],              # Sunday
         "why": "Sunday is blocked off on the Calendar page; notice is met.",
         "turns": [{"say": "Is it possible to get a dozen muffins tomorrow at 11am?",
-                   "must": [r"tuesday"], "must_not": [r"vacation|holiday|dentist|training"],
+                   "must": [r"tuesday"],
+                   "must_not": [r"vacation|holiday|dentist|training", r"closed (?:on )?sundays"],
                    "rubric": rubrics.BLOCKED_SUNDAY, "rubric_when": "idle"}],
     },
     {

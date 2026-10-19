@@ -262,10 +262,18 @@ def _closed_sentence(config, needed, earliest, notice, what):
     after = next_open(max(needed, earliest), config)
     if availability(needed, config) == "blocked":
         # Time the owner blocked off: not "closed" (a 2-hour block isn't),
-        # and never why (the owner's note is private, and not loaded).
+        # and never why (the owner's note is private, and not loaded). When
+        # their usual hours are open then, it's a one-off: journey_eval
+        # (2026-10-18, 2 runs in 4) said "we're closed on Sundays" for one
+        # blocked Sunday at a bakery open every Sunday.
+        day = _WEEKDAYS[needed.weekday()].capitalize()
+        usual = _next_by_hours(needed, config) == needed if _opening(config) else False
         say = (f" {name} isn't available on {when(needed)}, so {what} can't be "
                f"collected or delivered then, whatever the notice. Don't give a "
-               f"reason.")
+               f"reason."
+               + (f" It's a one-off: they're normally open then, so say this "
+                  f"{day} isn't available, never that they're closed on {day}s."
+                  if usual else ""))
     else:
         say = (f" {name} isn't open on {when(needed)}"
                + (f" (hours: {hours})" if hours else "")
@@ -729,7 +737,13 @@ def cancellation_outcome(config, hours_before=None, days_before=None,
         better = outcome_text(change[1], policy, k0)
         if starts_at is not None:
             deadline = _parse_local(starts_at) - timedelta(hours=upper)
-            say += (f" With at least {span(upper)} of notice (by {when(deadline)}), "
+            # "today" when it is: given "Tuesday, September 22 at 9:00 AM" on a
+            # Tuesday, the model wrote "by 9am Monday" (journey_eval
+            # 2026-10-18, 1 run). "9:00 AM today" is harder to get wrong.
+            today = clock.business_now(config, now).date()
+            by = (f"{clock_time(deadline)} today, {when(deadline)}"
+                  if deadline.date() == today else when(deadline))
+            say += (f" With at least {span(upper)} of notice (by {by}), "
                     f"{better}; that time has already passed, so it's too late for "
                     f"that now. Don't say they still have time for it, and don't name "
                     f"any later time as a way to avoid this.")

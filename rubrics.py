@@ -375,6 +375,8 @@ BLOCKED_SUNDAY = Rubric(
     criteria="""It is Saturday at 9am. Sunday at 11am is 26 hours away, so the
     24 hours' notice is met, but the bakery isn't available on Sunday (the
     owner has blocked the day off), and it is closed Mondays, so the earliest
-    they can have the muffins is Tuesday from 7am. The reply must say Sunday
-    isn't possible and offer Tuesday. It must not invent a reason for Sunday
-    (such as a holiday). Fails if it agrees to Sunday at 11am.""")
+    they can have the muffins is Tuesday from 7am. The reply must say this
+    Sunday isn't possible and offer Tuesday. It must not invent a reason for
+    Sunday (such as a holiday), and must not say they're closed on Sundays in
+    general: they're normally open Sundays. Fails if it agrees to Sunday at
+    11am.""")
