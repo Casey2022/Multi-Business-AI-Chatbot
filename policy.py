@@ -446,11 +446,38 @@ def _date_only(text):
     return datetime.fromisoformat(text[:10]).date()
 
 
-def _after_business_days(start, n, open_days):
+def blocked_all_day(day, config):
+    """True when time the owner blocked off (Calendar page) covers all of
+    this date's opening hours (the whole day if no hours are set). A
+    two-hour block doesn't take a business day away; a day off does."""
+    import scheduling
+    blocks = sorted(scheduling.settings(config or {})["blocks"])
+    if not blocks:
+        return False
+    pair = _opening(config).get(day.weekday())
+    start = datetime.combine(day, pair[0]) if pair else datetime.combine(day, datetime.min.time())
+    end = datetime.combine(day, pair[1]) if pair else start + timedelta(days=1)
+    reached = start
+    for b_start, b_end in blocks:
+        if b_start > reached:
+            break
+        reached = max(reached, b_end)
+        if reached >= end:
+            return True
+    return False
+
+
+def _after_business_days(start, n, open_days, config=None, skipped=None):
+    """The date n business days after start. Days the owner blocked off
+    entirely don't count either (2026-10-19), and are added to `skipped`."""
     day, counted = start, 0
     while counted < n:
         day += timedelta(days=1)
         if day.weekday() in open_days:
+            if blocked_all_day(day, config):
+                if skipped is not None and day not in skipped:
+                    skipped.append(day)
+                continue
             counted += 1
     return day
 
@@ -467,7 +494,8 @@ def add_business_days(start, business_days, up_to=None, what=None, config=None):
     if n < 0 or (up_to is not None and int(up_to) < n):
         raise ValueError("business days must be 0 or more, and up_to >= business_days")
     open_days = business_weekdays(config)
-    first = _after_business_days(begin, n, open_days)
+    skipped = []
+    first = _after_business_days(begin, n, open_days, config, skipped)
     closed = [_WEEKDAYS[d].capitalize() + "s" for d in range(7) if d not in open_days]
     result = {"start": _day(begin), "business_days": n, "date": _day(first),
               "closed_days": closed}
@@ -476,7 +504,7 @@ def add_business_days(start, business_days, up_to=None, what=None, config=None):
     # after Thursday is Tuesday"), the model said "by Tuesday" and dropped
     # the rule (rag_eval 2026-10-05), as it did with the deposit tool.
     if up_to is not None and int(up_to) != n:
-        last = _after_business_days(begin, int(up_to), open_days)
+        last = _after_business_days(begin, int(up_to), open_days, config, skipped)
         result.update(up_to_business_days=int(up_to), date_latest=_day(last))
         say = (f"The rule: {n} to {int(up_to)} business days, for {label}. "
                f"Counting from {_day(begin)}, that's {_day(first)} at the "
@@ -484,10 +512,18 @@ def add_business_days(start, business_days, up_to=None, what=None, config=None):
     else:
         say = (f"The rule: {n} business day{'s' if n != 1 else ''}, for {label}. "
                f"Counting from {_day(begin)}, that's {_day(first)}")
+    if skipped:
+        result["days_not_available"] = [_day(d) for d in skipped]
+    # Days the owner blocked off are skipped without a reason: the note is
+    # theirs (and never loaded), so "isn't available", not "a holiday".
     result["say"] = (f"{say}. "
                      + (f"{' and '.join(closed)} don't count. " if closed else "")
-                     + "Public holidays aren't counted, so a holiday in between "
-                       "would push it back a day.")
+                     + (f"{' and '.join(_day(d) for d in skipped)} "
+                        f"{'is' if len(skipped) == 1 else 'are'} skipped too: the "
+                        f"business isn't available then (don't give a reason). "
+                        if skipped else "")
+                     + "Public holidays the business hasn't blocked off aren't "
+                       "known, so one in between would push it back a day.")
     return result
 
 

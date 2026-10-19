@@ -194,6 +194,31 @@ def main():
           "error" in policy.run_tool("add_business_days", {"start": "2026-10-08",
                                      "business_days": 5, "up_to_business_days": 2,
                                      "what": "x"}, ridge))
+    heading("business days skip days the owner blocked off (2026-10-19)")
+    ridge_off = copy.deepcopy(ridge)
+    ridge_off.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
+        {"start": "2026-10-12 00:00", "end": "2026-10-13 00:00"},     # Monday, all day
+        {"start": "2026-10-13 10:00", "end": "2026-10-13 12:00"}]     # Tuesday, two hours
+    r = policy.add_business_days("2026-10-08", 3, config=ridge_off)
+    check("Thursday + 3 business days, Monday blocked off: Wednesday (Tuesday's two-hour block still counts)",
+          r["date"] == "Wednesday, October 14" and r["days_not_available"] == ["Monday, October 12"], r)
+    check("…said without a reason (the owner's note is private)",
+          "Monday, October 12 is skipped too: the business isn't available then (don't give a reason)"
+          in r["say"] and "holiday" not in r["say"].split("Public holidays")[0], r["say"])
+    r = policy.add_business_days("2026-10-08", 2, up_to=5, config=ridge_off)
+    check("a range skips it too: Tuesday the 13th at the earliest, Friday the 16th at the latest",
+          r["date"] == "Tuesday, October 13" and r["date_latest"] == "Friday, October 16", r)
+    check("no blocks: as before (Thursday + 3 is Tuesday)",
+          policy.add_business_days("2026-10-08", 3, config=ridge)["date"] == "Tuesday, October 13"
+          and "days_not_available" not in policy.add_business_days("2026-10-08", 3, config=ridge))
+    split = copy.deepcopy(ridge)
+    split.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
+        {"start": "2026-10-12 07:00", "end": "2026-10-12 12:00"},
+        {"start": "2026-10-12 12:00", "end": "2026-10-12 16:00"}]     # all of Monday's hours, in two
+    check("two blocks that together cover the opening hours take the day; one that doesn't, doesn't",
+          policy.blocked_all_day(datetime(2026, 10, 12).date(), split)
+          and not policy.blocked_all_day(datetime(2026, 10, 13).date(), ridge_off))
+
     facts = ["## How Estimates Work\n...sends a written quote within three business days."]
     check("offered when the excerpts count business days and they ask when",
           policy.needs_tools("the estimator came yesterday, when will I get my quote?",
