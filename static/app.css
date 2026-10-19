@@ -67,14 +67,14 @@
   --glass: blur(22px) saturate(1.4);
 
   /* A type scale, so sizes are chosen from a list rather than invented. */
-  --text-xs:  11px;
-  --text-sm:  12.5px;
-  --text-md:  14px;
-  --text-lg:  16px;
-  --text-xl:  20px;
-  --text-2xl: 26px;
-  --display-lg: 40px;        /* page titles in Cormorant, which runs small */
-  --display-md: 21px;        /* card titles */
+  --text-xs:  13px;
+  --text-sm:  14.5px;
+  --text-md:  16px;
+  --text-lg:  18px;
+  --text-xl:  22px;
+  --text-2xl: 28px;
+  --display-lg: 42px;        /* page titles in Cormorant, which runs small */
+  --display-md: 23px;        /* card titles */
 
   /* Spacing. Layout uses gap; these are the only step values. */
   --s1: 4px;  --s2: 8px;  --s3: 12px;
@@ -145,7 +145,7 @@ select option { background: var(--surface-solid); color: var(--ink); }
 .wordmark {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 24px;
+  font-size: 26px;
   color: #fff;
   letter-spacing: -.01em;
 }
@@ -182,7 +182,7 @@ select option { background: var(--surface-solid); color: var(--ink); }
 .page-header h1 { font-size: var(--display-lg); font-weight: 500; line-height: 1.05; letter-spacing: -.02em; }
 .subtitle { color: var(--ink-soft); font-size: var(--text-sm); }
 
-.breadcrumb { font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-faint); }
+.breadcrumb { font-size: 12.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-faint); }
 .breadcrumb a { color: var(--ink-soft); text-decoration: none; }
 .breadcrumb a:hover { color: var(--pen); text-decoration: underline; }
 
@@ -237,10 +237,10 @@ select option { background: var(--surface-solid); color: var(--ink); }
 
 .tablewrap { overflow-x: auto; }   /* the page body never scrolls sideways */
 
-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
 th {
   text-align: left;
-  font-size: 10.5px; font-weight: 500;
+  font-size: 12.5px; font-weight: 500;
   letter-spacing: .18em; text-transform: uppercase;
   color: var(--ink-faint);
   background: var(--surface-sunk);
@@ -323,7 +323,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .chip {
   font-family: var(--body);   /* even inside a serif card title */
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 11.5px; font-weight: 600;
+  font-size: 13.5px; font-weight: 600;
   padding: 3px var(--s2);
   border-radius: 999px;
   border: 1px solid;
@@ -351,7 +351,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 /* A field's name ("Title", "Business name", "Options and prices"): the
    thing an owner scans for, so it outranks the hint under it clearly. */
 .field > label:not(.chip-check), .field .split-baseline > label, details.field > summary {
-  font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: .01em;
+  font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: .01em;
 }
 .hint, .field .hint { font-size: var(--text-sm); color: var(--ink-faint); }
 
@@ -400,7 +400,7 @@ input:focus, select:focus, textarea:focus {
 .flash {
   padding: 11px var(--s3);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 15px;
   border: 1px solid;
 }
 .flash-success { background: linear-gradient(var(--booked-wash), var(--booked-wash)), var(--smoke);  border-color: var(--booked);  color: var(--booked); }
@@ -430,7 +430,7 @@ input:focus, select:focus, textarea:focus {
 }
 .login-card { width: 100%; max-width: 380px; }
 .login-title {
-  font-family: var(--display); font-size: 30px; font-weight: 500;
+  font-family: var(--display); font-size: 32px; font-weight: 500;
   text-align: center;
 }
 
@@ -440,7 +440,7 @@ input:focus, select:focus, textarea:focus {
 
 @media (max-width: 640px) {
   .page { padding-inline: var(--s3); padding-block: var(--s4) var(--s5); }
-  .page-header h1 { font-size: 32px; }
+  .page-header h1 { font-size: 34px; }
   .topnav { padding: var(--s2) var(--s3); }
 
   /* Tables are the thing that breaks on a phone. Rather than squeezing
@@ -459,7 +459,7 @@ input:focus, select:focus, textarea:focus {
   }
   .table-stack td::before {
     content: attr(data-label);
-    font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+    font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase;
     color: var(--ink-faint); font-weight: 600;
     text-align: left; flex-shrink: 0;
   }
@@ -536,7 +536,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
  */
 .details { display: flex; flex-direction: column; gap: 3px; font-size: var(--text-sm); }
 .details dt {
-  font-size: 10.5px; font-weight: 600; letter-spacing: .07em;
+  font-size: 12.5px; font-weight: 600; letter-spacing: .07em;
   text-transform: uppercase; color: var(--ink-faint); line-height: 1.4;
 }
 .details dd { color: var(--ink); line-height: 1.45; }
@@ -597,7 +597,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 }
 .convo:last-child { border-bottom: 0; }
 .convo:hover { background: var(--surface-sunk); color: var(--ink); }
-.convo-who { font-weight: 600; font-size: 13px; }
+.convo-who { font-weight: 600; font-size: 15px; }
 .convo-last {
   color: var(--ink-faint); font-size: var(--text-sm);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -625,7 +625,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .bubble {
   max-width: 74%;
   padding: 9px 13px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -637,7 +637,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   background: var(--pen-fill); color: #fff;
   border-radius: 14px 14px 4px 14px;
 }
-.bubble time { display: block; font-size: 10px; opacity: .65; margin-top: 4px; text-align: right; }
+.bubble time { display: block; font-size: 12px; opacity: .65; margin-top: 4px; text-align: right; }
 
 /* ---------------------------------------------------------------------- *
  * Week calendar
@@ -658,7 +658,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   color: var(--ink-soft); white-space: normal;
 }
 .weekgrid th.gutter { width: 62px; border-left: 0; }
-.weekgrid th .daynum { display: block; font-family: var(--display); font-size: 22px; color: var(--ink); font-weight: 500; }
+.weekgrid th .daynum { display: block; font-family: var(--display); font-size: 24px; color: var(--ink); font-weight: 500; }
 .weekgrid th.is-today { background: var(--pen-wash); }
 .weekgrid th.is-today .daynum { color: var(--pen); }
 
@@ -676,7 +676,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 
 .slot {
   display: block; border-radius: 4px; padding: 3px 6px; margin-bottom: 2px;
-  font-size: 11px; line-height: 1.3; text-decoration: none;
+  font-size: 13px; line-height: 1.3; text-decoration: none;
   background: var(--pen-fill); color: #fff; overflow: hidden;
 }
 .slot:hover { background: #3579C2; color: #fff; }
@@ -696,7 +696,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .facts th {
   width: 180px; text-align: left; vertical-align: top;
   background: transparent; border-bottom: 1px solid var(--rule);
-  color: var(--ink-faint); font-size: 10.5px;
+  color: var(--ink-faint); font-size: 12.5px;
   padding: 11px var(--s4) 11px var(--s4);
 }
 .facts td { padding: 11px var(--s4); }
@@ -722,7 +722,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   border: 1px solid var(--pending);
   background: linear-gradient(var(--pending-wash), var(--pending-wash)), var(--smoke);
   border-radius: var(--radius); color: var(--pending);
-  font-size: 13px;
+  font-size: 15px;
 }
 .banner { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
 .banner .btn-primary { background: var(--pending); border-color: var(--pending); color: var(--on-light); }
@@ -834,7 +834,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .qrows { display: flex; flex-direction: column; gap: var(--s2); }
 .qhead {
   display: flex; gap: var(--s2); padding-left: 26px;
-  font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--ink-faint); font-weight: 600;
 }
 .qhead .qlabel { flex: 0 0 180px; }
@@ -898,8 +898,8 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 }
 .pickcard { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s4); }
 .pick-kind { color: var(--pen); }
-.pick-name { font-family: var(--display); font-size: 26px; font-weight: 600; }
-.pick-blurb { font-size: 13px; color: var(--ink-soft); line-height: 1.55; flex: 1; }
+.pick-name { font-family: var(--display); font-size: 28px; font-weight: 600; }
+.pick-blurb { font-size: 15px; color: var(--ink-soft); line-height: 1.55; flex: 1; }
 .pickcard .btn { width: 100%; text-align: center; margin-top: var(--s1); }
 
 /* ---------------------------------------------------------------------- *
@@ -982,7 +982,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   border-left-width: 3px;
   background: linear-gradient(var(--pending-wash), var(--pending-wash)), var(--smoke);
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--pending);
 }
 .demobar span:last-child { flex: 1; min-width: 220px; }
@@ -1139,7 +1139,7 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   display: flex; flex-direction: column; gap: var(--s3);
   padding: var(--s4);
 }
-.assistant-pop .assistant-turn { max-width: 92%; font-size: 13.5px; }
+.assistant-pop .assistant-turn { max-width: 92%; font-size: 15.5px; }
 .assistant-pop .assistant-ask { padding: var(--s3); border-top: 1px solid var(--rule); }
 .assistant-pop-foot { padding: 0 var(--s4) var(--s3); font-size: var(--text-sm); text-align: right; }
 .assistant-turn.is-thinking .assistant-text { color: var(--ink-faint); font-style: italic; }
@@ -1182,10 +1182,10 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 }
 .phone-status {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 24px 4px; font-size: 13px; font-weight: 600; color: #fff;
+  padding: 10px 24px 4px; font-size: 15px; font-weight: 600; color: #fff;
 }
 .phone-clock { font-variant-numeric: tabular-nums; }
-.phone-icons { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+.phone-icons { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .phone-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; }
 .phone-bars i { display: block; width: 3px; background: #fff; border-radius: 1px; }
 .phone-bars i:nth-child(1) { height: 4px; } .phone-bars i:nth-child(2) { height: 6px; }
@@ -1201,11 +1201,11 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 }
 .phone-avatar {
   width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 20px; font-weight: 600; color: #fff;
+  font-size: 22px; font-weight: 600; color: #fff;
   background: linear-gradient(135deg, #5B6B82, #36404F);
 }
-.phone-name { font-size: 13px; font-weight: 600; color: #fff; margin-top: 2px; }
-.phone-kind { font-size: 10.5px; color: rgba(255,255,255,.6); }
+.phone-name { font-size: 15px; font-weight: 600; color: #fff; margin-top: 2px; }
+.phone-kind { font-size: 12.5px; color: rgba(255,255,255,.6); }
 .phone-thread {
   flex: 1; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: 6px; padding: var(--s3) var(--s3) var(--s2);
@@ -1214,12 +1214,12 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 .sms-in  { align-items: flex-start; }
 .sms-out { align-items: flex-end; }
 .sms-bubble {
-  max-width: 78%; padding: 8px 12px; font-size: 14px; line-height: 1.38;
+  max-width: 78%; padding: 8px 12px; font-size: 16px; line-height: 1.38;
   white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 18px;
 }
 .sms-in .sms-bubble  { background: #2A2C31; color: #F2F3F5; border-bottom-left-radius: 5px; }
 .sms-out .sms-bubble { background: #1F8A4C; color: #fff; border-bottom-right-radius: 5px; }
-.sms-meta { font-size: 10.5px; color: rgba(255,255,255,.6); margin: 2px 6px 4px; }
+.sms-meta { font-size: 12.5px; color: rgba(255,255,255,.6); margin: 2px 6px 4px; }
 .sms-typing { color: rgba(255,255,255,.6); font-style: italic; }
 .sms-notice { border-left: 3px solid #1F8A4C; }
 .sms-failed { border: 1px solid var(--refused); }
@@ -1232,11 +1232,11 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 }
 .phone-compose input {
   flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px;
-  background: #13161C; border: 1px solid rgba(255,255,255,.18); color: #fff; font-size: 14px;
+  background: #13161C; border: 1px solid rgba(255,255,255,.18); color: #fff; font-size: 16px;
 }
 .phone-compose button {
   width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer; flex-shrink: 0;
-  background: #1F8A4C; color: #fff; font-size: 18px; font-weight: 700; line-height: 1;
+  background: #1F8A4C; color: #fff; font-size: 20px; font-weight: 700; line-height: 1;
 }
 .phone-compose button:disabled { opacity: .5; cursor: default; }
 .textside { max-width: 420px; }
