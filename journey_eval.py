@@ -290,6 +290,39 @@ JOURNEYS = [
                    "state": "idle", "must": [DEPOSIT_GONE], "tool": "cancellation_outcome",
                    "must_not": [_SUNRISE_CANNED]}],
     },
+    # Opening hours (2026-10-18): the notice is met in each, and the shop is
+    # shut at the time wanted. Measured before changing check_notice, which
+    # deliberately ignores opening hours. Each must stay a question (state
+    # idle), so a turn that starts an order shows up instead of passing
+    # without being judged.
+    {
+        "name": "opening hours: custom cake for a Monday pickup (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 24, 10, 0),   # Thursday
+        "why": "72 hours' notice is met, but Sunrise is closed on Mondays.",
+        "turns": [{"say": "Could I pick up a custom birthday cake on Monday at 10am?",
+                   "state": "idle", "rubric": rubrics.CLOSED_MONDAY_CAKE}],
+    },
+    {
+        "name": "opening hours: muffins after closing time (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 26, 13, 0),   # Saturday
+        "why": "24 hours' notice is met, but Sunrise closes at 3pm.",
+        "turns": [{"say": "Is it possible to get a dozen blueberry muffins tomorrow at 5pm?",
+                   "state": "idle", "rubric": rubrics.AFTER_CLOSING_MUFFINS}],
+    },
+    {
+        "name": "opening hours: earliest pickup lands on a closed day (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 27, 13, 0),   # Sunday
+        "why": "Ready Monday at 1pm by the notice, but closed Mondays: Tuesday 7am.",
+        "turns": [{"say": "If I order a dozen muffins today, what's the earliest I could pick them up?",
+                   "state": "idle", "rubric": rubrics.EARLIEST_PICKUP_TUESDAY}],
+    },
+    {
+        "name": "opening hours: a party tray after closing (Crosstown)",
+        "slug": "crosstown_pizza", "clock": (2026, 9, 22, 10, 0),           # Tuesday
+        "why": "Three hours' notice is met, no Thursday cutoff, but closed after 10pm.",
+        "turns": [{"say": "Can I get a party tray on Thursday at 11pm?",
+                   "state": "idle", "rubric": rubrics.TRAY_AFTER_CLOSE}],
+    },
     {
         "name": "a real booking still starts, after a question (Bob's)",
         "slug": "bobs_plumbing",
