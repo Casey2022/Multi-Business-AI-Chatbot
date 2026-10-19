@@ -91,6 +91,9 @@ _CUT_AND_COLOUR_48 = dict(_COLOUR_48, services=["cut and colour"], windows=[
     {"at_least_hours": 48, "any": "no_charge"},
     {"at_least_hours": 24, "cut and colour": {"charge_percent": 50}, "appointment": "no_charge"},
     {"at_least_hours": 0, "any": {"charge_percent": 50}}])
+# Closed at the time wanted, said either way: by the answer or by the
+# booking flow ("We're closed then").
+_SAYS_CLOSED = r"\bclosed\b|isn'?t open|aren'?t open|not open|close[sd]? at|after (?:we )?close"
 _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|cost)|nothing to pay|at no cost"
 # Waiting only ever gives less notice (live, Belmont, 2026-10-17: "if you
 # can wait just another 18 hours or so, you'll hit the 48-hour mark").
@@ -292,15 +295,18 @@ JOURNEYS = [
     },
     # Opening hours (2026-10-18): the notice is met in each, and the shop is
     # shut at the time wanted. Measured before changing check_notice, which
-    # deliberately ignores opening hours. Each must stay a question (state
-    # idle), so a turn that starts an order shows up instead of passing
-    # without being judged.
+    # deliberately ignores opening hours. The baseline (3 runs each): the
+    # Monday cake and the 11pm tray started an order, and the booking flow
+    # said "We're closed then" with open times, which is right, so those two
+    # take either path, and must say it's closed. Muffins at 5pm (0/3: "Yes!")
+    # and the earliest pickup (1/3: no tool) must stay questions.
     {
         "name": "opening hours: custom cake for a Monday pickup (Sunrise)",
         "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 24, 10, 0),   # Thursday
         "why": "72 hours' notice is met, but Sunrise is closed on Mondays.",
         "turns": [{"say": "Could I pick up a custom birthday cake on Monday at 10am?",
-                   "state": "idle", "rubric": rubrics.CLOSED_MONDAY_CAKE}],
+                   "must": [_SAYS_CLOSED],
+                   "rubric": rubrics.CLOSED_MONDAY_CAKE, "rubric_when": "idle"}],
     },
     {
         "name": "opening hours: muffins after closing time (Sunrise)",
@@ -321,7 +327,8 @@ JOURNEYS = [
         "slug": "crosstown_pizza", "clock": (2026, 9, 22, 10, 0),           # Tuesday
         "why": "Three hours' notice is met, no Thursday cutoff, but closed after 10pm.",
         "turns": [{"say": "Can I get a party tray on Thursday at 11pm?",
-                   "state": "idle", "rubric": rubrics.TRAY_AFTER_CLOSE}],
+                   "must": [_SAYS_CLOSED],
+                   "rubric": rubrics.TRAY_AFTER_CLOSE, "rubric_when": "idle"}],
     },
     {
         "name": "a real booking still starts, after a question (Bob's)",

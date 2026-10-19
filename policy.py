@@ -115,6 +115,104 @@ def _cutoff_on(needed, order_by, order_by_days):
     return cutoff if cutoff <= needed else None
 
 
+# ---------------------------------------------------------------------------
+# Opening hours
+# ---------------------------------------------------------------------------
+#
+# 2026-10-18 (journey_eval baseline, 3/3): "a dozen muffins tomorrow at 5pm?"
+# at Sunrise, which closes at 3pm, got "Yes! … tomorrow at 5pm": check_notice
+# said 28 hours beats 24 and nothing mentioned closing time. Opening hours
+# decide WHEN something can be collected or delivered. They don't change how
+# notice is counted: "24 hours' notice" stays 24 clock hours, as the
+# documents say (whether closed hours count is the business's call, and a
+# guess would be wrong in a new way). Read the way the booking flow reads
+# them (scheduling.settings: weekday keys, Monday 0). No hours set: unknown,
+# and nothing here says anything.
+
+def _opening(config):
+    """{weekday: (open, close)} as times; {} when the business has none."""
+    import scheduling
+    hours = scheduling.settings(config or {})["business_hours"] or {}
+    out = {}
+    for day in range(7):
+        pair = hours.get(day, hours.get(str(day)))
+        try:
+            if pair:
+                out[day] = (datetime.strptime(pair[0], "%H:%M").time(),
+                            datetime.strptime(pair[1], "%H:%M").time())
+        except (TypeError, ValueError, IndexError):
+            continue
+    return out
+
+
+def is_open(moment, config):
+    """True or False, or None if the hours aren't known. Closing time
+    itself counts as open: "collect by 3pm" at a 3pm close is fine."""
+    hours = _opening(config)
+    if not hours:
+        return None
+    pair = hours.get(moment.weekday())
+    return bool(pair) and pair[0] <= moment.time() <= pair[1]
+
+
+def next_open(moment, config):
+    """The first moment at or after `moment` when the business is open."""
+    hours = _opening(config)
+    if not hours:
+        return None
+    for days in range(8):
+        day = (moment + timedelta(days=days)).date()
+        pair = hours.get(day.weekday())
+        if not pair:
+            continue
+        opens = datetime.combine(day, pair[0], tzinfo=moment.tzinfo)
+        closes = datetime.combine(day, pair[1], tzinfo=moment.tzinfo)
+        candidate = max(moment, opens)
+        if candidate <= closes:
+            return candidate
+    return None
+
+
+def last_open_before(moment, config, not_before):
+    """The latest moment at or before `moment` when the business is open,
+    but no earlier than `not_before` (the notice): None if there isn't one."""
+    hours = _opening(config)
+    for days in range(8):
+        day = (moment - timedelta(days=days)).date()
+        pair = hours.get(day.weekday())
+        if not pair:
+            continue
+        opens = datetime.combine(day, pair[0], tzinfo=moment.tzinfo)
+        closes = datetime.combine(day, pair[1], tzinfo=moment.tzinfo)
+        candidate = min(moment, closes)
+        if candidate < opens:
+            continue
+        return candidate if candidate >= not_before else None
+    return None
+
+
+def _closed_sentence(config, needed, earliest, notice, what):
+    """What to say when `needed` is outside opening hours: that, and the
+    nearest open times either side that still give the notice."""
+    name = ((config or {}).get("business") or {}).get("name") or "The business"
+    hours = ((config or {}).get("business") or {}).get("hours")
+    before = last_open_before(needed, config, earliest)
+    after = next_open(max(needed, earliest), config)
+    say = (f" {name} isn't open on {when(needed)}"
+           + (f" (hours: {hours})" if hours else "")
+           + f", so {what} can't be collected or delivered then, whatever the notice.")
+    options = []
+    if before is not None:
+        options.append(f"by {when(before)}")
+    if after is not None:
+        options.append(f"from {when(after)}")
+    if options:
+        say += (f" The nearest times they're open that still give {span(notice)} of "
+                f"notice: {' or '.join(options)}. Offer one of those; don't agree "
+                f"to {clock_time(needed)}.")
+    return say, before, after
+
+
 def check_notice(needed_by, notice_hours, what, config=None, now=None,
                  order_by=None, order_by_days=None):
     """How much time there is before `needed_by`, against the notice needed,
@@ -130,17 +228,33 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
     the document (one copy); the model passes it in like notice_hours.
     """
     now = clock.business_now(config, now)
-    needed = _parse_local(needed_by)
     notice = float(notice_hours)
     if notice < 0:
         raise ValueError("notice_hours can't be negative")
+    what = (what or "this").strip()
+    earliest = now + timedelta(hours=notice)
+    have_it = next_open(earliest, config)
+    if not needed_by:
+        # "How soon could I get…?" (2026-10-18): no time wanted, so the
+        # answer is the earliest it can be ready, moved to when they're open.
+        result = {"now": when(now), "notice_needed_hours": notice,
+                  "earliest_ready_if_ordered_now": when(earliest),
+                  "say": (f"It's {when(now)} now. The notice for {what} is "
+                          f"{span(notice)}, so ordered now the earliest it can be "
+                          f"ready is {when(earliest)}.")}
+        if have_it is not None and have_it != earliest:
+            name = ((config or {}).get("business") or {}).get("name") or "The business"
+            result["earliest_they_can_have_it"] = when(have_it)
+            result["say"] += (f" {name} is closed then, so the earliest they can "
+                              f"collect it or have it delivered is {when(have_it)}. "
+                              f"Say that time, not {when(earliest)}.")
+        return result
+    needed = _parse_local(needed_by)
     available = (needed - now).total_seconds() / 3600
     latest = needed - timedelta(hours=notice)
-    earliest = now + timedelta(hours=notice)
     cutoff = _cutoff_on(needed, order_by, order_by_days)
     if cutoff is not None and cutoff < latest:
         latest = cutoff
-    what = (what or "this").strip()
     in_time = available >= notice and (cutoff is None or now <= cutoff)
     result = {
         "now": when(now),
@@ -160,9 +274,23 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
                f"{clock_time(cutoff)}"
                + (f", and it's past {clock_time(cutoff)} now." if now > cutoff
                   else "."))
+    open_then = is_open(needed, config)
+    if open_then is not None:
+        result["open_at_needed_by"] = open_then
     if available < 0:
         result["say"] = (f"{when(needed)} has already passed; it's "
                          f"{when(now)} now.")
+    elif open_then is False:
+        closed, before, after = _closed_sentence(config, needed, earliest, notice, what)
+        met = (", which is met" if available >= notice
+               else f", so the notice is missed by {span(notice - available)}")
+        result["enough_notice"] = False
+        result["say"] = (f"From now ({when(now)}) to {when(needed)} is {span(available)}. "
+                         f"The notice for {what} is {span(notice)}{met}.{cut}{closed}")
+        if before is not None:
+            result["latest_open_before"] = when(before)
+        if after is not None:
+            result["next_open_after"] = when(after)
     elif in_time:
         result["say"] = (f"From now ({when(now)}) to {when(needed)} is "
                          f"{span(available)}. The notice for {what} is "
@@ -190,7 +318,10 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
                          f"by {when(latest)}."
                          + ("" if cutoff is not None else
                             f" Ordered now, the earliest it can be ready is "
-                            f"{when(earliest)}."))
+                            f"{when(earliest)}."
+                            + (f" They're closed then, so the earliest they can "
+                               f"have it is {when(have_it)}."
+                               if have_it is not None and have_it != earliest else "")))
         if cutoff is not None and now > cutoff:
             # Live and in journey_eval (2026-10-03, again 2026-10-11): with
             # the tray cutoff passed, the bot offered to "see if the kitchen
@@ -603,21 +734,26 @@ CHECK_NOTICE_TOOL = {
         "Work out whether there is enough notice for something the customer "
         "wants by a particular time. Use it whenever the customer names a "
         "time they need something by (tonight, 8am tomorrow, Saturday, "
-        "today) and the facts give a notice period for that thing. Not "
-        "for cancelling or moving: that is a different rule. It "
-        "returns the hours available, whether that is enough, the latest "
-        "time it could have been ordered, and a sentence to base the answer "
-        "on. Do this arithmetic here, never in your head."),
+        "today), or asks how soon they could have it, and the facts give a "
+        "notice period for that thing. Not for cancelling or moving: that is "
+        "a different rule. It returns the hours available, whether that is "
+        "enough, whether the business is open then, the latest time it could "
+        "have been ordered, and a sentence to base the answer on. Do this "
+        "arithmetic here, never in your head."),
     "input_schema": {
         "type": "object",
         "properties": {
+            # Nullable since 2026-10-18: "what's the earliest I could pick
+            # them up?" names no time, the tool wasn't used, and the reply
+            # hedged (journey_eval, 2 runs in 3).
             "needed_by": {
-                "type": "string",
+                "type": ["string", "null"],
                 "description": (
                     "When the customer needs it, business-local, as "
                     "YYYY-MM-DDTHH:MM, worked out from today's date and time "
                     "in the prompt. A day with no time: that day's opening "
-                    "time. 'Today' or 'now' with no time: right now.")},
+                    "time. 'Today' or 'now' with no time: right now. null when "
+                    "they ask how soon, or the earliest, they could have it.")},
             "notice_hours": {
                 "type": "number",
                 "description": (
@@ -743,6 +879,15 @@ _ABOUT_CANCELLING = re.compile(r"\b(?:cancel\w*|refund\w*|deposits?)\b", re.I)
 FOLLOW_UP_TURNS = 2
 
 
+# "How soon / the earliest" names no time but asks the notice question
+# (2026-10-18): offered and, when the top excerpt gives a notice, required.
+# Only when the retrieved excerpts give a notice period: "how soon can you
+# start" at Ridgeline (no notice in its documents) stays tool-free, as
+# 5e69c3f decided (extra tools moved answers that didn't need them).
+_ASKS_EARLIEST = re.compile(r"\b(?:earliest|soonest|how soon|as soon as possible)\b", re.I)
+_GIVES_NOTICE = re.compile(r"\bnotice\b", re.I)
+
+
 def _wants_tools(text, config):
     """Which tools one message calls for: a set of "notice", "cancellation".
 
@@ -781,6 +926,9 @@ def needs_tools(message, config, history=None, facts=None):
     wanted = set()
     for text in [message, *earlier]:
         wanted |= _wants_tools(text, config)
+    if _ASKS_EARLIEST.search(message or "") and any(_GIVES_NOTICE.search(f or "")
+                                                     for f in (facts or [])):
+        wanted.add("notice")
     if (any(_BUSINESS_DAYS.search(f or "") for f in (facts or []))
             and (_DAY_TO_COUNT_FROM.search(message or "")
                  or _TIME_NAMED.search(message or ""))):
@@ -799,6 +947,8 @@ def must_check_notice(message, facts=None):
     another day. Only the top excerpt counts, so a delivery-time question
     that happens to pull in the tray section isn't forced."""
     top = (facts or [None])[0]
+    if top and _ASKS_EARLIEST.search(message or "") and _GIVES_NOTICE.search(top):
+        return True
     return bool(top and _ORDER_BY_CUTOFF.search(top)
                 and _TIME_NAMED.search(message or ""))
 

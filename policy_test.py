@@ -267,6 +267,70 @@ def main():
     check("an unknown kind gives every kind", r["same_for_every_kind"] and
           "alike" in r["say"], r["say"])
 
+    heading("opening hours decide when it can be collected (journey_eval 2026-10-18)")
+    sun_cfg = yaml_config("sunrise_bakery_and_cafe")
+    cross = yaml_config("crosstown_pizza")
+    note = lambda cfg, at, **a: policy.check_notice(config=cfg, now=datetime(*at), **a)
+    r = note(sun_cfg, (2026, 9, 26, 13, 0), needed_by="2026-09-27T17:00", notice_hours=24,
+             what="a dozen muffins")
+    check("Saturday 1pm, muffins Sunday 5pm: notice met (28h) but they close at 3pm",
+          r["open_at_needed_by"] is False and r["enough_notice"] is False
+          and "which is met" in r["say"] and "isn't open on Sunday, September 27 at 5:00 PM" in r["say"]
+          and "don't agree to 5pm" in r["say"], r["say"])
+    check("…and offers Sunday by 3pm (still 24 hours' notice) or Tuesday from 7am",
+          r["latest_open_before"] == "Sunday, September 27 at 3:00 PM"
+          and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM", r)
+    r = note(sun_cfg, (2026, 9, 24, 10, 0), needed_by="2026-09-28T10:00", notice_hours=72,
+             what="a custom cake")
+    check("Thursday, a custom cake for Monday 10am: closed Mondays; Sunday by 3pm or Tuesday 7am",
+          r["open_at_needed_by"] is False and r["latest_open_before"] == "Sunday, September 27 at 3:00 PM"
+          and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM", r["say"])
+    r = note(sun_cfg, (2026, 9, 25, 10, 0), needed_by="2026-09-28T10:00", notice_hours=72,
+             what="a custom cake")
+    check("…a day later, Sunday 3pm no longer gives 72 hours: only Tuesday is offered",
+          "latest_open_before" not in r and r["next_open_after"] == "Tuesday, September 29 at 7:00 AM",
+          r["say"])
+    r = note(sun_cfg, (2026, 9, 27, 13, 0), needed_by=None, notice_hours=24, what="a dozen muffins")
+    check("'how soon?' with no time: ready Monday 1pm by the notice, closed, so Tuesday 7am",
+          r["earliest_ready_if_ordered_now"] == "Monday, September 28 at 1:00 PM"
+          and r["earliest_they_can_have_it"] == "Tuesday, September 29 at 7:00 AM"
+          and "Say that time, not Monday" in r["say"], r["say"])
+    r = note(sun_cfg, (2026, 9, 26, 9, 0), needed_by=None, notice_hours=24, what="a dozen muffins")
+    check("…and when ready during open hours, that time stands",
+          "earliest_they_can_have_it" not in r and "closed" not in r["say"], r["say"])
+    r = note(cross, (2026, 9, 22, 10, 0), needed_by="2026-09-24T23:00", notice_hours=3,
+             what="a party tray")
+    check("Crosstown, a tray Thursday 11pm: closed after 10pm; Thursday by 10pm offered",
+          r["open_at_needed_by"] is False and r["latest_open_before"] == "Thursday, September 24 at 10:00 PM",
+          r["say"])
+    r = note(sun_cfg, (2026, 9, 26, 9, 0), needed_by="2026-09-27T15:00", notice_hours=24,
+             what="a dozen muffins")
+    check("closing time itself counts as open (collect by 3pm at a 3pm close)",
+          r["open_at_needed_by"] is True and r["enough_notice"] is True, r["say"])
+    no_hours = copy.deepcopy(sun_cfg)
+    no_hours["calendar"]["scheduling"].pop("business_hours")
+    r = note(no_hours, (2026, 9, 26, 13, 0), needed_by="2026-09-27T17:00", notice_hours=24,
+             what="a dozen muffins")
+    check("no opening hours set: nothing said about them, as before",
+          "open_at_needed_by" not in r and r["enough_notice"] is True and "open" not in r["say"], r["say"])
+    check("notice is still clock hours: Sunday 1pm to Tuesday 1pm is 48, closed Monday or not",
+          note(sun_cfg, (2026, 9, 27, 13, 0), needed_by="2026-09-29T13:00", notice_hours=48,
+               what="x")["enough_notice"] is True)
+    top = ["## Muffins\n...order a dozen with 24 hours' notice to guarantee it."]
+    check("'what's the earliest I could pick them up?' gets the notice tool, required, when the facts give a notice",
+          "notice" in policy.needs_tools("what's the earliest I could pick them up?", sun_cfg, facts=top)
+          and policy.must_check_notice("what's the earliest I could pick them up?", top))
+    check("…but not where the facts give none ('how soon can you start' at Ridgeline)",
+          not policy.needs_tools("how soon can you start", yaml_config("ridgeline_contracting"),
+                                 facts=["## Roofing\n..."])
+          and not policy.must_check_notice("how soon can you start", ["## Roofing\n..."]))
+    check("the tool takes needed_by as null for 'how soon?'",
+          policy.CHECK_NOTICE_TOOL["input_schema"]["properties"]["needed_by"]["type"] == ["string", "null"]
+          and "earliest" in policy.run_tool("check_notice", {"needed_by": None, "notice_hours": 24,
+                                                              "what": "muffins", "order_by": None,
+                                                              "order_by_days": None},
+                                            sun_cfg, now=datetime(2026, 9, 27, 13, 0))["say"])
+
     heading("Belmont: one rule for every appointment, given the appointment time")
     bel = yaml_config("belmont_hair_studio")
     r = policy.cancellation_outcome(bel, starts_at="2026-09-23T09:00",
