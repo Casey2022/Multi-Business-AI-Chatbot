@@ -14,6 +14,7 @@
 
 import os
 import json
+import threading
 from datetime import datetime, timedelta
 
 from google.oauth2 import service_account
@@ -34,7 +35,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
 ]
 
-_service = None
+# One client per thread. The client sits on httplib2, which Google documents
+# as not thread-safe: two threads sharing one can read each other's
+# responses. gunicorn runs with --threads (2026-10-20: four visitors at once
+# waited 2.2, 3.9, 5.9 and 7.6 seconds with one thread, ~2 each with four),
+# so two bookings at once must not share it.
+_local = threading.local()
 
 # Seconds before a Calendar API call gives up. Without a timeout, httplib2
 # waits on the socket indefinitely: one request sat inside an availability
@@ -49,11 +55,12 @@ def _get_service():
     """Return an authenticated Calendar API client, building it lazily.
 
     Lazy for the same reason the ChromaDB client is: this must be created
-    inside the worker process, not inherited across a gunicorn fork.
+    inside the worker process, not inherited across a gunicorn fork. And
+    per thread: see _local.
     """
-    global _service
-    if _service is not None:
-        return _service
+    service = getattr(_local, "service", None)
+    if service is not None:
+        return service
 
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not raw:
@@ -76,14 +83,15 @@ def _get_service():
         from google_auth_httplib2 import AuthorizedHttp
         http = AuthorizedHttp(creds,
                               http=httplib2.Http(timeout=API_TIMEOUT_SECONDS))
-        _service = build("calendar", "v3", http=http, cache_discovery=False)
+        service = build("calendar", "v3", http=http, cache_discovery=False)
         log.info("Calendar client ready (timeout %ds)", API_TIMEOUT_SECONDS)
     except ImportError as e:
         log.warning("Building the calendar client without a timeout (%s) — "
                     "a hung request will block a customer's turn", e)
-        _service = build("calendar", "v3", credentials=creds,
-                         cache_discovery=False)
-    return _service
+        service = build("calendar", "v3", credentials=creds,
+                        cache_discovery=False)
+    _local.service = service
+    return service
 
 
 def is_enabled(config):

@@ -16,6 +16,7 @@
 # per-call so stale handles after re-ingestion are impossible.
 
 import re
+import threading
 import chromadb
 from pathlib import Path
 import os
@@ -127,6 +128,8 @@ DISTANCE_THRESHOLD = 0.50
 # fork deadlocks when the child first touches it.
 _chroma_client = None
 _chroma_pid = None      # the process that created _chroma_client
+# Two threads' first searches (gunicorn --threads) must not both build one.
+_chroma_lock = threading.Lock()
 
 
 def get_chroma_client():
@@ -146,21 +149,22 @@ def get_chroma_client():
     at import and move it into vector_boot.py.
     """
     global _chroma_client, _chroma_pid
-    if _chroma_client is not None and _chroma_pid != os.getpid():
-        log.error("ChromaDB client was created in process %s and inherited by "
-                  "worker %s (gunicorn --preload). Searches in this worker "
-                  "will likely hang: something opened a client at import; "
-                  "move it into vector_boot.py.", _chroma_pid, os.getpid())
-        try:
-            from chromadb.api.shared_system_client import SharedSystemClient
-            SharedSystemClient.clear_system_cache()
-        except Exception:
-            log.exception("Couldn't clear chromadb's client cache")
-        _chroma_client = None
-    if _chroma_client is None:
-        _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
-        _chroma_pid = os.getpid()
-    return _chroma_client
+    with _chroma_lock:
+        if _chroma_client is not None and _chroma_pid != os.getpid():
+            log.error("ChromaDB client was created in process %s and inherited by "
+                      "worker %s (gunicorn --preload). Searches in this worker "
+                      "will likely hang: something opened a client at import; "
+                      "move it into vector_boot.py.", _chroma_pid, os.getpid())
+            try:
+                from chromadb.api.shared_system_client import SharedSystemClient
+                SharedSystemClient.clear_system_cache()
+            except Exception:
+                log.exception("Couldn't clear chromadb's client cache")
+            _chroma_client = None
+        if _chroma_client is None:
+            _chroma_client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+            _chroma_pid = os.getpid()
+        return _chroma_client
 
 
 # ---------------------------------------------------------------------------

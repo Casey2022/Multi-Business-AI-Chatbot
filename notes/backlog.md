@@ -72,14 +72,19 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 Data doesn't cross between demos (`tenancy_test.py`, `demo_test.py`). What
 visitors do share:
 
-- **One request at a time.** Render's Start Command is `gunicorn app:app
-  --workers 1 --timeout 60 --bind 0.0.0.0:$PORT` (plus Render's own
-  `GUNICORN_CMD_ARGS`): one sync worker. While one reply waits several
-  seconds on the model, everyone else waits behind it. A request that
-  takes over 60 seconds gets its worker killed. The Procfile says
-  `--timeout 120`, but Render doesn't read it. More workers or threads
-  would need the in-memory rate limits (per process) and SQLite's 5-second
-  lock timeout looked at first. Not measured yet.
+- **One request at a time → four threads.** Render's Start Command was
+  `gunicorn app:app --workers 1 --timeout 60 --bind 0.0.0.0:$PORT`: one
+  sync worker. Measured locally with Render's settings, four visitors
+  sending at once waited 2.2, 3.9, 5.9, 7.6 s (one alone: 2.4 s). With
+  `--threads 4`: about 2 s each, twice. The code is ready for threads
+  (`threads_test.py`); **to do: add `--threads 4` to Render's Start
+  Command** (the Procfile has it, but Render doesn't read the Procfile).
+  Checked and fine with threads: rate limits (SQLite, atomic increment),
+  SQLite (800 writes from 8 threads, no lock errors), one message in
+  flight per chat page. Locally on macOS, `--preload` workers segfault on
+  the first outbound call unless run with
+  `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES no_proxy='*'`; Render (Linux)
+  doesn't need this.
 
 Decided, 2026-10-20: the per-IP limits (3 demo starts a minute from one
 Wi-Fi) and the 50-demo ceiling are fine as they are.
