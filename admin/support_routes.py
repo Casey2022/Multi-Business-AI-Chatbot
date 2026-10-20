@@ -161,6 +161,10 @@ def help_ask():
         return problem(f"You've asked a lot of questions in a short time. Try again in "
                        f"about {minutes} minute{'' if minutes == 1 else 's'}, or ask a "
                        f"person on the Help page.", 429)
+    import budget
+    note = budget.refusal()
+    if note:
+        return problem(note, 429)
     try:
         config = load_config(business["config_path"], business["id"]) if business else {}
         out = assistant.answer(user["email"], business, config, question,

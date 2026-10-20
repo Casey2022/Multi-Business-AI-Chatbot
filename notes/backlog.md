@@ -54,7 +54,12 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
   one-time link, short expiry, rate limit, no "no such user" leak. Changing a
   password should end other sessions. Re-check login throttling.
 - **Abuse and cost:** push on the existing rate limits (chat, demo creation,
-  uploads, support); cap model spend per demo visitor.
+  uploads, support). Demo spend is capped (`budget.py`: $0.50 a demo, $5
+  all demos, a day). It prices every call at `LLM_PRICE_IN`/`OUT`, so if
+  `ASSISTANT_MODEL` or `UPLOAD_MODEL` is set to a pricier model, those calls
+  are under-counted. The upload routes' budget checks aren't exercised by
+  `budget_test.py`'s sweep (they need a file or a fetched page first);
+  `llm._create` still refuses their calls past the budget.
 - **Secrets:** a real secrets story (`notes/security.md`, "Still to do"); the
   SMTP app password lives only in Render's environment.
 - **Dependencies:** `pip-audit` before each deploy that changes requirements.

@@ -265,6 +265,11 @@ if app.config["SESSION_COOKIE_SECURE"]:
 init_db()          # tables only — no ChromaDB access before fork
 app.register_blueprint(admin_bp)
 
+# Which demo, if any, each request spends for: budget.py caps demos' model
+# spend per day, and needs to know before the view runs.
+import budget
+app.before_request(budget.scope_request)
+
 # Run the startup sequence.
 #
 # This call has to be here, at module scope. gunicorn imports `app:app` and
@@ -487,6 +492,9 @@ def webchat_reply(slug):
         return {"reply": "You're sending messages faster than I can keep up "
                          "with. Give me a moment and try again.",
                 "retry_after": wait}, 429
+    note = budget.refusal()
+    if note:
+        return {"reply": note}
 
     config      = load_config(business["config_path"], business["id"])
     business_id = business["id"]
@@ -664,6 +672,9 @@ def textsim_reply(slug):
     if not allowed:
         return {"reply": "You're texting faster than I can keep up with. Give me "
                          "a moment and try again.", "retry_after": wait}, 429
+    note = budget.refusal()
+    if note:
+        return {"reply": note, "out": sms.segments(note), "in": sms.segments(message)}
     reply = sms_turn(business, phone, message)
     return {"reply": reply, "out": sms.segments(reply), "in": sms.segments(message)}
 

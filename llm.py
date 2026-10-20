@@ -11,6 +11,7 @@ import json
 import os
 import re
 
+import budget
 import policy
 import menu
 from anthropic import Anthropic
@@ -121,6 +122,18 @@ def _thought(response):
     return any(getattr(b, "type", None) == "thinking" for b in response.content)
 
 
+def _sent(call):
+    """One request to the model, charged to this request's demo."""
+    response = client.messages.create(**call)
+    try:
+        usage = response.usage
+        budget.record(usage.input_tokens / 1e6 * PRICE_IN_PER_MTOK
+                      + usage.output_tokens / 1e6 * PRICE_OUT_PER_MTOK)
+    except Exception as e:                      # bookkeeping never breaks a reply
+        log.debug("Couldn't price a call: %s", e)
+    return response
+
+
 def _create(**call):
     """messages.create with the model and its model-specific fallbacks.
 
@@ -131,22 +144,26 @@ def _create(**call):
     3. If a reply was cut off at max_tokens after thinking (empty or partial
        text, e.g. "C"), the call is retried once with the extra room. A reply
        cut off WITHOUT thinking is left alone: that's just a long reply.
+
+    Every request sent is charged to the demo it serves (budget.py), and a
+    demo whose day's budget is spent gets budget.Spent instead of a call.
     """
     global temperature_dropped, model_thinks
+    budget.check()
     call.setdefault("model", MODEL)
     if temperature_dropped:
         call.pop("temperature", None)
     if model_thinks:
         call["max_tokens"] = call.get("max_tokens", 0) + THINKING_ROOM
     try:
-        response = client.messages.create(**call)
+        response = _sent(call)
     except Exception as e:
         if "temperature" in call and "temperature" in str(e):
             log.warning("%s rejects temperature; sending none from now on.",
                         call["model"])
             temperature_dropped = True
             call.pop("temperature")
-            response = client.messages.create(**call)
+            response = _sent(call)
         else:
             raise
     if _thought(response) and not model_thinks:
@@ -155,7 +172,7 @@ def _create(**call):
         model_thinks = True
         if getattr(response, "stop_reason", None) == "max_tokens":
             call["max_tokens"] = call.get("max_tokens", 0) + THINKING_ROOM
-            response = client.messages.create(**call)
+            response = _sent(call)
     elif (_thought(response)
           and getattr(response, "stop_reason", None) == "max_tokens"):
         # Even the extra room ran out. Say so rather than hand back half a

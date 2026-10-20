@@ -4,6 +4,7 @@ from flask import render_template, request, abort, redirect, url_for, flash
 from admin import admin_bp
 from admin.auth import login_required, operator_required, require_business_access, current_user
 from config import load_config
+import budget
 import calendar_sync
 from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment, notifications_for_appointment)
 
@@ -622,6 +623,10 @@ def knowledge_preview(business_id):
         flash(f"Previews are limited to a few a minute. Try again in "
               f"{max(wait, 1)} seconds.", "error")
         return redirect(url_for("admin.knowledge", business_id=business_id))
+    note = budget.refusal()
+    if note:
+        flash(note, "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
 
     config = load_config(business["config_path"], business_id)
     questions = preview.parse_questions(request.form.get("questions", ""))
@@ -836,6 +841,10 @@ def knowledge_upload(business_id):
         flash(f"Uploads are limited to a few a minute. Try again in "
               f"{max(wait, 1)} seconds.", "error")
         return back
+    note = budget.refusal()
+    if note:
+        flash(note, "error")
+        return back
 
     config = load_config(business["config_path"], business_id)
     try:
@@ -964,6 +973,10 @@ def knowledge_upload_url(business_id):
         flash(f"Uploads are limited to a few a minute. Try again in {max(wait, 1)} seconds.",
               "error")
         return back
+    note = budget.refusal()
+    if note:
+        flash(note, "error")
+        return back
     config = load_config(business["config_path"], business_id)
     try:
         text, how, hidden, final_url = web_import.read_page(config, url)
@@ -1017,6 +1030,10 @@ def knowledge_upload_resuggest(business_id):
     allowed, wait = ratelimit.knowledge_upload(business_id)
     if not allowed:
         flash(f"That's limited to a few a minute. Try again in {max(wait, 1)} seconds.", "error")
+        return review
+    note = budget.refusal()
+    if note:
+        flash(note, "error")
         return review
     config = load_config(business["config_path"], business_id)
     word = photo_import.source_word(proposal["source"])

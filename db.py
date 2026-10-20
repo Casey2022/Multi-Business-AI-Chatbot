@@ -256,6 +256,19 @@ def init_db():
         )
     """)
 
+    # model_spend — what the model cost each demo, and all demos together,
+    # per day (budget.py). Same shape as geocode_usage: the date is part of
+    # the key, so a day starts at zero with no cleanup job. Millionths of a
+    # dollar, as an integer, so adding many small calls never drifts.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS model_spend (
+            spend_key     TEXT    NOT NULL,
+            day           TEXT    NOT NULL,
+            micro_dollars INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (spend_key, day)
+        )
+    """)
+
     # rate_limits — fixed-window counters for public endpoints. In SQLite
     # rather than memory because gunicorn workers don't share memory and the
     # container restarts; a counter that resets with the process is not a
@@ -1738,6 +1751,34 @@ def get_geocode_usage(usage_key, day):
     ).fetchone()
     conn.close()
     return row["calls"] if row else 0
+
+
+def add_model_spend(spend_key, day, micro_dollars):
+    """Add one model call's cost (millionths of a dollar) to a key's day.
+    One atomic UPSERT, so threads and workers can't lose each other's adds."""
+    conn = get_connection()
+    conn.execute(
+        """
+        INSERT INTO model_spend (spend_key, day, micro_dollars)
+        VALUES (?, ?, ?)
+        ON CONFLICT(spend_key, day) DO UPDATE SET
+            micro_dollars = micro_dollars + excluded.micro_dollars
+        """,
+        (spend_key, day, int(micro_dollars))
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_model_spend(spend_key, day):
+    """Millionths of a dollar already spent under this key today."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT micro_dollars FROM model_spend WHERE spend_key = ? AND day = ?",
+        (spend_key, day)
+    ).fetchone()
+    conn.close()
+    return row["micro_dollars"] if row else 0
 
 
 # ---------------------------------------------------------------------------
