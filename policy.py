@@ -992,7 +992,27 @@ _TIME_NAMED = re.compile(
     r"(?:\d+|a|an|one|two|three|four|five|six) (?:hours?|days?|weeks?)"
     r"|(?:\d+|one|two|three|four|five|six|seven|a) (?:hours?|days?|weeks?|months?) "
     r"(?:before|out|ahead|away|from now))\b", re.I)
-_ABOUT_CANCELLING = re.compile(r"\b(?:cancel\w*|refund\w*|deposits?)\b", re.I)
+_ABOUT_CANCELLING = re.compile(
+    r"\b(?:cancel\w*|refund\w*|deposits?|no[- ]?shows?|money back"
+    r"|money (?:I|we)(?:'?ve)? (?:already )?(?:put down|paid))\b", re.I)
+# The same question without those words (journey_eval "unworded deposit",
+# 2026-10-20: 0/12, "I don't have our no-show policy written down"): not
+# going ahead AND what it costs, both in one message. Either half alone is
+# an ordinary question: "I can't make it before 3, can I come at 4?",
+# "what does a wedding cake cost".
+_NOT_GOING_AHEAD = re.compile(
+    r"\b(?:(?:can'?t|cannot|won'?t|not (?:going to|gonna)) make it"
+    r"|(?:don'?t|doesn'?t|not) (?:show|turn) up|miss(?:ing)? (?:my|our|the) "
+    r"(?:appointment|order|pickup)|back(?:ing)? out|call(?:ed|ing)? (?:it )?off"
+    r"|change[ds]? (?:my|our) minds?)\b", re.I)
+_ABOUT_THE_MONEY = re.compile(
+    r"\b(?:money|paid|pay|charged?|fees?|costs?|penalty|lose|what happens)\b", re.I)
+
+
+def _about_cancelling(text):
+    text = text or ""
+    return bool(_ABOUT_CANCELLING.search(text)
+                or (_NOT_GOING_AHEAD.search(text) and _ABOUT_THE_MONEY.search(text)))
 
 
 # A follow-up keeps the tools: "what about a wedding cake?" after a deposit
@@ -1022,7 +1042,7 @@ def _wants_tools(text, config):
     wanted = set()
     if _TIME_NAMED.search(text or ""):
         wanted.add("notice")
-    if cancellation(config) and _ABOUT_CANCELLING.search(text or ""):
+    if cancellation(config) and _about_cancelling(text):
         wanted.add("cancellation")
     return wanted
 
@@ -1100,9 +1120,9 @@ def must_apply_cancellation(message, config, history=None):
     # the customer was just asking about cancelling: "Is there any way I can
     # avoid that charge?" names neither, wasn't required to use the tool, and
     # said "you're within 24 hours" at 30 hours out (journey_eval 2026-10-17).
-    about = (_ABOUT_CANCELLING.search(text)
+    about = (_about_cancelling(text)
              or (_ABOUT_THE_CHARGE.search(text)
-                 and any(_ABOUT_CANCELLING.search(t or "") for t in earlier)))
+                 and any(_about_cancelling(t) for t in earlier)))
     if not about:
         return False
     return any(_TIME_NAMED.search(t or "") for t in [text, *earlier])

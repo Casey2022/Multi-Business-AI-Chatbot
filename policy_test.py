@@ -532,6 +532,34 @@ def main():
           policy.needs_tools("what happens if I cancel late", bel_cfg) == {"cancellation"})
     check("'cancel' alone gets tools only where there are cancellation rules",
           gets("can I cancel?") and not gets("can I cancel?", "bobs_plumbing"))
+    # Unworded (journey_eval "unworded deposit", 2026-10-20): no cancel,
+    # refund or deposit, still a cancellation question.
+    for q, slug in (("the party's been called off, do I get that money back?",
+                     "sunrise_bakery_and_cafe"),
+                    ("if I back out of my wedding cake order, what happens to the "
+                     "money I put down?", "sunrise_bakery_and_cafe"),
+                    ("I can't make it to my cut, will I be charged anything?",
+                     "belmont_hair_studio"),
+                    ("what happens if I just don't show up for my appointment?",
+                     "belmont_hair_studio"),
+                    ("what's your no-show policy", "belmont_hair_studio"),
+                    ("we changed our minds about the cake, do we lose what we paid?",
+                     "sunrise_bakery_and_cafe")):
+        check(f"cancellation, unworded: {q[:50]}", "cancellation" in gets(q, slug))
+    for q, slug in (("I can't make it before 3, can I come at 4?", "belmont_hair_studio"),
+                    ("what does a wedding cake cost", "sunrise_bakery_and_cafe"),
+                    ("the party got called off", "sunrise_bakery_and_cafe"),
+                    ("what happens at a colour consultation", "belmont_hair_studio"),
+                    ("I can't make it, will I be charged?", "bobs_plumbing")):
+        check(f"no cancellation: {q}", "cancellation" not in gets(q, slug))
+    check("unworded with a time: the tool is required, not optional",
+          policy.must_apply_cancellation("I've got a cut at 2pm tomorrow but I can't "
+                                         "make it. Will I be charged anything?", bel_cfg))
+    check("an unworded question two messages back carries the charge follow-up",
+          policy.must_apply_cancellation(
+              "is there any way to avoid the charge?", bel_cfg,
+              history=[{"role": "user", "content": "my cut's at 2pm tomorrow and I "
+                                                   "won't make it, what happens?"}]))
     schema = policy.cancellation_tool(cfg)["input_schema"]["properties"]
     check("the tool doesn't offer amounts (they made the model ask for them)",
           "amount_paid" not in schema and "order_price" not in schema)

@@ -13,8 +13,12 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 
 ## Answer quality
 
-- A deposit question with no cancel/refund/deposit word, and none in the
-  customer's last two messages, doesn't get the cancellation rules.
+- "opening hours: a day the owner blocked off" passes 1/3 (2026-10-20, same
+  before and after the unworded-cancellation change). One miss is the
+  model: "we're not open on Sundays" for a one-off block, which
+  `policy.one_off_said_as_one` doesn't catch. The other may be the judge:
+  "not available this Sunday… open again Tuesday through Sunday" failed.
+  Decide who's wrong per run first.
 - Holidays the owner hasn't blocked off on the Calendar page aren't known to
   `check_notice` or `add_business_days` (blocked days are).
 

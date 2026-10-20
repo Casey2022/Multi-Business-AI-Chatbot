@@ -293,6 +293,49 @@ JOURNEYS = [
                    "state": "idle", "must": [DEPOSIT_GONE], "tool": "cancellation_outcome",
                    "must_not": [_SUNRISE_CANNED]}],
     },
+    # Unworded (backlog, 2026-10-20): the cancellation rules and tool are
+    # offered only when a message says cancel, refund or deposit
+    # (policy._ABOUT_CANCELLING). These ask the same questions without
+    # those words.
+    {
+        "name": "unworded deposit: party called off, 3 days out (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "No cancel/refund/deposit word, so no rules or tool offered.",
+        "turns": [{"say": "I paid half upfront for a custom cake but the party's been "
+                          "called off. It's 3 days before. Do I get that money back?",
+                   "state": "idle", "must": [DEPOSIT_GONE], "tool": "cancellation_outcome",
+                   "rubric": rubrics.DEPOSIT_THREE_DAYS}],
+    },
+    {
+        "name": "unworded deposit: backing out of a wedding cake a month ahead (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "No cancel/refund/deposit word, so no rules or tool offered.",
+        "turns": [{"say": "If I back out of my wedding cake order a month ahead, "
+                          "what happens to the money I put down?",
+                   "state": "idle", "must": [r"25\s?%"], "tool": "cancellation_outcome",
+                   "rubric": rubrics.WEDDING_CANCEL_MONTH_OUT}],
+    },
+    {
+        "name": "unworded deposit: can't make tomorrow's cut (Belmont)",
+        "slug": "belmont_hair_studio",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "28 hours out is free; only the notice tool is offered.",
+        "turns": [{"say": "I've got a cut at 2pm tomorrow but something came up and "
+                          "I can't make it. Will I be charged anything?",
+                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome",
+                   "must_not": [_BELMONT_CANNED]}],
+    },
+    {
+        "name": "unworded deposit: what if I don't show up (Belmont)",
+        "slug": "belmont_hair_studio",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A no-show is charged 50%; no rules offered to say so.",
+        "turns": [{"say": "What happens if I just don't show up for my appointment?",
+                   "state": "idle", "must": [r"50\s?%"],
+                   "must_not": [_BELMONT_CANNED]}],
+    },
     # Opening hours (2026-10-18): the notice is met in each, and the shop is
     # shut at the time wanted. Measured before changing check_notice, which
     # deliberately ignores opening hours. The baseline (3 runs each): the
