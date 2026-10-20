@@ -565,9 +565,18 @@ _NOT_BOOKING = re.compile(
     r"(?:book|order|place|make|start)"
     r"|\bnot\s+(?:trying|looking|wanting|here)\s+to\s+(?:book|order)"
     r"|\bi'?m\s+not\s+(?:booking|ordering)"
-    r"|\b(?:already|previously)\s+(?:ordered|booked|placed|paid|cancell?ed)"
     r"|^\s*no\b[,.!]?\s+i\s+(?:want|wanted|was\s+asking|meant|just\s+want)"
     r"\s+to\s+(?:know|ask)", re.I)
+# "Already ordered" is about an earlier order: usually a question about it
+# (a deposit, a refund), so it leaves the booking flow, unless the same
+# message asks for another one. Known false positive until 2026-10-19:
+# "I already ordered one last month and want another" left the order.
+_ALREADY = re.compile(
+    r"\b(?:already|previously)\s+(?:ordered|booked|placed|paid|cancell?ed)", re.I)
+_WANTS_ANOTHER = re.compile(
+    r"\b(?:another|again|one more|re-?order|same (?:one|thing|order|as (?:last|before))"
+    r"|a second one)\b"
+    r"|\b(?:want|like|need|order|get|book)\s+(?:a\s+)?(?:new|second)\b", re.I)
 
 
 def _handled_elsewhere(message, config):
@@ -589,7 +598,9 @@ def _handled_elsewhere(message, config):
 
 
 def _leaving_booking(message, config=None):
-    return bool(_NOT_BOOKING.search(message or "")
+    text = message or ""
+    return bool(_NOT_BOOKING.search(text)
+                or (_ALREADY.search(text) and not _WANTS_ANOTHER.search(text))
                 or _handled_elsewhere(message, config))
 
 

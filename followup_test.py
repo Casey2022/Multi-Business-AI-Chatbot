@@ -228,8 +228,16 @@ def main():
                  "I already paid for one, I'm asking about the refund"):
         check(f"leaves: {text[:45]}", sched._leaving_booking(text))
     for text in ("no", "no thanks", "do you have gluten free?",
-                 "custom cake", "Saturday at 10", "no nuts please"):
+                 "custom cake", "Saturday at 10", "no nuts please",
+                 # Asking for more after an earlier order (backlog, fixed
+                 # 2026-10-19: these used to leave the order).
+                 "I already ordered one last month and want another",
+                 "I already ordered a cake for her birthday, can I order the same again?",
+                 "I previously booked a colour, I'd like to book another",
+                 "already paid for one tray, need a second one for Friday"):
         check(f"stays: {text}", not sched._leaving_booking(text))
+    check("…but saying you don't want to order still leaves, even with 'another' in it",
+          sched._leaving_booking("I don't want to order another one, I'm asking about my refund"))
 
     answered = []
     real_s = (sched._answer_outside_booking, sched._answer_mid_booking,
