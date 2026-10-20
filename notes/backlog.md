@@ -53,9 +53,11 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 - **Accounts:** there is no password reset yet. Design it: an emailed
   one-time link, short expiry, rate limit, no "no such user" leak. Changing a
   password should end other sessions. Re-check login throttling.
-- **Authorization:** check every `/business/<id>` route for one owner reading
-  or changing another business (an IDOR sweep); operator-only pages; demo
-  tenants can't reach real businesses.
+- **Text simulator numbers:** the page invents `+1555` + 7 digits with
+  `Math.random` (10 million numbers), and `/textsim/<slug>/updates` has no
+  rate limit. Someone could guess numbers to read another simulator's
+  notices, or text as them. Low stakes (notices only follow an owner moving
+  or cancelling), but the server should hand out the number.
 - **Web:** no security headers are sent today (CSP, HSTS, frame-ancestors,
   Referrer-Policy); sweep templates for `|safe` and other unescaped output.
 - **Abuse and cost:** push on the existing rate limits (chat, demo creation,
@@ -64,6 +66,22 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
   SMTP app password lives only in Render's environment.
 - **Dependencies:** `pip-audit` before each deploy that changes requirements.
 - **Twilio, when it goes live:** test webhook signature validation.
+
+## Many visitors at once (2026-10-20)
+
+Data doesn't cross between demos (`tenancy_test.py`, `demo_test.py`). What
+visitors do share:
+
+- **One request at a time.** The Procfile runs gunicorn with `--workers 1`
+  and the default sync worker; check Render's Start Command. While one
+  reply waits several seconds on the model, everyone else waits behind it.
+  More workers or threads would need the in-memory rate limits (per
+  process) and SQLite's 5-second lock timeout looked at first.
+- **Rate limits are per IP**, and a room on one Wi-Fi is one IP: 3 demo
+  starts a minute and 20 an hour (`DEMO_PER_MINUTE`, `DEMO_PER_HOUR`), 30
+  chat messages a minute and 400 a day (`WEBCHAT_IP_*`) for the whole room.
+- **At most 50 live demos** (`DEMO_MAX_LIVE`); idle ones are swept after an
+  hour to make room.
 
 ## Bigger features
 
