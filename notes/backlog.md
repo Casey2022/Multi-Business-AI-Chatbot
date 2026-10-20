@@ -72,16 +72,17 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 Data doesn't cross between demos (`tenancy_test.py`, `demo_test.py`). What
 visitors do share:
 
-- **One request at a time.** The Procfile runs gunicorn with `--workers 1`
-  and the default sync worker; check Render's Start Command. While one
-  reply waits several seconds on the model, everyone else waits behind it.
-  More workers or threads would need the in-memory rate limits (per
-  process) and SQLite's 5-second lock timeout looked at first.
-- **Rate limits are per IP**, and a room on one Wi-Fi is one IP: 3 demo
-  starts a minute and 20 an hour (`DEMO_PER_MINUTE`, `DEMO_PER_HOUR`), 30
-  chat messages a minute and 400 a day (`WEBCHAT_IP_*`) for the whole room.
-- **At most 50 live demos** (`DEMO_MAX_LIVE`); idle ones are swept after an
-  hour to make room.
+- **One request at a time.** Render's Start Command is `gunicorn app:app
+  --workers 1 --timeout 60 --bind 0.0.0.0:$PORT` (plus Render's own
+  `GUNICORN_CMD_ARGS`): one sync worker. While one reply waits several
+  seconds on the model, everyone else waits behind it. A request that
+  takes over 60 seconds gets its worker killed. The Procfile says
+  `--timeout 120`, but Render doesn't read it. More workers or threads
+  would need the in-memory rate limits (per process) and SQLite's 5-second
+  lock timeout looked at first. Not measured yet.
+
+Decided, 2026-10-20: the per-IP limits (3 demo starts a minute from one
+Wi-Fi) and the 50-demo ceiling are fine as they are.
 
 ## Bigger features
 
