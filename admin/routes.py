@@ -1448,7 +1448,38 @@ def calendar_view(business_id):
         blocked    = booking_control.cells(upcoming, days, grid_hours),
         blocks     = [{**b, "label": booking_control.describe(b)} for b in upcoming],
         block_form = request.args,      # what was typed, after a refused block
+        holiday_choices = _holiday_choices(config, today),
     )
+
+
+def _holiday_choices(config, today):
+    """The Calendar page's "Holidays we close" list: each holiday, its next
+    date, and whether this business has it ticked (holidays.py)."""
+    import holidays
+    ticked = set(holidays.ticked(config))
+    upcoming = holidays.next_dates(today)
+    return [{"key": key, "label": label[:1].upper() + label[1:],
+             "next": f"{upcoming[key]:%a, %b %-d}", "ticked": key in ticked}
+            for key, (label, _) in holidays.HOLIDAYS.items()]
+
+
+@admin_bp.route("/business/<int:business_id>/calendar/holidays", methods=["POST"])
+@login_required
+def calendar_holidays(business_id):
+    """Save the holidays this business closes for. Live at once, like a
+    block: the assistant treats them as closed from the next message."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import holidays
+    from db import set_config_override
+    keys = [k for k in holidays.HOLIDAYS if k in request.form.getlist("holiday")]
+    set_config_override(business_id, "holidays", keys,
+                        updated_by=current_user()["email"])
+    flash("Saved. The assistant treats those days as closed every year."
+          if keys else "Saved. No holidays are marked as closed.", "success")
+    return redirect(url_for("admin.calendar_view", business_id=business_id) + "#holidays")
 
 
 @admin_bp.route("/business/<int:business_id>/calendar/block", methods=["POST"])

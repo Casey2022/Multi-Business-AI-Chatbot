@@ -17,8 +17,20 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
   Friday 7am-3pm" at Sunrise (open Tue–Sun), journey "a day the owner
   blocked off", 1 run in ~16 on 2026-10-20. A reply check against the
   config's hours would settle it, if it recurs.
-- Holidays the owner hasn't blocked off on the Calendar page aren't known to
-  `check_notice` or `add_business_days` (blocked days are).
+- "A day the owner blocked off", ~1 run in 10: the model says "closed on
+  Sundays and Mondays", and `policy.one_off_said_as_one` turns it into "not
+  available this Sunday and Mondays", which the judge rightly fails.
+- **Bookings don't check notice periods.** The booking flow never looks at
+  notice (no "notice" anywhere in `scheduler.py`): a dozen muffins at 6pm
+  for 8am tomorrow (24 hours needed) starts an order (journey "it's 6pm,
+  muffins guaranteed for 8am", 0/3), and the alternatives it offers can be
+  inside the notice too (Thanksgiving journey: today at 2:30pm). Notice
+  periods live only in knowledge-base prose ("96 hours' notice"), so the
+  booking flow has nothing to check against: they need a structured home
+  per service first (one source of truth, like `policies.cancellation`).
+- A slot answered out of turn gets the same question again word for word
+  (Ridgeline: scope given while asked for timing, "Any timeframe in mind?"
+  twice). Correct, but reads as a bot that didn't listen.
 
 ## Owner portal
 
@@ -37,9 +49,9 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 
 ## Testing
 
-- More journeys: a full booking to confirmation at each business; a question
-  mid-booking at each; a Ridgeline business-days conversation; Sunrise's
-  "it's 6pm, muffins for 8am" through the live path.
+- Journeys exist for a booking to confirmation and a question mid-booking at
+  each business, Ridgeline business days, and holidays (2026-10-20). Next:
+  a correction at the read-back ("actually make it Thursday") at each.
 
 ## Security review (before wider use)
 

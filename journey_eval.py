@@ -49,6 +49,11 @@ db.DB_PATH = Path(tempfile.mkdtemp(prefix="journey_")) / "journey.db"
 if Path(_REAL_DB).exists():
     shutil.copy(_REAL_DB, db.DB_PATH)   # real businesses and documents
 db.init_db()
+# Each run starts from this, not from what the run before it left: a booking
+# made in run 1 made the same slot "already booked" in runs 2 and 3
+# (Ridgeline's estimate visit, 2026-10-20, 1/3 clean for that reason alone).
+_PRISTINE = db.DB_PATH.with_name("pristine.db")
+shutil.copy(db.DB_PATH, _PRISTINE)
 
 import clock
 import geocode
@@ -100,6 +105,10 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 # The keyword shortcuts' own replies (config rules: cancel_existing), whole,
 # so a model that adds "to cancel, give us a call" after the answer passes.
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
+# The customer's own words for when, pasted after "on": "drain cleaning on
+# tomorrow at 10am", "pizza on 7pm" (booking greeting, walked 2026-10-20).
+_RAW_WHEN = (r"\bon (?:tomorrow|today|tonight|this \w+|next \w+"
+             r"|\d{1,2}(?::\d{2})?\s*(?:am|pm))\b")
 _SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
 # Rescheduling offered as the way round it; at Belmont moving counts the
 # same ("cancelled or moved"). Mirrors policy._RESCHEDULE_INSTEAD.
@@ -343,7 +352,10 @@ JOURNEYS = [
     # Monday cake and the 11pm tray started an order, and the booking flow
     # said "We're closed then" with open times, which is right, so those two
     # take either path, and must say it's closed. Muffins at 5pm (0/3: "Yes!")
-    # and the earliest pickup (1/3: no tool) must stay questions.
+    # and the earliest pickup (1/3: no tool) must stay questions. Muffins
+    # became orderable on 2026-10-20 ("muffins by the dozen"; before, the
+    # booking path booked them as cupcakes), so 5pm muffins now start an
+    # order too, and the booking flow says "We're closed then": either path.
     {
         "name": "opening hours: custom cake for a Monday pickup (Sunrise)",
         "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 24, 10, 0),   # Thursday
@@ -357,7 +369,8 @@ JOURNEYS = [
         "slug": "sunrise_bakery_and_cafe", "clock": (2026, 9, 26, 13, 0),   # Saturday
         "why": "24 hours' notice is met, but Sunrise closes at 3pm.",
         "turns": [{"say": "Is it possible to get a dozen blueberry muffins tomorrow at 5pm?",
-                   "state": "idle", "rubric": rubrics.AFTER_CLOSING_MUFFINS}],
+                   "must": [_SAYS_CLOSED],
+                   "rubric": rubrics.AFTER_CLOSING_MUFFINS, "rubric_when": "idle"}],
     },
     {
         "name": "opening hours: earliest pickup lands on a closed day (Sunrise)",
@@ -394,6 +407,233 @@ JOURNEYS = [
             {"say": "do you do drain cleaning?", "state": "idle"},
             {"say": "great, I'd like to book a drain cleaning tomorrow at 10",
              "state": "collecting"},
+        ],
+    },
+    # Bookings to confirmation, one per business (backlog, 2026-10-20). Walked
+    # by hand first: each flow asks in its own order, and the answers below
+    # follow it. Two defects showed up: the greeting pasted the customer's
+    # words after "on" ("drain cleaning on tomorrow at 10am", "pizza on
+    # 7pm"), and Sunrise booked "a dozen blueberry muffins" as "cupcake
+    # orders (dozen minimum)": muffins weren't a bookable service.
+    {
+        "name": "booking to confirmation: drain cleaning (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A whole booking, through the live path, ends booked.",
+        "turns": [
+            {"say": "I'd like to book a drain cleaning tomorrow at 10am", "state": "collecting",
+             "must": [NAME_ASK], "must_not": [_RAW_WHEN]},
+            {"say": "Jordan", "state": "collecting", "must": [r"address"]},
+            {"say": "12 Elm Street, Rochester NY", "state": "collecting"},
+            {"say": "kitchen sink draining slowly", "state": "collecting"},
+            {"say": "yes", "state": "confirming",
+             "must": [r"drain cleaning", r"September 23", r"10:00"]},
+            {"say": "yes", "state": "idle", "must": [r"scheduled|booked"]},
+        ],
+    },
+    {
+        "name": "booking to confirmation: a haircut (Belmont)",
+        "slug": "belmont_hair_studio",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A whole booking, through the live path, ends booked.",
+        "turns": [
+            {"say": "I'd like to book a haircut on Thursday at 2pm", "state": "collecting",
+             "must": [NAME_ASK]},
+            {"say": "Sam", "state": "collecting"},
+            {"say": "no preference", "state": "collecting"},
+            {"say": "yes", "state": "confirming",
+             "must": [r"haircut", r"September 24", r"2:00"]},
+            {"say": "yes", "state": "idle", "must": [r"booked"]},
+        ],
+    },
+    {
+        "name": "booking to confirmation: pizza delivery (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "A whole order, through the live path, ends placed.",
+        "turns": [
+            {"say": "I want to order a large pepperoni pizza for delivery at 7pm",
+             "state": "collecting", "must": [NAME_ASK], "must_not": [_RAW_WHEN]},
+            {"say": "Alex", "state": "collecting", "must": [r"deliver"]},
+            {"say": "34 Oak Avenue, Rochester NY", "state": "collecting"},
+            {"say": "none", "state": "confirming",
+             "must": [r"pepperoni", r"7:00"]},
+            {"say": "yes", "state": "idle", "must": [r"order in|placed"]},
+        ],
+    },
+    {
+        "name": "booking to confirmation: an estimate visit (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A whole booking, through the live path, ends booked.",
+        "turns": [
+            {"say": "I'd like to book an estimate visit for a deck repair on Friday at 9am",
+             "state": "collecting", "must": [NAME_ASK]},
+            {"say": "Morgan", "state": "collecting", "must": [r"address"]},
+            {"say": "56 Pine Road, Rochester NY", "state": "collecting"},
+            # Scope and timing in one answer: the flow asks for scope only if
+            # the first message didn't give it ("deck repair" sometimes does),
+            # so a script answering them one at a time answered the wrong one
+            # 1 run in 3 (2026-10-20).
+            {"say": "the deck boards are rotting, and no rush on timing",
+             "state": "confirming", "must": [r"deck", r"September 25", r"9:00"]},
+            {"say": "yes", "state": "idle", "must": [r"booked"]},
+        ],
+    },
+    {
+        "name": "booking to confirmation: a dozen muffins (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "Booked as 'cupcake orders (dozen minimum)' (walked 2026-10-20).",
+        "turns": [
+            {"say": "I'd like to order a dozen blueberry muffins for pickup Friday at 9am",
+             "state": "collecting", "must": [NAME_ASK], "must_not": [r"cupcake"]},
+            {"say": "Riley", "state": "collecting"},
+            {"say": "none", "state": "confirming",
+             "must": [r"muffin", r"September 25", r"9:00"], "must_not": [r"cupcake"]},
+            {"say": "yes", "state": "idle", "must": [r"placed|booked"],
+             "must_not": [r"cupcake"]},
+        ],
+    },
+    # A question in the middle of a booking, one per business: answered, and
+    # the booking picks up where it was (the question asked again).
+    {
+        "name": "question mid-booking: the price of a drain cleaning (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A question mid-booking is answered, then the booking carries on.",
+        "turns": [
+            {"say": "I'd like to book a drain cleaning tomorrow at 10am", "state": "collecting"},
+            {"say": "wait, how much does a drain cleaning cost?", "state": "collecting",
+             "must": [r"\$\d|price|cost|charge|fee", NAME_ASK]},
+            {"say": "Jordan", "state": "collecting", "must": [r"address"]},
+        ],
+    },
+    {
+        "name": "question mid-booking: do you take card (Belmont)",
+        "slug": "belmont_hair_studio",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A question mid-booking is answered, then the booking carries on.",
+        "turns": [
+            {"say": "I'd like to book a haircut on Thursday at 2pm", "state": "collecting"},
+            {"say": "quick question, do you take credit cards?", "state": "collecting",
+             "must": [r"card|cash|pay", NAME_ASK]},
+            {"say": "Sam", "state": "collecting"},
+        ],
+    },
+    {
+        "name": "question mid-booking: is there a delivery fee (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "A question mid-booking is answered, then the order carries on.",
+        "turns": [
+            {"say": "I want to order a large pepperoni pizza for delivery at 7pm",
+             "state": "collecting"},
+            {"say": "is there a delivery fee?", "state": "collecting",
+             "must": [r"fee|\$\d|free|charge", NAME_ASK]},
+            {"say": "Alex", "state": "collecting", "must": [r"deliver"]},
+        ],
+    },
+    {
+        "name": "question mid-booking: is the estimate free (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A question mid-booking is answered, then the booking carries on.",
+        "turns": [
+            {"say": "I'd like to book an estimate visit for a deck repair on Friday at 9am",
+             "state": "collecting"},
+            {"say": "is the estimate free?", "state": "collecting",
+             "must": [r"free|no charge|cost|\$\d", NAME_ASK]},
+            {"say": "Morgan", "state": "collecting", "must": [r"address"]},
+        ],
+    },
+    {
+        "name": "question mid-booking: nut-free options (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A question mid-booking is answered, then the order carries on.",
+        "turns": [
+            {"say": "I'd like to order a custom birthday cake for pickup Saturday at 11am",
+             "state": "collecting"},
+            {"say": "can you make it nut-free?", "state": "collecting",
+             "must": [r"nut", NAME_ASK]},
+            {"say": "Riley", "state": "collecting"},
+        ],
+    },
+    {
+        "name": "business days: the quote after a Friday visit (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 10, 5, 10, 0),                                   # a Monday
+        "why": "Three business days from Friday October 2 is Wednesday the 7th, "
+               "worked out by add_business_days, then a follow-up.",
+        "turns": [
+            {"say": "The estimator came out last Friday. When should I expect the quote?",
+             "state": "idle", "tool": "add_business_days",
+             "must": [r"Wednesday|October 7|Oct\.? 7(?!\d)"],
+             "must_not": [r"Monday|Tuesday|Thursday"]},
+            {"say": "and if it hasn't come by then?", "state": "idle",
+             "must": [r"call|\(585\)|reach"]},
+        ],
+    },
+    # Holidays (backlog, 2026-10-20). Before: Ridgeline's three business days
+    # from the Wednesday before Thanksgiving came out as Monday the 30th,
+    # counting Thanksgiving and the day after; Sunrise took a Thanksgiving
+    # order without a second thought. Owners tick the holidays they close
+    # for (Calendar page, holidays.py); nothing is assumed for the rest.
+    {
+        "name": "holidays: the quote across Thanksgiving (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 11, 25, 10, 0),                                  # Wednesday
+        "why": "Ridgeline's YAML ticks Thanksgiving and the day after: three "
+               "business days from the 25th is Wednesday, December 2.",
+        "turns": [{"say": "Your estimator came by today. When will I get my quote?",
+                   "state": "idle", "tool": "add_business_days",
+                   "must": [r"December 2(?!\d)|Dec\.? 2(?!\d)"],
+                   "must_not": [r"November 30|Monday"]}],
+    },
+    {
+        "name": "holidays: are you open on Thanksgiving? (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 11, 20, 10, 0),
+        "why": "No time named, so no tool: the prompt has to carry the holidays.",
+        "turns": [{"say": "Are you guys open on Thanksgiving?", "state": "idle",
+                   "must": [r"closed|not open|aren'?t open"],
+                   "must_not": [r"not sure|don'?t know|can'?t confirm"]}],
+    },
+    {
+        "name": "holidays: muffins on Thanksgiving morning, ticked (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 11, 25, 8, 0),                                   # Wednesday
+        "holidays": ["thanksgiving"],
+        "why": "The notice is met (25 hours) but the owner closes for "
+               "Thanksgiving: Friday is the next chance.",
+        "turns": [{"say": "Can I pick up a dozen muffins tomorrow at 9am?",
+                   # The reason, not just "not available" (it said "We're not
+                   # available at Thursday…" before 2026-10-20).
+                   "must": [r"Friday|November 27", r"Thanksgiving"],
+                   "must_not": [r"order placed|you'?re (all set|booked)",
+                                r"closed (?:on )?Thursdays", r"available at \w+day"]}],
+    },
+    {
+        "name": "holidays: Thanksgiving not ticked, nothing assumed (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 11, 23, 10, 0),                                  # Monday
+        "holidays": [],
+        "why": "A bakery may open Thanksgiving morning: unticked, it's a normal day.",
+        "turns": [{"say": "I'd like to order a dozen muffins for pickup Thursday at 9am",
+                   "state": "collecting", "must": [NAME_ASK],
+                   "must_not": [r"Thanksgiving|closed"]}],
+    },
+    {
+        "name": "it's 6pm, muffins guaranteed for 8am (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 18, 0),                                   # Tuesday
+        "why": "Fourteen hours away: a dozen needs 24 hours' notice to guarantee, "
+               "checked by check_notice, not promised.",
+        "turns": [
+            {"say": "it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow?",
+             "tool": "check_notice", "must": [r"24[\s-]*hours?"],
+             "must_not": [r"you'?re all set|guaranteed for 8|we'?ll have (them|it) ready"]},
         ],
     },
 ]
@@ -457,6 +697,7 @@ def _short(value, limit=260):
 
 
 def run(journey, verbose=False):
+    shutil.copy(_PRISTINE, db.DB_PATH)
     config = prepare(config_for(journey["slug"]))
     if journey.get("policy"):
         # Rules an owner set on the Cancellation rules page, for this journey only.
@@ -465,6 +706,15 @@ def run(journey, verbose=False):
         # Time an owner blocked off on the Calendar page, for this journey only.
         config.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
             {"start": a, "end": b} for a, b in journey["blocks"]]
+    if "holidays" in journey:
+        # Holidays the owner ticked on the Calendar page, for this journey
+        # only (replacing the YAML's list), as config.load_config adds them.
+        import holidays
+        cal = config.setdefault("calendar", {})
+        cal["holidays"] = journey["holidays"]
+        cal.setdefault("scheduling", {})["blocks"] = (
+            [{"start": a, "end": b} for a, b in journey.get("blocks", [])]
+            + holidays.blocks(journey["holidays"], journey["clock"][0]))
     business_id = config["business"].get("id")
     if business_id is None:
         return [], [("setup", f"{journey['slug']} isn't registered in the database")]

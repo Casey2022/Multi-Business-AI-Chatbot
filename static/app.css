@@ -859,6 +859,8 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .chip-check:has(input:checked) { border-color: var(--pen); color: var(--pen);
   background: var(--pen-wash); }
 .chip-check input { margin: 0; }
+/* Calendar page, "Holidays we close": the chips wrap, each with its date. */
+.holiday-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .quota { font-size: var(--text-sm); color: var(--ink-faint); }
 .quota.is-full { color: var(--pending); font-weight: 600; }
 

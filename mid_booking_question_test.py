@@ -60,6 +60,16 @@ def main():
             "datetime": "Tuesday at 9am", "datetime_parsed": "2026-09-29 09:00",
             "customization": "none"}
     try:
+        heading("the opening line reads with the customer's own words for when")
+        slots = sched.get_slot_definitions(cfg)
+        for when in ("tomorrow at 10am", "7pm", "Thursday at 2pm"):
+            reply = sched._ask_next_or_finalize(
+                phone, biz, {"service": "custom birthday cakes", "datetime": when},
+                cfg, slots, first_turn=True)
+            check(f"'… for {when}', not '… on {when}' (journey_eval 2026-10-20)",
+                  f"custom birthday cakes for {when}." in reply
+                  and f" on {when}" not in reply, reply)
+
         heading("the live conversation: a question at the notes prompt")
         set_state(phone, biz, "collecting", pending=dict(base))
         extract_returns.clear(); extract_returns["notes"] = "gluten free"
@@ -70,6 +80,23 @@ def main():
         check("and NOT stored as the note", "notes" not in pending, str(pending))
         check("and the notes question is asked again", "anything else" in reply.lower(),
               reply)
+
+        heading("a question at the name prompt, filed as a later answer")
+        # journey_eval, 2026-10-20, 0/3: asked for a name, "can you make it
+        # nut-free?" came back as the customization "nut-free", a question
+        # not yet asked. It wasn't answered, the name was asked again, and
+        # the customization question was skipped later.
+        early = {k: v for k, v in base.items() if k in ("service", "datetime",
+                                                         "datetime_parsed")}
+        set_state(phone, biz, "collecting", pending=dict(early))
+        extract_returns.clear(); extract_returns["customization"] = "nut-free"
+        answered.clear()
+        reply = sched._handle_booking_inner(phone, "can you make it nut-free?", cfg, biz)
+        pending = get_state(phone, biz)["pending"]
+        check("the question is answered", answered == ["can you make it nut-free?"], reply)
+        check("and NOT stored as the customization", "customization" not in pending,
+              str(pending))
+        check("and the name is asked again", "name" in reply.lower(), reply)
 
         heading("a question the extractor reads as something else (the eval run)")
         # conversation_eval, 2026-09-26: "do you fix leaky faucets too?" at the

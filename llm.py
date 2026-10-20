@@ -418,6 +418,17 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
             + " Don't offer times or say they can book. Questions about the "
               "business are answered as usual.")
 
+    # The holidays the owner closes for (holidays.py), beside the hours, so
+    # "are you open on Thanksgiving?" is answered: no time is named, so no
+    # tool is offered, and the blocks alone wouldn't reach the model. Empty
+    # when none are ticked: those prompts stay byte-identical.
+    import holidays
+    upcoming = holidays.next_dates(now.date())
+    holiday_text = "".join(
+        f"\n- Closed every year for {label} (next: {upcoming[key]:%A, %B %-d, %Y})"
+        for key, (label, _) in holidays.HOLIDAYS.items()
+        if key in holidays.ticked(config))
+
     return f"""You are an SMS assistant for {business['name']}.
                Today is {today_str}.
 
@@ -427,7 +438,7 @@ Business facts:
 - Name: {business['name']}
 - Phone: {business['phone']}
 - Address: {business['address']}
-- Hours: {business['hours']}
+- Hours: {business['hours']}{holiday_text}
 - Service area: {business.get('service_area', 'N/A')}
 
 Services we offer:
@@ -887,6 +898,8 @@ def _reply_using_tools(call, config, now, results_seen=None):
             arguments = use.input
             if use.name == "cancellation_outcome":
                 arguments = policy.arguments_from_words(dict(arguments or {}), said, config)
+            elif use.name == "add_business_days":
+                arguments = policy.start_from_words(dict(arguments or {}), said, now)
             result = policy.run_tool(use.name, arguments, config, now)
             if results_seen is not None:
                 results_seen.append(result)

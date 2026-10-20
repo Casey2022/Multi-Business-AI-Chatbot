@@ -16,6 +16,10 @@ services:
   - "wedding cakes"
   - "cupcake orders (dozen minimum)"
   - "pastry trays for events"
+  # The knowledge base says a dozen muffins can be ordered ahead; without
+  # this, "a dozen blueberry muffins" was booked as "cupcake orders (dozen
+  # minimum)", the nearest service (journey_eval, 2026-10-20).
+  - "muffins by the dozen"
 
 # The menu: the ONLY copy of this business's prices (2026-10-11). The
 # knowledge-base sections keep everything else (notice, flavours, timing);

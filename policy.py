@@ -268,12 +268,19 @@ def _closed_sentence(config, needed, earliest, notice, what):
         # blocked Sunday at a bakery open every Sunday.
         day = _WEEKDAYS[needed.weekday()].capitalize()
         usual = _next_by_hours(needed, config) == needed if _opening(config) else False
+        # A holiday the owner ticked (holidays.py) is a reason anyone may
+        # know, unlike their own block notes: "closed for Thanksgiving".
+        import holidays
+        holiday = holidays.name_on(needed, config)
+        reason = (f" It's {holiday}: say they're closed for {holiday}." if holiday
+                  else " Don't give a reason.")
         say = (f" {name} isn't available on {when(needed)}, so {what} can't be "
-               f"collected or delivered then, whatever the notice. Don't give a "
-               f"reason."
+               f"collected or delivered then, whatever the notice.{reason}"
                + (f" It's a one-off: they're normally open then. Say \"we're not "
                   f"available this {day}\", never that they're closed on {day}s."
-                  if usual else ""))
+                  if usual and not holiday else "")
+               + (f" They're normally open on {day}s; never say they're closed on "
+                  f"{day}s." if usual and holiday else ""))
         one_off = day if usual else None
     else:
         one_off = None
@@ -424,8 +431,9 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
 # estimates "two to five business days out". Counting that from a Thursday
 # means skipping a weekend, which is the kind of sum the model gets wrong.
 # Business days are the days the business has hours (its calendar's
-# business_hours), Monday to Friday if none are set. Public holidays aren't
-# known, and the result says so.
+# business_hours), Monday to Friday if none are set, less the days the owner
+# blocked and the holidays they ticked (holidays.py). Holidays they didn't
+# tick aren't known, and the result says so.
 
 def business_weekdays(config=None):
     """Weekday numbers (Monday = 0) the business is open."""
@@ -515,14 +523,22 @@ def add_business_days(start, business_days, up_to=None, what=None, config=None):
     if skipped:
         result["days_not_available"] = [_day(d) for d in skipped]
     # Days the owner blocked off are skipped without a reason: the note is
-    # theirs (and never loaded), so "isn't available", not "a holiday".
+    # theirs (and never loaded), so "isn't available". A holiday they ticked
+    # is named (holidays.py): "closed for Thanksgiving" is no secret.
+    import holidays
+    named = [(d, holidays.name_on(d, config)) for d in skipped]
+    shut = [f"{_day(d)} ({name})" for d, name in named if name]
+    unsaid = [_day(d) for d, name in named if not name]
     result["say"] = (f"{say}. "
                      + (f"{' and '.join(closed)} don't count. " if closed else "")
-                     + (f"{' and '.join(_day(d) for d in skipped)} "
-                        f"{'is' if len(skipped) == 1 else 'are'} skipped too: the "
-                        f"business isn't available then (don't give a reason). "
-                        if skipped else "")
-                     + "Public holidays the business hasn't blocked off aren't "
+                     + (f"{' and '.join(shut)} {'is' if len(shut) == 1 else 'are'} "
+                        f"skipped too: the business is closed for "
+                        f"{'that holiday' if len(shut) == 1 else 'those holidays'}. "
+                        if shut else "")
+                     + (f"{' and '.join(unsaid)} {'is' if len(unsaid) == 1 else 'are'} "
+                        f"skipped too: the business isn't available then (don't give "
+                        f"a reason). " if unsaid else "")
+                     + "Holidays the business hasn't marked as closed aren't "
                        "known, so one in between would push it back a day.")
     return result
 
@@ -1230,6 +1246,51 @@ def timing_from_words(arguments, texts):
             out = {k: v for k, v in arguments.items() if k != "days_before"}
             out["hours_before"] = hours
             return out
+    return arguments
+
+
+# The day a visit was, read in code. journey_eval, 2026-10-20, 1 run in 3:
+# on Monday October 5, "the estimator came out last Friday" was counted from
+# September 28 (the model's own reckoning), and the quote was due "Thursday,
+# October 1", already past. Only days said as past: "the estimate is on
+# Friday" is a visit still to come, and is left to the model.
+_WEEKDAY_WORD = r"(mon|tues?|wed(?:nes)?|thu(?:rs?)?|fri|sat(?:ur)?|sun)(?:day)?"
+_PAST_DAY = re.compile(
+    r"\b(today|yesterday|this morning|this afternoon)\b"
+    rf"|\blast {_WEEKDAY_WORD}\b"
+    r"|\b(?:came|was|were|visited|stopped by|dropped by)\b[^.?!]{0,40}?"
+    rf"\b(?:on )?{_WEEKDAY_WORD}\b", re.I)
+
+
+def start_from_words(arguments, texts, now):
+    """add_business_days's arguments with `start` set from the day the
+    customer said, when they said one in the past. `texts` are the
+    customer's messages, latest first; the first that names a day decides.
+    `now` is the business's local time."""
+    if now is None:
+        return arguments
+    today = now.date() if hasattr(now, "date") else now
+    for text in texts or []:
+        found = _PAST_DAY.search(text or "")
+        if not found:
+            continue
+        said, last, after_verb = (g.lower() if g else None for g in found.groups())
+        if said == "yesterday":
+            day = today - timedelta(days=1)
+        elif said:
+            day = today
+        else:
+            weekday = next(i for i, name in enumerate(_WEEKDAYS)
+                           if name.startswith((last or after_verb)[:3]))
+            back = (today.weekday() - weekday) % 7
+            if last and back == 0:
+                back = 7                  # "last Monday", said on a Monday
+            day = today - timedelta(days=back)
+        if arguments.get("start") != day.isoformat():
+            log.info("add_business_days start %r -> %s, from the customer's words",
+                     arguments.get("start"), day.isoformat())
+            arguments["start"] = day.isoformat()
+        return arguments
     return arguments
 
 

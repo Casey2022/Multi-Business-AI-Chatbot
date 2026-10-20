@@ -346,6 +346,10 @@ def load_config(config_path, business_id=None):
                 # "cancellation_draft" is ignored here the same way).
                 import policy_form
                 policy_form.apply_live(config, value)
+            elif field == "holidays" and isinstance(value, list):
+                # The holidays the owner closes for (Calendar page). Live at
+                # once, like the page's blocks; the YAML's list is the default.
+                config.setdefault("calendar", {})["holidays"] = value
 
         # The owner's blocked time (Calendar page), read by scheduling.py
         # beside the weekly blackout. Only blocks that haven't ended: past
@@ -358,6 +362,11 @@ def load_config(config_path, business_id=None):
                       for b in list_time_blocks(business_id, ending_after=since)]
         except Exception:
             blocks = []
+        # And the holidays they close for, as all-day blocks (holidays.py):
+        # the same list, so nothing downstream needs to know the difference.
+        import clock
+        import holidays
+        blocks += holidays.blocks(holidays.ticked(config), clock.utc_now().year)
         config.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = blocks
 
         # Stamp the business's immutable slug onto the config, AFTER the

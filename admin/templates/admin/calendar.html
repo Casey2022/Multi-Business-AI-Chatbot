@@ -141,4 +141,25 @@
   </div>
   {% endif %}
 </div>
+
+<div class="card" id="holidays">
+  <div class="card-title">Holidays we close</div>
+  <p class="hint card-pad">Tick the ones you close for. The assistant treats them as closed
+    every year: no bookings, and they don't count as business days. It assumes nothing
+    about the ones you leave unticked.</p>
+  <form method="POST" action="{{ url_for('admin.calendar_holidays', business_id=business.id) }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="field card-pad holiday-list">
+      {% for h in holiday_choices %}
+        <label class="chip-check">
+          <input type="checkbox" name="holiday" value="{{ h.key }}" {{ 'checked' if h.ticked }}>
+          <span>{{ h.label }} <span class="cell-sub">{{ h.next }}</span></span>
+        </label>
+      {% endfor %}
+    </div>
+    <div class="toolbar card-pad">
+      <button class="btn btn-primary" type="submit">Save holidays</button>
+    </div>
+  </form>
+</div>
 {% endblock %}

@@ -38,6 +38,11 @@ calendar:
   provider: "simulated"
   timezone: "America/New_York"
   default_duration_minutes: 60
+  # Holidays they close for (holidays.py): closed days for estimates and for
+  # counting "three business days". The owner changes these on the Calendar
+  # page; the other businesses tick none, and nothing is assumed.
+  holidays: [new_years_day, memorial_day, independence_day, labor_day,
+             thanksgiving, day_after_thanksgiving, christmas_day]
   service_durations:
     # A whole-room remodel walk-through takes longer than a look at a porch.
     "kitchen remodel estimate": 90

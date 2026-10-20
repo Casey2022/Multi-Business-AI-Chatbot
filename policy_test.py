@@ -179,7 +179,8 @@ def main():
     check("Thursday + 3 business days = Tuesday (the weekend skipped)",
           r["date"] == "Tuesday, October 13", r)
     check("says weekends don't count, and that holidays aren't known",
-          "Saturdays and Sundays don't count" in r["say"] and "holiday" in r["say"], r["say"])
+          "Saturdays and Sundays don't count" in r["say"] and "holiday" in r["say"].lower(),
+          r["say"])
     r = policy.add_business_days("2026-10-02", 2, up_to=5, config=ridge)
     check("Friday + 2 to 5 business days = Tuesday to next Friday",
           r["date"] == "Tuesday, October 6" and r["date_latest"] == "Friday, October 9", r)
@@ -211,6 +212,27 @@ def main():
     check("no blocks: as before (Thursday + 3 is Tuesday)",
           policy.add_business_days("2026-10-08", 3, config=ridge)["date"] == "Tuesday, October 13"
           and "days_not_available" not in policy.add_business_days("2026-10-08", 3, config=ridge))
+    # The day the visit was, from the customer's words (journey_eval
+    # 2026-10-20: on Monday October 5, "last Friday" was counted from Sep 28).
+    from datetime import datetime as _dt
+    monday = _dt(2026, 10, 5, 10, 0)
+    start = lambda text: policy.start_from_words({"start": "model"}, [text], monday)["start"]
+    for text, day in (("The estimator came out last Friday. When's the quote?", "2026-10-02"),
+                      ("your estimator was here yesterday", "2026-10-04"),
+                      ("he came by today", "2026-10-05"),
+                      ("they visited on Thursday, when's my quote", "2026-10-01"),
+                      ("last monday someone came", "2026-09-28")):
+        check(f"start from the words: {text[:40]} -> {day}", start(text) == day, start(text))
+    check("a visit still to come is left to the model",
+          start("my estimate is on Friday, when will I get the quote?") == "model")
+    check("no day said: left to the model", start("how long until I get the quote") == "model")
+    check("the latest message that names a day decides",
+          policy.start_from_words({"start": "model"},
+                                  ["and if it hasn't come?", "he came Thursday"],
+                                  monday)["start"] == "2026-10-01")
+    check("the tool loop applies it to add_business_days",
+          'policy.start_from_words(dict(arguments or {}), said, now)'
+          in (ROOT / "llm.py").read_text())
     split = copy.deepcopy(ridge)
     split.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
         {"start": "2026-10-12 07:00", "end": "2026-10-12 12:00"},

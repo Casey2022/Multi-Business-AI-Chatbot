@@ -539,8 +539,11 @@ def _what_a_question_really_answers(extracted, pending, missing, slots):
       went out again with no answer.
     - A question never changes the service. "Do you fix leaky faucets too?"
       is asking, not switching the job to a leak repair.
-    - Free text for the slot being asked is the question itself, filed as
-      an answer ("do you have gluten free?" as the note "gluten free").
+    - Free text is the question itself, filed as an answer: "do you have
+      gluten free?" as the note "gluten free" at the notes prompt, and "can
+      you make it nut-free?" as the customization "nut-free" while the name
+      was being asked (journey_eval, 2026-10-20). Any free-text slot, not
+      only the one being asked.
 
     What's left (usually a time: "can you come Monday at 11?") is kept. An
     empty result sends the message down the question path: answered, then
@@ -549,8 +552,8 @@ def _what_a_question_really_answers(extracted, pending, missing, slots):
     real = {k: v for k, v in extracted.items()
             if str(v).strip().lower() != str(pending.get(k, "")).strip().lower()
             and k != "service"}
-    if missing and missing["key"] in _free_text_keys(slots):
-        real.pop(missing["key"], None)
+    for key in _free_text_keys(slots):
+        real.pop(key, None)
     return real
 
 
@@ -883,9 +886,12 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
                 # Acknowledge what we understood, so the handoff reads like a
                 # conversation continuing rather than a form appearing. Built
                 # per-case: gluing "for {datetime}" onto "Happy to help with"
-                # produced "Happy to help with for next wednesday".
+                # produced "Happy to help with for next wednesday". "for", not
+                # "on": `when` is the customer's own words, and "on" made
+                # "drain cleaning on tomorrow at 10am", "pizza on 7pm"
+                # (journey_eval, 2026-10-20). "for" reads with every form.
                 if service and when:
-                    ack = f"Happy to help with {service} on {when}."
+                    ack = f"Happy to help with {service} for {when}."
                 elif service:
                     ack = f"Happy to help with {service}."
                 else:
@@ -1151,8 +1157,14 @@ def _unavailable_message(desired_iso, alternatives, config, reason=None):
     elif reason == "closed":
         lead = f"We're closed then — our hours are {hours}."
     elif reason in ("blackout", "blocked"):
-        # Blocked by the owner: their note is private, so no reason given.
-        lead = f"We're not available at {desired}."
+        # Blocked by the owner: their note is private, so no reason given,
+        # unless it's a holiday they ticked (holidays.py), which is no secret.
+        # "on", not "at": it was "We're not available at Thursday, November
+        # 26 at 9:00 AM" (journey_eval, 2026-10-20).
+        import holidays
+        holiday = holidays.name_on(_dt.strptime(desired_iso, "%Y-%m-%d %H:%M"), config)
+        lead = (f"We're closed for {holiday} on {desired}." if holiday
+                else f"We're not available on {desired}.")
     else:
         lead = f"Sorry, {desired} is already booked."
 
