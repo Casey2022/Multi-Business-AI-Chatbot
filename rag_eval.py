@@ -163,7 +163,8 @@ TESTS = {
         # section to retrieve. The answer is still scored.
         ("what's your cancellation policy",       "ANSWER_ONLY",
          ["7 days", ("forfeit", "lose it", "lose the deposit", "lose your deposit",
-                     "deposit is gone", "keep the deposit", "not refunded")]),
+                     "deposit is gone", "keep the deposit", "not refunded",
+                     "lose the whole deposit", "whole deposit is forfeited")]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         # Two delivery rules (2026-10-19): trays free, cakes $15. Kept in one
         # section so a bare "is delivery free?" gets both, not whichever

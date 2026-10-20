@@ -794,6 +794,27 @@ def without_repeated_number(reply, history, message, config):
     return text
 
 
+# No channel shows markdown: the web chat displays text as typed, SMS and
+# voice can't. The channel prompts say plain text, and still (rag_eval,
+# Sunrise, 2026-10-20, temperature 0) a reply came back with "**Custom
+# cakes:**" and the customer would have seen the asterisks.
+_BOLD = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1", re.S)
+_HEADING = re.compile(r"^[ \t]*#{1,6}[ \t]+", re.M)
+_STAR_BULLET = re.compile(r"^([ \t]*)[*•][ \t]+", re.M)
+
+
+def plain_text(reply):
+    """The reply without markdown a customer would see as symbols: bold
+    markers and heading hashes go, "* " bullets become "- ". Line breaks,
+    dashes and the words themselves are kept."""
+    if not reply:
+        return reply
+    text = _BOLD.sub(r"\2", reply)
+    text = _HEADING.sub("", text)
+    text = _STAR_BULLET.sub(r"\1- ", text)
+    return text
+
+
 def unavailable_reply(config):
     """What the customer sees when the assistant can't do its job right now."""
     phone = ((config or {}).get("business") or {}).get("phone")
@@ -1003,6 +1024,7 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         reply = policy.without_false_hope(reply, tool_results, config)
         # A day blocked off once isn't "closed on Sundays" (policy).
         reply = policy.one_off_said_as_one(reply, tool_results)
+        reply = plain_text(reply)
         return without_repeated_number(reply, history, message, config)
 
     except Exception as e:

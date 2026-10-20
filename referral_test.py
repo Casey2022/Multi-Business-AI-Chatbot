@@ -135,6 +135,27 @@ def main():
     check("get_llm_reply removes the repeat", got == "Not sure about that — call us.",
           repr(got))
 
+    heading("no markdown reaches the customer (rag_eval, 2026-10-20)")
+    from pathlib import Path
+    llm_src = (Path(__file__).resolve().parent / "llm.py").read_text()
+    plain = llm.plain_text
+    seen = ("Here's how it works:\n\n**Custom cakes:** 50% deposit upfront.\n"
+            "- Cancel 7+ days ahead: full deposit back\n"
+            "* Cancel within 48 hours: charged the full order price\n"
+            "## Wedding cakes\n__Note__: lose the whole deposit.")
+    got = plain(seen)
+    check("bold markers and heading hashes go; '* ' bullets become '- '",
+          got == ("Here's how it works:\n\nCustom cakes: 50% deposit upfront.\n"
+                  "- Cancel 7+ days ahead: full deposit back\n"
+                  "- Cancel within 48 hours: charged the full order price\n"
+                  "Wedding cakes\nNote: lose the whole deposit."), repr(got))
+    check("ordinary text is untouched: sums, prices, a lone asterisk, dashes",
+          plain("2 * 3 trays at $15 each — 5*4 is 20, *not* bold") ==
+          "2 * 3 trays at $15 each — 5*4 is 20, *not* bold")
+    check("empty stays empty", plain("") == "" and plain(None) is None)
+    check("every model reply goes through it, before the referral check",
+          llm_src.index("reply = plain_text(reply)") < llm_src.index("return without_repeated_number("))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")
