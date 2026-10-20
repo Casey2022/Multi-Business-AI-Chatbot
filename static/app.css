@@ -859,8 +859,12 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .chip-check:has(input:checked) { border-color: var(--pen); color: var(--pen);
   background: var(--pen-wash); }
 .chip-check input { margin: 0; }
-/* Calendar page, "Holidays we close": the chips wrap, each with its date. */
-.holiday-list { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Calendar page, "Holidays we close": the chips wrap, each with its date.
+   A row, explicitly: .field stacks its children in a column, which made
+   every chip the card's full width (seen in the browser, 2026-10-20). */
+.holiday-list { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.holiday-list .chip-check { display: inline-flex; }
+.holiday-list .cell-sub { margin-left: 4px; }
 .quota { font-size: var(--text-sm); color: var(--ink-faint); }
 .quota.is-full { color: var(--pending); font-weight: 600; }
 
