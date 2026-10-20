@@ -31,13 +31,15 @@ themed displays need 72 hours' notice, the same as custom cakes.
 Pastry trays for offices, breakfast meetings, and small events come in
 two sizes, for 8-12 people or for 20-25 people, with an assortment of
 croissants, danishes, scones, and mini muffins. We need 48 hours' notice
-for trays. Delivery is free for orders over $50 within 5 miles.
+for trays. Trays can be delivered: see Pickup, Delivery, and Hours for
+when it's free.
 
-## Pickup, Delivery, and Hours
+## Pickup, Delivery, and Hours (Topics: delivery, delivery fee, free delivery, pickup)
 We're open Tuesday through Sunday, 7am to 3pm, closed Mondays. Cake
 pickup is available anytime during open hours; we recommend pickup at
-least 2 hours before you need the cake. Delivery is available for cake
-orders over $50 within a 5-mile radius for a $15 fee.
+least 2 hours before you need the cake. Delivery is available for orders
+over $50 within a 5-mile radius: pastry trays are delivered free, and cakes
+have a $15 delivery fee.
 
 ## Allergens and Dietary Notes
 Our kitchen handles wheat, eggs, dairy, soy, and tree nuts daily. We

@@ -165,6 +165,12 @@ TESTS = {
          ["7 days", ("forfeit", "lose it", "lose the deposit", "lose your deposit",
                      "deposit is gone", "keep the deposit", "not refunded")]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
+        # Two delivery rules (2026-10-19): trays free, cakes $15. Kept in one
+        # section so a bare "is delivery free?" gets both, not whichever
+        # section happened to be retrieved.
+        ("is delivery free?",                     "Pickup, Delivery",  ["$15", ("tray", "trays")]),
+        ("do you charge to deliver a pastry tray", "Pickup, Delivery", ("free", "no charge", "no fee")),
+        ("how much is cake delivery",             "Pickup, Delivery",  "$15"),
         ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
         ("do you sell coffee beans",                "ANSWER_ONLY",       DECLINE),
         ("can I book a table for breakfast",        "ANSWER_ONLY",       DECLINE),
