@@ -1267,13 +1267,22 @@ def one_off_said_as_one(reply, results):
     they're closed on Sundays"): "we're closed Sundays" for one blocked
     Sunday at a bakery open every Sunday. Where this turn's check_notice
     flagged a one-off day, "closed (on) Sundays" becomes "not available
-    this Sunday". Nothing else is touched."""
+    this Sunday". Nothing else is touched.
+
+    "Not open" too (journey_eval 2026-10-20: "we're not open on Sundays"):
+    the negation stays, the day becomes this one ("aren't available this
+    Sunday", "don't open this Sunday")."""
     for result in results or []:
         day = result.get("one_off_unavailable_day")
         if not day or not reply:
             continue
         fixed = re.sub(rf"\bclosed (?:on )?{day}s\b", f"not available this {day}",
                        reply, flags=re.I)
+        # "don't open" first: the next rule would make it "don't available".
+        fixed = re.sub(rf"\b(do not|don'?t) open (?:on )?{day}s\b",
+                       rf"\1 open this {day}", fixed, flags=re.I)
+        fixed = re.sub(rf"(\bnot|n't) open (?:on )?{day}s\b",
+                       rf"\1 available this {day}", fixed, flags=re.I)
         if fixed != reply:
             log.info("Said a one-off blocked %s as one", day)
             reply = fixed

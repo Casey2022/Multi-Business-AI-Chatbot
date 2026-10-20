@@ -376,6 +376,16 @@ def main():
           fix("Unfortunately we're closed Sundays, so we can't do that.", [r])
           == "Unfortunately we're not available this Sunday, so we can't do that."
           and fix("We are closed on Sundays.", [r]) == "We are not available this Sunday.")
+    check("'not open on Sundays' keeps its negation, for this Sunday (journey 2026-10-20)",
+          fix("Unfortunately we're not open on Sundays, so we can't.", [r])
+          == "Unfortunately we're not available this Sunday, so we can't."
+          and fix("We aren't open Sundays.", [r]) == "We aren't available this Sunday."
+          and fix("We don't open on Sundays.", [r]) == "We don't open this Sunday."
+          and fix("We do not open Sundays.", [r]) == "We do not open this Sunday.")
+    check("…and leaves the right sentences alone",
+          fix("We're not available this Sunday. We're open Tuesday through Sunday.", [r])
+          == "We're not available this Sunday. We're open Tuesday through Sunday."
+          and fix("We're not open on Mondays.", [r]) == "We're not open on Mondays.")
     check("…only where a one-off was flagged, and only that day",
           fix("We're closed Sundays.", [{"say": "x"}]) == "We're closed Sundays."
           and fix("We're closed Mondays.", [r]) == "We're closed Mondays.")

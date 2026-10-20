@@ -324,17 +324,18 @@ JOURNEYS = [
         "why": "28 hours out is free; only the notice tool is offered.",
         "turns": [{"say": "I've got a cut at 2pm tomorrow but something came up and "
                           "I can't make it. Will I be charged anything?",
-                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome",
-                   "must_not": [_BELMONT_CANNED]}],
+                   "state": "idle", "must": [_FREE], "tool": "cancellation_outcome"}],
     },
     {
         "name": "unworded deposit: what if I don't show up (Belmont)",
         "slug": "belmont_hair_studio",
         "clock": (2026, 9, 22, 10, 0),
         "why": "A no-show is charged 50%; no rules offered to say so.",
+        # No must_not for the canned "give us a call… we'll sort it out": no
+        # shortcut keyword here, and the model added it after a right answer
+        # (2026-10-20). The 50% is the proof the rules arrived.
         "turns": [{"say": "What happens if I just don't show up for my appointment?",
-                   "state": "idle", "must": [r"50\s?%"],
-                   "must_not": [_BELMONT_CANNED]}],
+                   "state": "idle", "must": [r"50\s?%"]}],
     },
     # Opening hours (2026-10-18): the notice is met in each, and the shop is
     # shut at the time wanted. Measured before changing check_notice, which
