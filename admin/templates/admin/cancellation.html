@@ -168,7 +168,7 @@
 
 {% if not is_new and not removed %}
 <form method="POST" class="mt-4"
-      onsubmit="return confirm('Remove your cancellation rules? Customers keep the current ones until you publish.');">
+      data-confirm="Remove your cancellation rules? Customers keep the current ones until you publish.">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="remove">
   <button class="btn" type="submit">Remove these rules</button>

@@ -64,10 +64,13 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   // An invented number in 555, the range kept for fiction; plays the role
-  // the session id plays in the web chat. The server only accepts this shape.
-  const phone = "+1555" + String(Math.floor(Math.random() * 1e7)).padStart(7, "0");
+  // the session id plays in the web chat. The server picks it and signs it
+  // (app.text_page); the page sends the signed token, never the number, so
+  // nobody can text as, or read the notices of, a number they didn't get.
+  const phone = {{ sim_phone | tojson }};
+  const token = {{ sim_token | tojson }};
   const slug = {{ business.slug | tojson }};
   const COST_OUT = {{ cost_out | tojson }}, COST_IN = {{ cost_in | tojson }};
   let inFlight = false, segOut = 0, segIn = 0;
@@ -148,7 +151,7 @@
       const res = await fetch(`/textsim/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, phone: phone }),
+        body: JSON.stringify({ message: text, token: token }),
       });
       if (res.status === 404) { typing.remove(); businessGone(); return; }
       const data = await res.json();
@@ -179,7 +182,7 @@
   async function checkForUpdates() {
     if (document.hidden) return;
     try {
-      const res = await fetch(`/textsim/${slug}/updates?phone=${encodeURIComponent(phone)}`);
+      const res = await fetch(`/textsim/${slug}/updates?token=${encodeURIComponent(token)}`);
       if (res.status === 404) { businessGone(); return; }
       if (!res.ok) return;
       const data = await res.json();

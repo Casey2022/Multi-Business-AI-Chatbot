@@ -53,7 +53,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   const slug = {{ business.slug | tojson }};
 
   // The session id plays the role of the phone number: the key for this

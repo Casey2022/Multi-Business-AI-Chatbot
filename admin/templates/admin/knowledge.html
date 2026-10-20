@@ -190,7 +190,7 @@
   <div class="section-foot">
     <span class="meta">Previous versions are kept when a section is deleted.</span>
     <form method="POST" action="{{ url_for('admin.knowledge_delete', document_id=s.id) }}"
-          onsubmit="return confirm('Delete this section? Its previous versions are kept.');">
+          data-confirm="Delete this section? Its previous versions are kept.">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger btn-sm" type="submit">Delete section</button>
     </form>

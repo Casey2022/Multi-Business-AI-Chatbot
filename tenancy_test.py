@@ -88,6 +88,60 @@ def snapshot(business_id):
     return rows
 
 
+def test_text_simulator():
+    """The simulator's number is the server's: a page can't pick one.
+
+    It used to: the page invented the number and the server took whatever
+    came, so a visitor could text as another's number or read its notices
+    (this sweep, 2026-10-20). Now each page load gets a number signed with
+    SECRET_KEY, and only the signature is accepted."""
+    heading("the text simulator: a number is the server's, not the page's")
+    slug = "sunrise_bakery_and_cafe"
+    business = db.get_business_by_slug(slug)
+    real_turn = app_module.sms_turn
+    app_module.sms_turn = lambda business, phone, message: f"texted from {phone}"
+    try:
+        client = app.test_client()
+        page = client.get(f"/chat/{slug}/text").get_data(as_text=True)
+        phone = re.search(r'const phone = "(\+1555\d{7})"', page).group(1)
+        token = re.search(r'const token = "([^"]+)"', page).group(1)
+        other = re.search(r'const phone = "(\+1555\d{7})"',
+                          client.get(f"/chat/{slug}/text").get_data(as_text=True)).group(1)
+        check("each page load gets its own number", phone != other, (phone, other))
+
+        sent = client.post(f"/textsim/{slug}", json={"message": "hi", "token": token})
+        check("its signed token texts as its number",
+              sent.status_code == 200 and sent.get_json()["reply"] == f"texted from {phone}",
+              sent.get_data(as_text=True))
+        for what, body in (("a bare number", {"message": "hi", "phone": other}),
+                           ("a token for a number we didn't sign",
+                            {"message": "hi", "token": token[:-2] + "xx"}),
+                           ("no token", {"message": "hi"})):
+            r = client.post(f"/textsim/{slug}", json=body)
+            check(f"refused: {what}", r.status_code == 400, r.status_code)
+
+        # Encoded: a bare "+" in a query string is a space, which would be
+        # refused for the wrong reason.
+        r = client.get(f"/textsim/{slug}/updates", query_string={"phone": other})
+        check("updates refuse a bare number", r.status_code == 400, r.status_code)
+        r = client.get(f"/textsim/{slug}/updates?token={token}")
+        check("updates answer a signed token", r.status_code == 200, r.status_code)
+
+        # The draw is forced to land on a number in use first.
+        import secrets
+        db.save_message("+15550000001", "user", "taken", business["id"], source="textsim")
+        draws = iter([1, 2])
+        real_draw, secrets.randbelow = secrets.randbelow, lambda n: next(draws)
+        try:
+            picked = app_module._new_sim_number(business["id"])
+        finally:
+            secrets.randbelow = real_draw
+        check("a number already used at this business isn't handed out again",
+              picked == "+15550000002", picked)
+    finally:
+        app_module.sms_turn = real_turn
+
+
 def main():
     heading("two visitors, two businesses")
     a_client, a_token, a_user = visitor("sunrise_bakery_and_cafe")
@@ -171,6 +225,8 @@ def main():
     check("B's own calendar opens for B, with the private note",
           response.status_code == 200 and "Zanzibar dentist" in response.get_data(as_text=True),
           response.status_code)
+
+    test_text_simulator()
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 1 if FAILED else 0

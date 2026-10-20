@@ -148,7 +148,7 @@
   <div class="card-title">Cancel</div>
   <div class="card-pad">
     <form method="POST" action="{{ url_for('admin.cancel', appointment_id=appt.id) }}"
-          onsubmit="return confirm('Cancel this appointment? This also removes it from your calendar and tells the customer.');">
+          data-confirm="Cancel this appointment? This also removes it from your calendar and tells the customer.">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger" type="submit">Cancel appointment</button>
     </form>

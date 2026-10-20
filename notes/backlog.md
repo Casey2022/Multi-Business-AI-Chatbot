@@ -53,13 +53,6 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 - **Accounts:** there is no password reset yet. Design it: an emailed
   one-time link, short expiry, rate limit, no "no such user" leak. Changing a
   password should end other sessions. Re-check login throttling.
-- **Text simulator numbers:** the page invents `+1555` + 7 digits with
-  `Math.random` (10 million numbers), and `/textsim/<slug>/updates` has no
-  rate limit. Someone could guess numbers to read another simulator's
-  notices, or text as them. Low stakes (notices only follow an owner moving
-  or cancelling), but the server should hand out the number.
-- **Web:** no security headers are sent today (CSP, HSTS, frame-ancestors,
-  Referrer-Policy); sweep templates for `|safe` and other unescaped output.
 - **Abuse and cost:** push on the existing rate limits (chat, demo creation,
   uploads, support); cap model spend per demo visitor.
 - **Secrets:** a real secrets story (`notes/security.md`, "Still to do"); the

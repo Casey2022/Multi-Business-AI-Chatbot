@@ -106,11 +106,14 @@ def main():
           'channel="sms"' in turn and "sms.for_sms(reply_text)" in turn
           and app_src.count("= sms_turn(business") == 2)
     sim = app_src.split("def textsim_reply(")[1].split("\n@app.route")[0]
-    check("the simulator only accepts an invented number, caps length, and is rate limited",
-          "_SIM_NUMBER.fullmatch(phone)" in sim and "len(message) > 1000" in sim
+    check("the simulator only takes a number it signed, caps length, and is rate limited",
+          '_sim_number_from(data.get("token"))' in sim and "len(message) > 1000" in sim
           and "ratelimit.webchat(slug, phone, _client_ip())" in sim)
-    check("its updates endpoint only reads an invented number's notices",
-          "_SIM_NUMBER.fullmatch(phone)" in app_src.split("def textsim_updates(")[1].split("\n@app.route")[0])
+    check("its updates endpoint only reads a signed number's notices",
+          '_sim_number_from(request.args.get("token"))'
+          in app_src.split("def textsim_updates(")[1].split("\n@app.route")[0])
+    check("a signed number must still be an invented one",
+          "_SIM_NUMBER.fullmatch(phone)" in app_src.split("def _sim_number_from(")[1].split("\ndef ")[0])
     check("its regex is the same shape sms.is_simulated accepts",
           '_SIM_NUMBER = re.compile(r"\\+1555\\d{7}")' in app_src)
     csrf = (ROOT / "admin" / "csrf.py").read_text()
@@ -119,9 +122,9 @@ def main():
     page = (ROOT / "templates" / "text.html").read_text()
     check("the page shows replies as text, never markup", "innerHTML" not in page
           and "textContent" in page)
-    check("the page invents a +1555 number and posts it",
-          '"+1555" + String(Math.floor(Math.random() * 1e7)).padStart(7, "0")' in page
-          and "phone: phone" in page)
+    check("the page shows the server's number and posts only its signed token",
+          "{{ sim_phone | tojson }}" in page and "token: token" in page
+          and "Math.random" not in page and "phone: phone" not in page)
     check("the web chat links to it", "url_for('text_page'" in (ROOT / "templates" / "demo.html").read_text())
 
     # A demo copy can be cleared under an open tab (an hour idle, or a server

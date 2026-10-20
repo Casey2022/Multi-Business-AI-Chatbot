@@ -155,7 +155,7 @@
   <div class="section-foot menu-remove">
     <span class="meta"></span>
     <form method="POST" action="{{ url_for('admin.menu_item_delete', business_id=business.id, index=c.index) }}"
-          onsubmit="return confirm('Remove {{ c.original }} from the menu? You can discard this before publishing.');">
+          data-confirm="Remove {{ c.original }} from the menu? You can discard this before publishing.">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="original" value="{{ c.original }}">
     <input type="hidden" name="fingerprint" value="{{ c.fingerprint }}">

@@ -586,6 +586,39 @@ def webchat_history(slug):
 _SIM_NUMBER = re.compile(r"\+1555\d{7}")
 
 
+# The simulator's number is the server's, signed. The page used to invent it
+# with Math.random (10 million numbers) and send it with every text, and the
+# server took whatever came: anyone could pick another visitor's number, read
+# its notices from /updates or text as them (tenancy sweep, 2026-10-20). Now
+# the page gets a number with a signature made with SECRET_KEY, sends both
+# back, and a number the server didn't sign is refused. One per page load, as
+# before: a reload starts a fresh conversation (the page keeps no history).
+def _sim_signer():
+    from itsdangerous import URLSafeSerializer
+    return URLSafeSerializer(app.secret_key, salt="textsim-number")
+
+
+def _new_sim_number(business_id):
+    """An invented +1555 number nobody has used at this business yet."""
+    import secrets
+    from db import get_recent_messages
+    for _ in range(20):
+        phone = f"+1555{secrets.randbelow(10**7):07d}"
+        if not get_recent_messages(phone, business_id, limit=1):
+            return phone
+    return phone
+
+
+def _sim_number_from(token):
+    """The number a signed token carries, or None if we didn't sign it."""
+    from itsdangerous import BadSignature
+    try:
+        phone = _sim_signer().loads(token or "")
+    except BadSignature:
+        return None
+    return phone if isinstance(phone, str) and _SIM_NUMBER.fullmatch(phone) else None
+
+
 @app.route("/chat/<slug>/text", methods=["GET"])
 def text_page(slug):
     """The same assistant, as a text conversation on a phone.
@@ -599,8 +632,10 @@ def text_page(slug):
         return "Unknown business", 404
     import sms
     config = load_config(business["config_path"], business["id"])
+    phone = _new_sim_number(business["id"])
     return render_template(
         "text.html", business=business, is_demo=bool(business.get("is_demo")),
+        sim_phone=phone, sim_token=_sim_signer().dumps(phone),
         cost_out=sms.COST_OUT_CENTS, cost_in=sms.COST_IN_CENTS,
         greeting=f"Hi! This is {config['business']['name']}. Text us a question "
                  f"or to book.")
@@ -608,11 +643,11 @@ def text_page(slug):
 
 @app.route("/textsim/<slug>", methods=["POST"])
 def textsim_reply(slug):
-    """JSON {"message", "phone"} -> {"reply", "out": segments, "in": segments}.
+    """JSON {"message", "token"} -> {"reply", "out": segments, "in": segments}.
 
-    `phone` is the simulator's invented number (+1555 and seven digits),
-    made by the page the way the web chat makes its session id. Limited
-    exactly like /webchat: every message is a model call."""
+    `token` is the simulator's invented number (+1555 and seven digits),
+    signed by text_page; the number itself is never taken from the page.
+    Limited exactly like /webchat: every message is a model call."""
     import ratelimit
     import sms
     business = get_business_by_slug(slug)
@@ -620,8 +655,8 @@ def textsim_reply(slug):
         return {"error": "Unknown business"}, 404
     data = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
-    phone = (data.get("phone") or "").strip()
-    if not message or not _SIM_NUMBER.fullmatch(phone):
+    phone = _sim_number_from(data.get("token"))
+    if not message or not phone:
         return {"error": "message and a simulated phone number are required"}, 400
     if len(message) > 1000:
         return {"error": "Message too long"}, 400
@@ -636,15 +671,16 @@ def textsim_reply(slug):
 @app.route("/textsim/<slug>/updates", methods=["GET"])
 def textsim_updates(slug):
     """Texts the business sent this simulated phone unasked (a moved or
-    cancelled appointment): the web chat's pickup, keyed by the number."""
+    cancelled appointment): the web chat's pickup, keyed by the number, which
+    comes from the signed token (?token=), so only that page can read them."""
     import clock
     import sms
     from db import collect_notifications
     business = get_business_by_slug(slug)
     if not business:
         return {"error": "Unknown business"}, 404
-    phone = (request.args.get("phone") or "").strip()
-    if not _SIM_NUMBER.fullmatch(phone):
+    phone = _sim_number_from(request.args.get("token"))
+    if not phone:
         return {"error": "phone is required"}, 400
     from reconcile import maybe_reconcile
     maybe_reconcile(business, min_interval=60)
