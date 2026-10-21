@@ -1,9 +1,11 @@
 # Bookings check notice periods: design
 
 Decided 2026-10-20. Status: version 1 built the same day (tables for
-Sunrise and Crosstown; the booking flow refuses and filters). Not yet:
-the generated knowledge-base lines, `check_notice` reading the table, and
-variants (see the backlog).
+Sunrise and Crosstown; the booking flow refuses and filters), then the
+duplication removed: generated knowledge-base lines (notice first, before
+prices: after them, "Friday at five" offered trays 2 runs in 9), and
+`check_notice` reading the table as a floor. Not yet: variants and an owner
+page (see the backlog).
 
 ## The gap
 

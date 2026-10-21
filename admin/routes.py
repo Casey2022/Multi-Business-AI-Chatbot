@@ -445,6 +445,7 @@ def _knowledge_page(business, conflict=None, status=200):
         changes = unpublished_changes(business),
         pending_upload = get_upload_proposal(business_id),
         price_lines = section_price_lines(business, get_documents(business_id)),
+        notice_lines = section_notice_lines(business, get_documents(business_id)),
         menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
     ), status
@@ -565,6 +566,20 @@ def section_price_lines(business, sections):
             if (line := menu.price_lines_for(s["title"], config))}
 
 
+def section_notice_lines(business, sections):
+    """{section id: the notice line that section's chunk carries}, shown
+    read-only under it like the price lines: booking.notice is the only copy
+    of the numbers (notes/booking_notice.md), so an owner who saw a cake
+    section with no notice in it shouldn't type the number back in."""
+    import policy
+    try:
+        config = load_config(business["config_path"], business["id"])
+    except Exception:
+        return {}
+    return {s["id"]: line for s in sections
+            if (line := policy.notice_line_for(s["title"], config))}
+
+
 def menu_changes_waiting(business):
     """Lines describing the unpublished menu changes (empty if none)."""
     import menu
@@ -659,6 +674,7 @@ def knowledge_preview(business_id):
         changes = unpublished_changes(business),
         pending_upload = get_upload_proposal(business_id),
         price_lines = section_price_lines(business, get_documents(business_id)),
+        notice_lines = section_notice_lines(business, get_documents(business_id)),
         menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
         preview_results = results,

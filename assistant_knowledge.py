@@ -234,6 +234,13 @@ def _read(section, config):
         import menu
         text += ("\nShown under it on the page, from the menu (not part of the text; "
                  "change with the menu tools): " + menu.price_lines_for(section["title"], config))
+    # The notice line likewise (booking.notice, the only copy): so a request
+    # to "add the notice" isn't answered by typing the number into the text.
+    import policy
+    notice = policy.notice_line_for(section["title"], config)
+    if notice:
+        text += ("\nShown under it on the page, from the booking settings (not part of "
+                 "the text; the text must not repeat it): " + notice)
     return text
 
 

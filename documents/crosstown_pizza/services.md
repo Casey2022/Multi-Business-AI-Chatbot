@@ -28,12 +28,11 @@ blue cheese, Italian, balsamic, Greek.
 
 ## Party Trays (Topics: party tray, catering, large order, office)
 Party trays feed 15 to 20: a half-sheet pizza tray, a 50-wing tray, or a
-sub platter. Trays need at least three hours' notice, and on Friday and
-Saturday nights we ask for the order by 4pm — the oven is full after
-that. The cutoff is for trays only: regular pizzas, wings and subs can be
-ordered for tonight right up until the kitchen stops taking orders. Trays
-tie up the kitchen for about 45 minutes, which is why they're booked as
-their own slot.
+sub platter. On Friday and Saturday nights trays have an order-by time,
+because the oven is full after that. The cutoff is for trays only: past
+it, regular pizzas, wings and subs can still be ordered for tonight
+right up until the kitchen stops taking orders. Trays tie up the kitchen
+for about 45 minutes, which is why they're booked as their own slot.
 
 ## Delivery (Topics: delivery, deliver, how far, fee, minimum)
 We deliver within 6 miles of the Culver Rd shop. The delivery fee is

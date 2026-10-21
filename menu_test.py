@@ -93,9 +93,12 @@ def main():
     cut = _rag.chunk_text(menu.attach_prices_to_markdown(seed, cfg))
     trays = [c for c in cut if "Party Trays" in c.splitlines()[0]]
     line = menu.price_lines_for("Party Trays (Topics: party tray)", cfg)
+    # Price line, then the notice line (booking.notice, 2026-10-20): both
+    # generated, both once, at the section's end.
+    generated = menu.section_lines_for("Party Trays (Topics: party tray)", cfg)
     check("a section cut in two carries its price line once, at its end",
-          sum(c.count(line) for c in trays) == 1 and trays[-1].rstrip().endswith(line),
-          trays)
+          sum(c.count(line) for c in trays) == 1
+          and trays[-1].rstrip().endswith(generated), trays)
     check("…and the trays-only sentence is never interrupted by it",
           all("Trays\n" + line not in c for c in trays))
     check("a menu edit changes the collection's fingerprint",

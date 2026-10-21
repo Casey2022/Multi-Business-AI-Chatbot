@@ -249,6 +249,39 @@ def main():
     check("notice_for: no service yet, or no table: None",
           policy.notice_for(None, table) is None
           and policy.notice_for("custom birthday cakes", {}) is None)
+    # The table is the only copy: each section's line is generated from it,
+    # and check_notice takes its numbers from it (2026-10-20).
+    sun = yaml_config("sunrise_bakery_and_cafe")
+    cross = yaml_config("crosstown_pizza")
+    check("the generated line for custom cakes",
+          policy.notice_line_for("Custom Birthday Cakes (Topics: x)", sun)
+          == "Notice for custom birthday cakes: at least 3 days (72 hours).",
+          policy.notice_line_for("Custom Birthday Cakes (Topics: x)", sun))
+    check("the tray line carries the cutoff",
+          policy.notice_line_for("Party Trays (Topics: x)", cross)
+          == "Notice for party tray: at least 3 hours, and on Fridays and Saturdays "
+             "it must be ordered by 4pm.")
+    check("a section with no entry gets no line",
+          policy.notice_line_for("Flavors and Fillings Available", sun) == "")
+    filled = lambda what, hours, said="", cfg=sun: policy.notice_from_table(
+        {"what": what, "notice_hours": hours, "order_by": None}, [said], cfg)
+    check("check_notice: a missing number comes from the table",
+          filled("a dozen muffins", None)["notice_hours"] == 24)
+    check("check_notice: a lower one is raised to the table's",
+          filled("custom cake", 48)["notice_hours"] == 72)
+    check("check_notice: a longer variant from the text is kept (gluten-free 96)",
+          filled("gluten free muffins", 96)["notice_hours"] == 96)
+    check("check_notice: the tray cutoff is filled in",
+          filled("party tray", 3, cfg=cross)["order_by"] == "16:00"
+          and filled("party tray", 3, cfg=cross)["order_by_days"] == ["friday", "saturday"])
+    check("check_notice: named only in the customer's words still counts",
+          filled("it", None, said="can I get a wedding cake next week?")["notice_hours"] == 336)
+    check("check_notice: nothing the table knows: untouched",
+          filled("a pizza", 0, cfg=cross) == {"what": "a pizza", "notice_hours": 0,
+                                              "order_by": None})
+    check("the tool loop applies it to check_notice",
+          'policy.notice_from_table(dict(arguments or {}), said, config)'
+          in (ROOT / "llm.py").read_text())
     split = copy.deepcopy(ridge)
     split.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
         {"start": "2026-10-12 07:00", "end": "2026-10-12 12:00"},

@@ -175,6 +175,12 @@
         <div>{{ price_lines[s.id] }}</div>
       </div>
       {% endif %}
+      {% if notice_lines and notice_lines.get(s.id) %}
+      <div class="menu-prices">
+        <div class="cell-sub">Notice, from your booking settings (the assistant reads this with this section, and bookings follow it):</div>
+        <div>{{ notice_lines[s.id] }}</div>
+      </div>
+      {% endif %}
     </div>
     <div class="section-foot">
       <span class="meta">

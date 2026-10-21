@@ -320,6 +320,75 @@ def notice_for(service, config):
     return None
 
 
+def notice_line_for(title, config):
+    """The generated notice line for a knowledge-base section with this
+    title ("" if none): the table (booking.notice) is the only copy of the
+    numbers, so the prose no longer states them, and this line is what the
+    chat retrieves and reads. Matched like price lines (menu.section_core)."""
+    import menu
+    core = menu.section_core(title)
+    table = ((config or {}).get("booking") or {}).get("notice") or {}
+    lines = []
+    for service, entry in table.items():
+        if not isinstance(entry, dict) or menu.section_core(entry.get("section")) != core:
+            continue
+        line = f"Notice for {service}: at least {span(float(entry.get('hours') or 0))}"
+        if entry.get("order_by"):
+            cutoff = datetime.strptime(entry["order_by"], "%H:%M")
+            days = [d.capitalize() for d in entry.get("order_by_days") or []]
+            line += (f", and on {' and '.join(d + 's' for d in days)}" if days else
+                     ", and every day") + f" it must be ordered by {clock_time(cutoff)}"
+        lines.append(line + ".")
+    return " ".join(lines)
+
+
+def _phrase_in(phrase, text):
+    """`phrase` appears in `text` as whole words, plurals ignored (menu's
+    reading of words: "muffins" is "muffin", "trays" is "tray")."""
+    import menu
+    want, have = menu._words(phrase), menu._words(text)
+    return bool(want) and any(have[i:i + len(want)] == want
+                              for i in range(len(have) - len(want) + 1))
+
+
+def notice_from_table(arguments, texts, config):
+    """check_notice's arguments with the table's numbers (booking.notice),
+    for the service the question is about. Which service: the one `what`
+    names (the model's reading of the thing), else the one the customer's
+    latest message names, if only one. The table is a floor: a longer notice
+    the text gives for a variant (gluten-free 96 hours, themed displays 72)
+    is kept; a shorter or missing one is raised. A cutoff the model left out
+    is filled in. Before, the numbers lived only in the prose and the model
+    read them each time (notes/booking_notice.md)."""
+    table = ((config or {}).get("booking") or {}).get("notice") or {}
+    entries = {s: e for s, e in table.items() if isinstance(e, dict)}
+
+    def naming(text):
+        return [s for s, e in entries.items()
+                if any(_phrase_in(w, text) for w in [s, *(e.get("words") or [])])]
+    found = naming(arguments.get("what") or "")
+    if len(found) != 1:
+        latest = naming((texts or [""])[0])
+        found = latest if len(latest) == 1 else found[:1]
+    if not found:
+        return arguments
+    service, entry = found[0], entries[found[0]]
+    hours = float(entry.get("hours") or 0)
+    try:
+        said = float(arguments.get("notice_hours"))
+    except (TypeError, ValueError):
+        said = None
+    if said is None or said < hours:
+        log.info("check_notice notice_hours %r -> %g, from the table (%s)",
+                 arguments.get("notice_hours"), hours, service)
+        arguments["notice_hours"] = hours
+    if entry.get("order_by") and not arguments.get("order_by"):
+        arguments["order_by"] = entry["order_by"]
+        arguments["order_by_days"] = entry.get("order_by_days")
+        log.info("check_notice order_by -> %s, from the table (%s)", entry["order_by"], service)
+    return arguments
+
+
 def too_soon(service, start, config, now=None):
     """Why a booking of `service` at `start` (business-local) misses its
     notice, or None when it doesn't: {"why": "notice", "hours": 72,

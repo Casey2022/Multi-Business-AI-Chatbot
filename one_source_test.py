@@ -121,6 +121,43 @@ def main():
             check(f"{slug}: '{needle.replace(chr(10), ' ')}' in '{head}'",
                   needle.lower() in chunk.lower(), chunk[:200])
 
+    # Notice (2026-10-20): booking.notice is the only copy of a service's
+    # notice. Its section's text must not state the number too; the line the
+    # bot reads is generated (policy.notice_line_for). A variant the table
+    # doesn't hold yet (themed 72h, gluten-free 96h) may stay in the text.
+    heading("notice numbers live only in booking.notice")
+    import re
+    import policy
+    import menu
+    for path in sorted((ROOT / "config").glob("*.yaml")):
+        if path.name == "personas.yaml":
+            continue
+        cfg = load_config(str(path))
+        slug = path.stem
+        for service, entry in ((cfg.get("booking") or {}).get("notice") or {}).items():
+            title = entry.get("section")
+            check(f"{slug}: '{service}' names a section that exists",
+                  bool(title and section(slug, title)), title)
+            body = section(slug, title) if title else ""
+            hours = float(entry["hours"])
+            spoken = {f"{hours:g} hours", f"{hours / 24:g} days", f"{hours / 168:g} weeks"}
+            spoken |= {"three hours"} if hours == 3 else set()
+            said = [s for s in spoken if hours >= 1 and re.search(
+                rf"\b{re.escape(s)}(?:'|’)? notice", " ".join(body.split()), re.I)]
+            check(f"{slug}: '{title}' doesn't state {service}'s notice ({hours:g}h) in its text",
+                  not said, said)
+            check(f"{slug}: '{title}' gets the generated line, before any prices",
+                  menu.section_lines_for(title, cfg).startswith(policy.notice_line_for(title, cfg))
+                  and f"Notice for {service}" in menu.section_lines_for(title, cfg))
+    import copy
+    import rag
+    sun = load_config(str(ROOT / "config" / "sunrise_bakery_and_cafe.yaml"))
+    changed = copy.deepcopy(sun)
+    changed["booking"]["notice"]["custom birthday cakes"]["hours"] = 96
+    docs = ROOT / "documents" / "sunrise_bakery_and_cafe"
+    check("a changed notice changes the boot digest (the collection is rebuilt)",
+          rag._source_digest(docs, sun) != rag._source_digest(docs, changed))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

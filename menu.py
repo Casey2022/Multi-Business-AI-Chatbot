@@ -261,6 +261,24 @@ def price_lines_for(title, config):
                     if it["section"] and section_core(it["section"]) == core)
 
 
+def section_lines_for(title, config):
+    """Everything generated under a section: its price lines (the menu) and
+    its notice line (booking.notice, policy.notice_line_for). Both tables
+    are the only copy of their numbers, so the prose doesn't state them."""
+    # Notice first: it reads on from the section's own text, which explains
+    # it (Crosstown: "past the order-by time, pizzas … can still be ordered").
+    # After the prices, it followed a list of trays, and 2 runs in 9 offered
+    # those trays for tonight (journey "Friday at five", 2026-10-20; 6/6 with
+    # the old prose).
+    import policy
+    return " ".join(part for part in (policy.notice_line_for(title, config),
+                                      price_lines_for(title, config)) if part)
+
+
+def _has_generated(config):
+    return bool(items(config)) or bool(((config or {}).get("booking") or {}).get("notice"))
+
+
 def attach_prices_to_markdown(text, config):
     """A seed document with each section's price lines added at the end of
     the section, BEFORE it's cut into chunks (boot ingestion).
@@ -269,14 +287,15 @@ def attach_prices_to_markdown(text, config):
     on every piece of a section that chunk_text had split, straight after a
     sentence cut in half ("…stops taking orders. Trays / Party tray prices:
     …"), and Friday at five started failing. Added to the section first, it
-    lands once, at the section's end, wherever the cut falls."""
-    if not items(config):
+    lands once, at the section's end, wherever the cut falls. The notice
+    line goes with it (section_lines_for)."""
+    if not _has_generated(config):
         return text
     blocks = re.split(r"(?=^## )", text, flags=re.M)
     out = []
     for block in blocks:
         if block.startswith("## "):
-            lines = price_lines_for(block.splitlines()[0][3:], config)
+            lines = section_lines_for(block.splitlines()[0][3:], config)
             if lines:
                 block = block.rstrip() + "\n" + lines + "\n\n"
         out.append(block)
@@ -287,12 +306,13 @@ def attach_prices(chunks, config):
     """Each section chunk with its menu items' price lines added: for
     sections from the database, which are one chunk each (Publish, the
     owner's preview). Boot cuts the seed into chunks, so it adds the lines
-    before cutting (attach_prices_to_markdown)."""
-    if not items(config):
+    before cutting (attach_prices_to_markdown). The notice line goes with
+    it (section_lines_for)."""
+    if not _has_generated(config):
         return list(chunks)
     out = []
     for chunk in chunks:
-        lines = price_lines_for(_title(chunk), config)
+        lines = section_lines_for(_title(chunk), config)
         out.append(f"{chunk.rstrip()}\n{lines}" if lines else chunk)
     return out
 

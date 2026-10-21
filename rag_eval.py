@@ -238,7 +238,7 @@ TESTS = {
         ("what wing sauces do you have",          "Wings",              ("honey garlic", "garlic parm")),
         ("how much is a sub",                     "Subs and Salads",    "$13"),
         ("do you do party trays",                 "Party Trays",        ("$45", "$52", "$60")),
-        ("how much notice for a party tray",      "Party Trays",        "three hours"),
+        ("how much notice for a party tray",      "Party Trays",        ("three hours", "3 hours")),
         ("how far do you deliver",                "Delivery",           "6 miles"),
         ("what's the delivery minimum",           "Delivery",           "$15"),
         ("how long does delivery take",           "Delivery",           ("30 to 45", "30-45")),
@@ -594,6 +594,12 @@ def validate_tests():
             prices = menu.render_menu(loaded)
             if prices:
                 document += "\n\n" + prices
+            # And notice (booking.notice), which each section's chunk carries
+            # as a generated line (policy.notice_line_for) since 2026-10-20.
+            for entry in ((loaded.get("booking") or {}).get("notice") or {}).values():
+                line = policy.notice_line_for(entry.get("section"), loaded)
+                if line:
+                    document += "\n\n" + line
         lowered  = document.lower()
         headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", document, re.M)]
 

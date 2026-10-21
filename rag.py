@@ -448,6 +448,10 @@ def _source_digest(docs_path, config=None):
     if config is not None:
         import menu
         digest.update(menu.render_menu(config).encode("utf-8"))
+        # And the notice lines (booking.notice): the same reasoning.
+        import json
+        digest.update(json.dumps((config.get("booking") or {}).get("notice") or {},
+                                 sort_keys=True).encode("utf-8"))
     # How chunks are built is part of the fingerprint too: change it (as on
     # 2026-10-11, price lines added before cutting instead of after) and an
     # index built the old way, from the same files, must still be rebuilt.
