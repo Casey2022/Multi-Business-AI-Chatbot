@@ -56,11 +56,10 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 
 The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 
-- **Prompt injection, round 2:** customer chat (role-play, "ignore your
-  rules", fake system text, instructions aimed at tool arguments); knowledge-
-  base sections an owner or demo visitor writes; uploads (round 1 done:
-  hidden text, SSRF); the owner and Help assistants (can they be talked past
-  drafts, or into another business?); support messages in the operator inbox.
+- **Prompt injection:** round 2 done (`notes/security.md` section 9: 14
+  attacks measured, the one that got through fixed). Worth a round 3 when
+  real SMS goes live (texts arrive with no page around them) and if the
+  owner assistant gains tools beyond drafts.
 - **Accounts:** there is no password reset yet. Design it: an emailed
   one-time link, short expiry, rate limit, no "no such user" leak. Changing a
   password should end other sessions. Re-check login throttling.
