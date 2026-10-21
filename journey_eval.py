@@ -612,7 +612,10 @@ JOURNEYS = [
                    # available at Thursday…" before 2026-10-20).
                    "must": [r"Friday|November 27", r"Thanksgiving"],
                    "must_not": [r"order placed|you'?re (all set|booked)",
-                                r"closed (?:on )?Thursdays", r"available at \w+day"]}],
+                                r"closed (?:on )?Thursdays", r"available at \w+day",
+                                # Inside the 24 hours' notice (offered before
+                                # bookings checked notice, 2026-10-20).
+                                r"Wednesday, November 25"]}],
     },
     {
         "name": "holidays: Thanksgiving not ticked, nothing assumed (Sunrise)",
@@ -628,12 +631,39 @@ JOURNEYS = [
         "name": "it's 6pm, muffins guaranteed for 8am (Sunrise)",
         "slug": "sunrise_bakery_and_cafe",
         "clock": (2026, 9, 22, 18, 0),                                   # Tuesday
-        "why": "Fourteen hours away: a dozen needs 24 hours' notice to guarantee, "
-               "checked by check_notice, not promised.",
+        "why": "Fourteen hours away: a dozen needs 24 hours' notice to guarantee. "
+               "Either path: the Q&A's check_notice, or the booking flow's notice "
+               "check (notes/booking_notice.md); before, it started an order, 0/3.",
         "turns": [
             {"say": "it's 6pm, can I get two dozen blueberry muffins guaranteed for 8am tomorrow?",
-             "tool": "check_notice", "must": [r"24[\s-]*hours?"],
-             "must_not": [r"you'?re all set|guaranteed for 8|we'?ll have (them|it) ready"]},
+             "must": [r"24[\s-]*hours?"], "must_not": [NAME_ASK,
+             r"you'?re all set|guaranteed for 8|we'?ll have (them|it) ready"]},
+        ],
+    },
+    # Notice in the booking flow (notes/booking_notice.md, 2026-10-20): a
+    # time inside a service's notice is refused, with times that meet it.
+    {
+        "name": "notice: a custom cake for tomorrow (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "why": "72 hours' notice: the earliest is Friday the 25th at 10am.",
+        "turns": [
+            {"say": "I'd like to order a custom birthday cake for pickup tomorrow at 2pm",
+             "must": [r"72 hours", r"Friday|September 25"],
+             # Not offered: naming the asked-for time as too soon is right.
+             "must_not": [NAME_ASK,
+                          r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
+        ],
+    },
+    {
+        "name": "notice: a party tray at 5pm on a Friday (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 25, 17, 0),                                   # Friday
+        "why": "Trays on Friday nights must be ordered by 4pm; Saturday's are fine.",
+        "turns": [
+            {"say": "I'd like to order a party tray for delivery at 8pm tonight",
+             "must": [r"4(?::00)?\s*pm|4:00 PM"],
+             "must_not": [NAME_ASK, r"Friday, September 25 at"]},
         ],
     },
 ]

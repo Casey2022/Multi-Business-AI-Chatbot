@@ -207,6 +207,15 @@ rules:
 booking:
   noun: "order"
   noun_plural: "orders"
+  # Notice each service needs, in hours before the pickup (policy.notice_for,
+  # notes/booking_notice.md). The booking flow refuses a time inside it and
+  # offers times that meet it. Keys match `services` above.
+  notice:
+    custom birthday cakes: {hours: 72}
+    wedding cakes: {hours: 336}                   # 2 weeks
+    cupcake orders (dozen minimum): {hours: 24}
+    pastry trays for events: {hours: 48}
+    muffins by the dozen: {hours: 24}
   greeting: "Happy to help you place an order! What would you like? (e.g. {services_examples})"
   service_confirmation: "Got it — {service}."
   ask_datetime: "When would you like it ready? (e.g. 'Tuesday at 3pm' or 'next Friday morning')"

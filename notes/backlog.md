@@ -20,14 +20,15 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 - "A day the owner blocked off", ~1 run in 10: the model says "closed on
   Sundays and Mondays", and `policy.one_off_said_as_one` turns it into "not
   available this Sunday and Mondays", which the judge rightly fails.
-- **Bookings don't check notice periods.** The booking flow never looks at
-  notice (no "notice" anywhere in `scheduler.py`): a dozen muffins at 6pm
-  for 8am tomorrow (24 hours needed) starts an order (journey "it's 6pm,
-  muffins guaranteed for 8am", 0/3), and the alternatives it offers can be
-  inside the notice too (Thanksgiving journey: today at 2:30pm). Notice
-  periods live only in knowledge-base prose ("96 hours' notice"), so the
-  booking flow has nothing to check against: they need a structured home
-  per service first (one source of truth, like `policies.cancellation`).
+- **Booking notice, after version 1** (`notes/booking_notice.md`). Bookings
+  now refuse times inside a service's notice (Sunrise's five services,
+  Crosstown's tray cutoff). Still to do: (1) the numbers are in two places,
+  `booking.notice` and the knowledge-base prose the chat reads; generate
+  each section's notice line from the table and drop the prose (as menu
+  price lines are), and have `check_notice` take its numbers from
+  `policy.notice_for`. Until then, change both together. (2) Variants:
+  themed cupcake displays 72h, gluten-free 96h. (3) An owner page to edit
+  them.
 - A slot answered out of turn gets the same question again word for word
   (Ridgeline: scope given while asked for timing, "Any timeframe in mind?"
   twice). Correct, but reads as a bot that didn't listen.

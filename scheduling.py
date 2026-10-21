@@ -95,6 +95,16 @@ def unknown_condition_services(config):
     return stale
 
 
+def unknown_notice_services(config):
+    """Notice entries (booking.notice) for services the business doesn't
+    offer. policy.notice_for treats a service it can't find as needing no
+    notice, so a typo or a renamed service fails open, silently: startup
+    logs these, the way it logs durations nobody matches."""
+    table = (config.get("booking") or {}).get("notice") or {}
+    offered = {_normalise(s) for s in (config.get("services") or [])}
+    return [name for name in table if _normalise(name) not in offered]
+
+
 def unknown_duration_services(config):
     """service_durations keys that name no service this business offers.
 
@@ -197,6 +207,12 @@ def is_slot_available(config, start_iso, busy, service=None):
     if not within_business_hours(start, duration, sched):
         return False
 
+    # Inside the service's notice, or after its order-by cutoff
+    # (notes/booking_notice.md). Here, so find_alternatives never offers one.
+    import policy
+    if policy.too_soon(service, start, config):
+        return False
+
     if sched["model"] == "capacity":
         overlapping = sum(1 for b_start, b_end in busy
                           if start < b_end and end > b_start)
@@ -226,6 +242,18 @@ def find_alternatives(config, desired_iso, busy, service=None):
     wanted  = sched["max_alternatives"]
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
     now     = clock.business_now(config)   # once, not 672 times
+
+    # A notice longer than the week searched (a wedding cake's two weeks)
+    # would find nothing near what was asked: search from the earliest time
+    # the notice allows instead, on the step grid.
+    import policy
+    late = policy.too_soon(service, desired, config, now)
+    if late and late["why"] == "notice":
+        earliest = late["earliest"].replace(second=0, microsecond=0)
+        minutes = (earliest.hour * 60 + earliest.minute) % sched["granularity"]
+        if minutes:
+            earliest += timedelta(minutes=sched["granularity"] - minutes)
+        desired = max(desired, earliest - step)
 
     def search(direction, limit):
         """Walk one direction, collecting available slots."""
@@ -268,7 +296,8 @@ def find_alternatives(config, desired_iso, busy, service=None):
 
 def slot_rejection_reason(config, start_iso, busy, service=None):
     """Why a slot is unavailable: 'past', 'closed', 'blackout', 'blocked'
-    (the owner blocked it off), 'conflict', or None."""
+    (the owner blocked it off), 'notice' or 'cutoff' (the service's notice,
+    notes/booking_notice.md), 'conflict', or None."""
     sched    = settings(config)
     duration = duration_for(config, service)
 
@@ -298,6 +327,11 @@ def slot_rejection_reason(config, start_iso, busy, service=None):
 
     if _in_block(start, end, sched):
         return "blocked"
+
+    import policy
+    late = policy.too_soon(service, start, config)
+    if late:
+        return late["why"]                  # "notice" or "cutoff"
 
     if not is_slot_available(config, start_iso, busy, service):
         return "conflict"

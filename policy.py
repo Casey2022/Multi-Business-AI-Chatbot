@@ -320,6 +320,25 @@ def notice_for(service, config):
     return None
 
 
+def too_soon(service, start, config, now=None):
+    """Why a booking of `service` at `start` (business-local) misses its
+    notice, or None when it doesn't: {"why": "notice", "hours": 72,
+    "earliest": datetime} or {"why": "cutoff", "cutoff": datetime}. The
+    cutoff is check_notice's rule (_cutoff_on): one reading of "on Friday
+    and Saturday nights, order by 4pm" for the chat and the booking flow."""
+    entry = notice_for(service, config)
+    if not entry:
+        return None
+    now = clock.business_now(config, now)
+    hours = float(entry.get("hours") or 0)
+    if start < now + timedelta(hours=hours):
+        return {"why": "notice", "hours": hours, "earliest": now + timedelta(hours=hours)}
+    cutoff = _cutoff_on(start, entry.get("order_by"), entry.get("order_by_days"))
+    if cutoff is not None and now > cutoff:
+        return {"why": "cutoff", "cutoff": cutoff}
+    return None
+
+
 def check_notice(needed_by, notice_hours, what, config=None, now=None,
                  order_by=None, order_by_days=None):
     """How much time there is before `needed_by`, against the notice needed,

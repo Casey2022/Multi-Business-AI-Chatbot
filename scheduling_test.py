@@ -251,11 +251,79 @@ def main():
         check(f"{path.name}: no question is set for a service it doesn't offer",
               orphaned == [],
               "; ".join(f"{k} -> {v!r}" for k, v in orphaned))
+        check(f"{path.name}: no notice is set for a service it doesn't offer",
+              scheduling.unknown_notice_services(config) == [],
+              scheduling.unknown_notice_services(config))
+
+    notice_checks()
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")
     return 1 if FAILED else 0
+
+
+def notice_checks():
+    """A booking inside its service's notice is refused, and the times
+    offered instead all meet it (notes/booking_notice.md). Before, the
+    booking flow never looked: a custom cake for tomorrow (72 hours needed)
+    and a Friday 8pm tray at 5pm (order by 4pm) were both taken."""
+    import clock
+    import scheduler
+    from datetime import timezone
+    from zoneinfo import ZoneInfo
+    from config import load_config
+    heading("notice: a booking inside it is refused, and the alternatives meet it")
+    sunrise = load_config("config/sunrise_bakery_and_cafe.yaml")
+    crosstown = load_config("config/crosstown_pizza.yaml")
+    real = clock.utc_now
+
+    def pin(*local):
+        moment = datetime(*local, tzinfo=ZoneInfo("America/New_York"))
+        clock.utc_now = lambda: moment.astimezone(timezone.utc)
+    try:
+        pin(2026, 9, 22, 10, 0)                                  # Tuesday 10am
+        cake = "custom birthday cakes"
+        check("a custom cake tomorrow: 'notice'",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-23 14:00", [], cake)
+              == "notice")
+        check("72 hours on: fine",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-25 10:00", [], cake) is None)
+        alts = scheduling.find_alternatives(sunrise, "2026-09-23 14:00", [], cake)
+        check("every alternative offered meets the 72 hours",
+              alts and all(a >= "2026-09-25 10:00" for a in alts), alts)
+        alts = scheduling.find_alternatives(sunrise, "2026-09-23 14:00", [], "wedding cakes")
+        check("two weeks' notice: alternatives start two weeks out, not none",
+              alts and alts[0] == "2026-10-06 10:00", alts)
+        check("a service with no notice entry is unaffected (the shop's hours only)",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-23 14:00", []) is None)
+        lead = scheduler._unavailable_message("2026-09-23 14:00", alts, sunrise,
+                                              reason="notice", service=cake)
+        check("the refusal says the notice and that the time is too soon",
+              lead.startswith("We need 3 days (72 hours) of notice for custom birthday "
+                              "cakes, so Wednesday, September 23 at 2:00 PM is too soon."),
+              lead)
+
+        pin(2026, 9, 25, 17, 0)                                  # Friday 5pm
+        tray = "party tray"
+        check("a Friday 8pm tray at 5pm: 'cutoff' (order by 4pm)",
+              scheduling.slot_rejection_reason(crosstown, "2026-09-25 20:00", [], tray)
+              == "cutoff")
+        alts = scheduling.find_alternatives(crosstown, "2026-09-25 20:00", [], tray)
+        check("no Friday-night tray is offered instead",
+              alts and not any(a.startswith("2026-09-25") for a in alts), alts)
+        check("a pizza at the same time: fine",
+              scheduling.slot_rejection_reason(crosstown, "2026-09-25 20:00", [], "pizza")
+              is None)
+        lead = scheduler._unavailable_message("2026-09-25 20:00", alts, crosstown,
+                                              reason="cutoff", service=tray)
+        check("the refusal says the cutoff",
+              lead.startswith("On Fridays, we need party tray orders by 4pm"), lead)
+        pin(2026, 9, 25, 15, 0)                                  # Friday 3pm
+        check("before the cutoff, with three hours to spare: fine",
+              scheduling.slot_rejection_reason(crosstown, "2026-09-25 20:00", [], tray) is None)
+    finally:
+        clock.utc_now = real
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 # Bookings check notice periods: design
 
-Decided 2026-10-20. Status: design; nothing built yet.
+Decided 2026-10-20. Status: version 1 built the same day (tables for
+Sunrise and Crosstown; the booking flow refuses and filters). Not yet:
+the generated knowledge-base lines, `check_notice` reading the table, and
+variants (see the backlog).
 
 ## The gap
 

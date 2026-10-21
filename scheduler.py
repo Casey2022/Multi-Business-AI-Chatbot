@@ -939,7 +939,8 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
                 # written into pending after set_state is thrown away.
                 pending["_offered"] = list(alts)
                 _save_state(phone, business_id, "collecting", pending=pending)
-                return _unavailable_message(parsed, alts, config, reason=reason)
+                return _unavailable_message(parsed, alts, config, reason=reason,
+                                            service=service)
         except Exception as e:
             log_cal.warning(f"Availability check failed (continuing): {e}")
 
@@ -1137,7 +1138,7 @@ def _confirmation_question(pending, config, lead=None):
         lines.insert(0, lead.strip())
     return substitute(" ".join(lines), config)
 
-def _unavailable_message(desired_iso, alternatives, config, reason=None):
+def _unavailable_message(desired_iso, alternatives, config, reason=None, service=None):
     """Explain why a slot doesn't work, and offer nearby openings.
 
     The reason matters: "we're closed then" and "that time is taken" call
@@ -1165,6 +1166,20 @@ def _unavailable_message(desired_iso, alternatives, config, reason=None):
         holiday = holidays.name_on(_dt.strptime(desired_iso, "%Y-%m-%d %H:%M"), config)
         lead = (f"We're closed for {holiday} on {desired}." if holiday
                 else f"We're not available on {desired}.")
+    elif reason in ("notice", "cutoff"):
+        # The service's notice (notes/booking_notice.md), said with the rule,
+        # so the customer knows what any other time has to meet.
+        import policy
+        late = policy.too_soon(service, _dt.strptime(desired_iso, "%Y-%m-%d %H:%M"),
+                               config) or {}
+        what = service or "that"
+        if reason == "cutoff" and late.get("cutoff"):
+            cutoff = late["cutoff"]
+            lead = (f"On {cutoff:%A}s, we need {what} orders by "
+                    f"{policy.clock_time(cutoff)}, and it's past that now.")
+        else:
+            lead = (f"We need {policy.span(late.get('hours', 0))} of notice for {what}, "
+                    f"so {desired} is too soon.")
     else:
         lead = f"Sorry, {desired} is already booked."
 
@@ -1223,7 +1238,8 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
         pending.pop("datetime", None)
         pending["_offered"] = list(alts)          # before the save, not after
         _save_state(phone, business_id, "collecting", pending=pending)
-        return _unavailable_message(candidate, alts, config, reason=reason)
+        return _unavailable_message(candidate, alts, config, reason=reason,
+                                    service=service)
     except Exception as e:
         log_cal.warning(f"Early availability check failed: {e}")
         return None

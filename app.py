@@ -134,7 +134,7 @@ def bootstrap():
                   "ADMIN_PASSWORD are not set — the admin portal is "
                   "unreachable.")
 
-    from scheduling import (unknown_duration_services,
+    from scheduling import (unknown_duration_services, unknown_notice_services,
                             unknown_condition_services)
     from import_documents import import_for_business
     for b in businesses:
@@ -173,6 +173,12 @@ def bootstrap():
                     "%s still has a faq: block in its config. It is ignored "
                     "— move those answers into the knowledge base",
                     b["name"])
+            unknown_notice = unknown_notice_services(config)
+            if unknown_notice:
+                log_boot.warning(
+                    "%s has notice set for services it doesn't offer: %s "
+                    "— those services are booked with no notice",
+                    b["name"], ", ".join(repr(s) for s in unknown_notice))
             stale = unknown_duration_services(config)
             if stale:
                 log_boot.warning(
