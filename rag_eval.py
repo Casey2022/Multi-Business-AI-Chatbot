@@ -255,6 +255,44 @@ TESTS = {
 }
 
 
+# Rules an owner can change in the portal, which the rubrics are written
+# against as the YAML has them (validate_tests checks quotes against the
+# YAML). 2026-10-20: a cancellation override saved locally on 10-17 gave
+# Belmont's colour a 48-hour rule; the bot answered it correctly ("cancel by
+# Monday 9am") and the 24-hour rubric failed it, 3 runs in 3, until someone
+# went digging in the database. Said up front now.
+_RULE_FIELDS = ("cancellation", "menu", "holidays")
+
+
+def local_rule_overrides(slugs):
+    """Lines naming each business whose local database overrides a rule the
+    rubrics take from the YAML: what's scored then isn't what's deployed."""
+    try:
+        from db import get_business_by_slug
+    except Exception:
+        return []
+
+    def rules(config):
+        return {"cancellation": (config.get("policies") or {}).get("cancellation"),
+                "menu": config.get("menu"),
+                "holidays": (config.get("calendar") or {}).get("holidays")}
+    lines = []
+    for slug in slugs:
+        business = get_business_by_slug(slug)
+        if not business:
+            continue
+        # As loaded, not as stored: a published menu is kept as an override
+        # even when it's the YAML's own, and that isn't worth a warning.
+        local = rules(load_config(business["config_path"], business["id"]))
+        shipped = rules(load_config(business["config_path"]))
+        fields = sorted(f for f in _RULE_FIELDS if local[f] != shipped[f])
+        if fields:
+            lines.append(f"{slug}: your local database overrides {', '.join(fields)}; "
+                         f"rows about them are scored against those local rules, not "
+                         f"the YAML the rubrics quote (and Render deploys).")
+    return lines
+
+
 def preflight(slugs):
     """Refuse to score against collections that aren't there.
 
@@ -851,6 +889,9 @@ def main():
             print("  ·", problem)
         print("\nFix these before reading any score from this run.")
         return 1
+
+    for line in local_rule_overrides(slugs):
+        print("  Note:", line)
 
     if ask_llm:
         start_turn_accounting()

@@ -194,9 +194,28 @@ def the_page():
     check("another visitor can't change them", r.status_code == 403, r.status_code)
 
 
+def eval_warning():
+    heading("rag_eval says when local rules aren't the deployed ones")
+    import rag_eval
+    ridge = db.get_business_by_slug("ridgeline_contracting")
+    check("no local change: no warning",
+          rag_eval.local_rule_overrides(["ridgeline_contracting"]) == [])
+    db.set_config_override(ridge["id"], "holidays", ["christmas_eve"], updated_by="test")
+    lines = rag_eval.local_rule_overrides(["ridgeline_contracting"])
+    check("ticked holidays that differ from the YAML: warned, by name",
+          len(lines) == 1 and "holidays" in lines[0], lines)
+    db.set_config_override(ridge["id"], "holidays",
+                           load_config("config/ridgeline_contracting.yaml")["calendar"]["holidays"],
+                           updated_by="test")
+    check("an override that equals the YAML: no warning (a saved, unchanged page)",
+          rag_eval.local_rule_overrides(["ridgeline_contracting"]) == [])
+    db.clear_config_override(ridge["id"], "holidays")
+
+
 def main():
     dates()
     loading()
+    eval_warning()
     the_rules()
     the_prompt()
     the_page()

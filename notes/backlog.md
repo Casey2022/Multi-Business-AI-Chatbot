@@ -27,6 +27,11 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
   (1) variants: themed cupcake displays 72h, gluten-free 96h, still in the
   prose; (2) an owner page to edit notice (the Knowledge page shows it
   read-only).
+- Belmont, "it's 11am, can I get a cut and colour this afternoon" (rag_eval
+  row 30): "it's tight, text 'appointment' to see what's free", where the
+  document says "we can't usually fit one in on the same day". 3/3 on
+  2026-10-20 once a local override stopped masking it; the answering rule
+  "'Usually can't' is an answer" doesn't hold here.
 - A slot answered out of turn gets the same question again word for word
   (Ridgeline: scope given while asked for timing, "Any timeframe in mind?"
   twice). Correct, but reads as a bot that didn't listen.
