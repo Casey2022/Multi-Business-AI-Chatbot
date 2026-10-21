@@ -233,6 +233,22 @@ def main():
     check("the tool loop applies it to add_business_days",
           'policy.start_from_words(dict(arguments or {}), said, now)'
           in (ROOT / "llm.py").read_text())
+    # The one notice lookup (notes/booking_notice.md).
+    table = {"booking": {"notice": {
+        "custom birthday cakes": {"hours": 72},
+        "party trays": {"hours": 3, "order_by": "16:00",
+                        "order_by_days": ["friday", "saturday"]}}}}
+    check("notice_for: a listed service gets its entry",
+          policy.notice_for("custom birthday cakes", table) == {"hours": 72})
+    check("notice_for: names match as the rest of the code matches them",
+          policy.notice_for("Custom  Birthday Cakes", table) == {"hours": 72})
+    check("notice_for: a cutoff comes back whole",
+          policy.notice_for("party trays", table)["order_by_days"] == ["friday", "saturday"])
+    check("notice_for: an unlisted service needs no notice",
+          policy.notice_for("drain cleaning", table) is None)
+    check("notice_for: no service yet, or no table: None",
+          policy.notice_for(None, table) is None
+          and policy.notice_for("custom birthday cakes", {}) is None)
     split = copy.deepcopy(ridge)
     split.setdefault("calendar", {}).setdefault("scheduling", {})["blocks"] = [
         {"start": "2026-10-12 07:00", "end": "2026-10-12 12:00"},

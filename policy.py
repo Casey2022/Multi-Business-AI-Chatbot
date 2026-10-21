@@ -299,6 +299,27 @@ def _closed_sentence(config, needed, earliest, notice, what):
     return say, before, after, one_off
 
 
+def notice_for(service, config):
+    """The notice a booked service needs (notes/booking_notice.md), from
+    `booking.notice` in the config. Returns a dict shaped like the YAML
+    entry, {"hours": 72} or {"hours": 3, "order_by": "16:00",
+    "order_by_days": ["friday", "saturday"]}, or None when it needs none.
+
+    The one lookup: the booking flow and check_notice both call this, so
+    they can't disagree about a service's notice.
+    """
+    table = ((config or {}).get("booking") or {}).get("notice") or {}
+    if not service:
+        return None
+    # scheduling.same_service, the rule durations and booking questions use:
+    # one notion of "the same service". A service not listed needs no notice.
+    from scheduling import same_service
+    for name, entry in table.items():
+        if same_service(name, service) and isinstance(entry, dict):
+            return entry
+    return None
+
+
 def check_notice(needed_by, notice_hours, what, config=None, now=None,
                  order_by=None, order_by_days=None):
     """How much time there is before `needed_by`, against the notice needed,
