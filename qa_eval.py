@@ -99,7 +99,8 @@ SCENARIOS = [
             (3, r"separate system", "no talk of a separate system"),
         ],
         "reply_must": [
-            (3, r"'(order|book)'", "tells them how: text 'order'"),
+            # Any quote marks: Claude Haiku 5.5 writes Text "order" (2026-10-22).
+            (3, r"['\"‘’“”](order|book)['\"‘’“”]", "tells them how: text 'order'"),
         ],
     },
 ]

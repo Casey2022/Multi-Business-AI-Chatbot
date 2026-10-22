@@ -684,24 +684,42 @@ def _drop_restated_service(extracted, config):
 
     Never touches service, datetime, or the address — only the owner's own
     extra questions, which are the ones a stray fragment can silently fill.
+
+    How it's handed over, too (2026-10-22, Claude Haiku 5.5): "a dozen
+    blueberry muffins for pickup Friday" came back with notes = "pickup",
+    3 runs in 3 at every effort level, and "for delivery at 7pm" with notes =
+    "delivery". Sunrise's notes question is "Anything else we should know?
+    (allergies, pickup person…)", so the allergy question was never asked.
+    An answer made only of the service's words and pickup/delivery words
+    says nothing new, and goes the same way.
     """
     service = _normalise(extracted.get("service") or "")
-    if not service:
-        return extracted
+    allowed = set(service.split()) | _HANDOFF_WORDS
 
-    protected = set(RESERVED_SLOT_KEYS) | {ADDRESS_SLOT_KEY}
+    # The name too: "Pat" sits inside "patch test", and a substring test
+    # dropped it (found by mid_booking_question_test, 2026-10-22).
+    protected = set(RESERVED_SLOT_KEYS) | {ADDRESS_SLOT_KEY, NAME_SLOT_KEY}
     kept = {}
     for key, value in extracted.items():
         if key in protected or key.startswith("_"):
             kept[key] = value
             continue
-        if _normalise(value) and _normalise(value) in service:
-            log.info("Dropping %s=%r — it only restates the service %r; "
-                     "asking the question instead", key, value,
+        said = _normalise(value)
+        if said and ((service and said in service)
+                     or set(said.split()) - _FILLER_WORDS <= allowed):
+            log.info("Dropping %s=%r — it only restates the service %r or how "
+                     "it's handed over; asking the question instead", key, value,
                      extracted.get("service"))
             continue
         kept[key] = value
     return kept
+
+
+# Words that say how an order changes hands, not anything about it.
+_HANDOFF_WORDS = {"pickup", "pick", "up", "picking", "collect", "collection",
+                  "collecting", "delivery", "deliver", "delivered", "delivering",
+                  "takeaway", "takeout", "order", "ordering"}
+_FILLER_WORDS = {"for", "a", "an", "the", "to", "by", "at", "on", "in", "it", "be"}
 
 
 def _snap_to_catalogue(value, config):

@@ -26,15 +26,46 @@ log = logging.getLogger("llm")
 # Module-level constants (not business-specific — safe at import time)
 # ---------------------------------------------------------------------------
 
-# The receptionist model, overridable so a stronger one can be measured with
+# The receptionist model, overridable so another can be measured with
 # rag_eval before anyone pays for it in production:
-#   LLM_MODEL=claude-sonnet-5 LLM_PRICE_IN=3 LLM_PRICE_OUT=15 python3 rag_eval.py --all
-# The prices only feed the cost log line; set them to match the model.
+#   LLM_MODEL=claude-sonnet-5-5 LLM_PRICE_IN=2 LLM_PRICE_OUT=10 python3 rag_eval.py --all
+# The prices feed the cost log line and the demo spend cap (budget.py), and
+# follow the model (_PRICES) unless set. Still Claude Haiku 4.5 by default:
+# Haiku 5.5 was measured on 2026-10-22 (better single answers, rag_eval
+# 154/156 vs 150/156, a tenth of the price) but retracted true replies it
+# didn't write ("I need to correct my last message: I can't actually place
+# or confirm appointments" after a real booking), which isn't shippable
+# yet. Everything here works on it: LLM_MODEL=claude-haiku-5-5.
 MODEL = os.environ.get("LLM_MODEL", "claude-haiku-4-5-20251001")
+
+# Models before the 5.5 generation: they take `temperature`, don't take
+# `effort`, and don't think unless asked. Everything newer rejects a
+# non-default temperature, thinks by default, and takes an effort level.
+_OLDER_MODELS = ("claude-haiku-4-5",)
+
+# Models that accept a forced tool call (tool_choice "tool") while thinking:
+# the call then skips its thinking. Older thinking models rejected the pair,
+# and Claude Sonnet 5.5 / Opus 5.5 reject forced tool calls altogether.
+_FORCES_WHILE_THINKING = ("claude-haiku-5-5",)
+
+
+def can_force_tools():
+    """True if the receptionist's model may be made to call a tool. Before
+    Haiku 5.5 this was "doesn't think"; with it, the forced calls that fix
+    real failures (cancellation_outcome, add_business_days, check_notice,
+    menu_price) would all have switched off quietly (followup_test caught
+    it, 2026-10-22)."""
+    return not model_thinks or MODEL.startswith(_FORCES_WHILE_THINKING)
+
+# How hard the model thinks (output_config.effort), for models that take it.
+# Low: the receptionist's work is short, high-volume chat; the facts come
+# from tools and excerpts, not from reasoning at length.
+EFFORT = os.environ.get("LLM_EFFORT", "low")
 
 # Set once a model rejects `temperature` ("deprecated for this model", as
 # Sonnet 5 does). From then on it isn't sent, and rag_eval says so, because
-# unpinned replies make two scores less comparable.
+# unpinned replies make two scores less comparable. Newer models are known
+# not to take it (_OLDER_MODELS), so it isn't sent to them at all.
 temperature_dropped = False
 
 # Set the first time a reply comes back with a thinking block. From then on
@@ -42,7 +73,7 @@ temperature_dropped = False
 # doesn't eat the SMS-sized reply budget. Retrying after the fact cost a
 # full re-send of the input each time, and on the first Sonnet 5 run it left
 # replies like "C" and "perfect for your".
-model_thinks = False
+model_thinks = not MODEL.startswith(_OLDER_MODELS)   # newer models think by default
 THINKING_ROOM = 2048
 
 
@@ -59,8 +90,16 @@ THINKING_ROOM = 2048
 # Prices are for the log line only, and they WILL go stale; the token counts
 # beside them come from the API and won't. Check the current rates at
 # https://platform.claude.com/docs/en/about-claude/pricing
-PRICE_IN_PER_MTOK  = float(os.environ.get("LLM_PRICE_IN",  "1.00"))
-PRICE_OUT_PER_MTOK = float(os.environ.get("LLM_PRICE_OUT", "5.00"))
+# Per million tokens, input / output, by model (Haiku 5.5's are for prompts
+# up to 100K tokens; the receptionist's are a few thousand). LLM_PRICE_IN /
+# LLM_PRICE_OUT still win. Following the model means switching LLM_MODEL
+# can't leave the spend cap priced for the wrong one.
+_PRICES = {"claude-haiku-4-5": (1.00, 5.00), "claude-haiku-5-5": (0.10, 0.50),
+           "claude-sonnet-5-5": (2.00, 10.00), "claude-sonnet-5": (2.00, 10.00),
+           "claude-opus-5-5": (4.00, 20.00)}
+_price = next((v for k, v in _PRICES.items() if MODEL.startswith(k)), (1.00, 5.00))
+PRICE_IN_PER_MTOK  = float(os.environ.get("LLM_PRICE_IN",  _price[0]))
+PRICE_OUT_PER_MTOK = float(os.environ.get("LLM_PRICE_OUT", _price[1]))
 
 # Per-turn totals. A ContextVar for the same reason the log's turn id is
 # one: the four call sites below are scattered across this module and none
@@ -125,6 +164,11 @@ def _thought(response):
 def _sent(call):
     """One request to the model, charged to this request's demo."""
     response = client.messages.create(**call)
+    if getattr(response, "stop_reason", None) == "refusal":
+        # Newer models run safety classifiers; a decline is a normal 200
+        # with no text, which every caller already treats as "no reply".
+        details = getattr(response, "stop_details", None)
+        log.warning("The model declined (%s)", getattr(details, "category", None))
     try:
         usage = response.usage
         budget.record(usage.input_tokens / 1e6 * PRICE_IN_PER_MTOK
@@ -151,6 +195,10 @@ def _create(**call):
     global temperature_dropped, model_thinks
     budget.check()
     call.setdefault("model", MODEL)
+    if not call["model"].startswith(_OLDER_MODELS):
+        # Newer models: no temperature (400 if sent), and an effort level.
+        call.pop("temperature", None)
+        call.setdefault("output_config", {"effort": EFFORT})
     if temperature_dropped:
         call.pop("temperature", None)
     if model_thinks:
@@ -1062,24 +1110,25 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         if tools:
             call["tools"] = tools
             # Required, not offered, when the message says both "cancel" and
-            # when (policy.must_apply_cancellation). Not with a model that
-            # thinks: forcing a tool is incompatible with extended thinking.
+            # when (policy.must_apply_cancellation). Only where the model
+            # accepts it (can_force_tools: older thinking models didn't).
+            force = can_force_tools()
             if (policy.must_apply_cancellation(message, config, history)
-                    and not model_thinks):
+                    and force):
                 call["tool_choice"] = {"type": "tool",
                                        "name": "cancellation_outcome"}
             # Business days are offered only with a day to count from, and
             # then required: offered, the model counted for itself and said
             # "Wednesday or Thursday" for two business days after a Friday,
             # 3 runs in 3 (2026-10-05).
-            elif "business_days" in wanted and not model_thinks:
+            elif "business_days" in wanted and force:
                 call["tool_choice"] = {"type": "tool",
                                        "name": "add_business_days"}
-            elif ("notice" in wanted and not model_thinks
+            elif ("notice" in wanted and force
                   and policy.must_check_notice(
                       message, [c for c, _ in (retrieved_chunks or [])])):
                 call["tool_choice"] = {"type": "tool", "name": "check_notice"}
-            elif wants_menu and not model_thinks:
+            elif wants_menu and force:
                 call["tool_choice"] = {"type": "tool", "name": "menu_price"}
         if temperature is not None:
             call["temperature"] = temperature

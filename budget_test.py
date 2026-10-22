@@ -10,7 +10,7 @@ answers with a friendly note; llm._create refuses any call past the budget
 (budget.Spent), so a route that forgot to ask still can't spend.
 
 The model is a fake that reports token usage, so this runs offline and the
-costs are exact: one fake call is 100,000 tokens in and 20,000 out.
+costs are exact: one fake call costs $0.20 at the configured prices.
 
 The sweep at the end posts to every route with a demo that's over budget and
 fails if any route got as far as asking the model: that route is missing its
@@ -62,12 +62,17 @@ class FakeMessages:
         SENT.append(call)
         return types.SimpleNamespace(
             content=[types.SimpleNamespace(type="text", text="a fake reply")],
-            usage=types.SimpleNamespace(input_tokens=100_000, output_tokens=20_000),
+            usage=types.SimpleNamespace(input_tokens=FAKE_IN, output_tokens=FAKE_OUT),
             stop_reason="end_turn")
 
 
+# Sized from the prices, so one fake call costs $0.20 whatever the model:
+# at Haiku 4.5's prices a fixed 100K/20K was $0.20, at Haiku 5.5's $0.02, and
+# crossing $0.50 then took 26 messages, past the chat rate limit (2026-10-22).
+FAKE_IN = round(0.10 / llm.PRICE_IN_PER_MTOK * 1e6)
+FAKE_OUT = round(0.10 / llm.PRICE_OUT_PER_MTOK * 1e6)
 llm.client = types.SimpleNamespace(messages=FakeMessages())
-CALL = 0.1 * llm.PRICE_IN_PER_MTOK + 0.02 * llm.PRICE_OUT_PER_MTOK
+CALL = FAKE_IN / 1e6 * llm.PRICE_IN_PER_MTOK + FAKE_OUT / 1e6 * llm.PRICE_OUT_PER_MTOK
 
 
 def one_call_per_message(message, sender_id, business_id, config, channel):

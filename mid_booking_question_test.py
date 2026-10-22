@@ -70,6 +70,28 @@ def main():
                   f"custom birthday cakes for {when}." in reply
                   and f" on {when}" not in reply, reply)
 
+        heading("an opening fragment doesn't answer a question nobody asked")
+        drop = sched._drop_restated_service
+        # Claude Haiku 5.5, 2026-10-22: "for pickup" filed as the notes, so
+        # "Anything else? (allergies…)" was never asked, 3 runs in 3.
+        got = drop({"service": "muffins by the dozen", "customization": "blueberry",
+                    "notes": "pickup"}, cfg)
+        check("'pickup' as the notes is dropped; 'blueberry' is a real answer and stays",
+              "notes" not in got and got.get("customization") == "blueberry", got)
+        check("'for delivery' too", "notes" not in drop(
+            {"service": "pizza", "notes": "for delivery"}, cfg))
+        check("the service said again is dropped, as before ('leak' for leak repair)",
+              "problem_description" not in drop(
+                  {"service": "leak repair", "problem_description": "leak"}, cfg))
+        keep = {"service": "custom birthday cakes", "notes": "nut allergy, my mum picks it up"}
+        check("a real note that mentions pickup is kept", drop(dict(keep), cfg) == keep)
+        check("a customer called Pat booking a patch test keeps their name",
+              drop({"service": "patch test", "customer_name": "Pat"}, cfg)
+              == {"service": "patch test", "customer_name": "Pat"})
+        check("service, time and name are never touched",
+              drop({"service": "pickup", "datetime": "pickup at 9", "customer_name": "Pick"}, cfg)
+              == {"service": "pickup", "datetime": "pickup at 9", "customer_name": "Pick"})
+
         heading("the live conversation: a question at the notes prompt")
         set_state(phone, biz, "collecting", pending=dict(base))
         extract_returns.clear(); extract_returns["notes"] = "gluten free"
