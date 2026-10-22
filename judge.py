@@ -27,12 +27,13 @@ import json
 import os
 import re
 
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-5")
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "claude-sonnet-5-5")   # since 2026-10-22
 
-# Assumed Sonnet-class prices, overridable. The receptionist's own cost
-# accounting in llm.py is priced for Haiku, so the judge counts separately.
-JUDGE_PRICE_IN_PER_MTOK  = float(os.environ.get("JUDGE_PRICE_IN",  "3.00"))
-JUDGE_PRICE_OUT_PER_MTOK = float(os.environ.get("JUDGE_PRICE_OUT", "15.00"))
+# Claude Sonnet 5.5's prices (Sonnet 5's too; this said $3/$15 until
+# 2026-10-22), overridable. The receptionist's cost accounting in llm.py is
+# priced for its own model, so the judge counts separately.
+JUDGE_PRICE_IN_PER_MTOK  = float(os.environ.get("JUDGE_PRICE_IN",  "2.00"))
+JUDGE_PRICE_OUT_PER_MTOK = float(os.environ.get("JUDGE_PRICE_OUT", "10.00"))
 
 # Sonnet 5 rejects the temperature parameter outright ("deprecated for
 # this model"), so by default the judge sends none and its verdicts are not
@@ -151,8 +152,10 @@ def text_of(blocks):
 
 def _request(prompt):
     # Room for a thinking block AND the verdict. At 200, a long thinking
-    # block could use the whole budget and leave no answer.
-    body = {"model": JUDGE_MODEL, "max_tokens": 1024,
+    # block could use the whole budget and leave no answer; at 1024 it still
+    # did once ("judge gave no verdict: ''", rag_eval 2026-10-22): Sonnet 5.5
+    # thinks at high effort by default.
+    body = {"model": JUDGE_MODEL, "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}]}
     if JUDGE_TEMPERATURE is not None:
         body["temperature"] = float(JUDGE_TEMPERATURE)

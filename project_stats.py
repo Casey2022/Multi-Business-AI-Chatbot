@@ -66,7 +66,7 @@ def main():
 
     print(f"\nWHICH LAYER PRODUCED THE REPLY   ({tracked} tracked)")
     if tracked:
-        labels = {"rule": "Keyword rules", "llm": "LLM + RAG",
+        labels = {"rule": "Keyword rules", "llm": "LLM + RAG", "llm_tool": "LLM + tools",
                   "scheduler": "Booking flow"}
         for s in sources:
             pct = 100 * s["n"] / tracked

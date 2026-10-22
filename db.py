@@ -519,6 +519,25 @@ def chat_transcript(phone, business_id, limit=40):
              "notice": r["source"] == "notification"} for r in reversed(rows)]
 
 
+# Replies the Q&A model didn't write, or wrote from a tool's answer: the
+# booking flow's, a keyword rule's, an owner's notice, and Q&A replies that
+# used a tool. Claude Haiku 5.5 (2026-10-22) took them back as its own
+# mistakes ("I need to correct my last message: I can't actually place or
+# confirm appointments"); llm.get_llm_reply is told which ones they are.
+OTHERS_WROTE = ("scheduler", "rule", "notification", "llm_tool")
+
+
+def replies_by_others(phone, business_id, limit=10):
+    """The assistant messages among the last `limit` that OTHERS_WROTE wrote."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT role, content, source FROM messages WHERE phone = ? AND business_id = ? "
+        "ORDER BY id DESC LIMIT ?", (phone, business_id, limit)).fetchall()
+    conn.close()
+    return [r["content"] for r in reversed(rows)
+            if r["role"] == "assistant" and r["source"] in OTHERS_WROTE]
+
+
 def get_recent_messages(phone, business_id, limit=10):
     """Return the last `limit` turns for this (phone, business) as a list of
     {role, content} dicts — in chronological order, ready for the Claude API.

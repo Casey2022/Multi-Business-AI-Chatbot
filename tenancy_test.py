@@ -228,6 +228,24 @@ def main():
 
     test_text_simulator()
 
+    heading("which earlier replies others wrote (db.replies_by_others)")
+    for role, text, source in (("user", "book a cut", "customer"),
+                               ("assistant", "You're booked: haircut Thursday.", "scheduler"),
+                               ("user", "when's my quote?", "customer"),
+                               ("assistant", "By Wednesday, October 7.", "llm_tool"),
+                               ("user", "thanks", "customer"),
+                               ("assistant", "You're welcome!", "rule"),
+                               ("user", "parking?", "customer"),
+                               ("assistant", "Street parking out front.", "llm")):
+        db.save_message("web-others", role, text, A, source=source)
+    said = db.replies_by_others("web-others", A, limit=10)
+    check("the booking flow's, a tool-backed answer's and a rule's replies; not the plain Q&A",
+          said == ["You're booked: haircut Thursday.", "By Wednesday, October 7.",
+                   "You're welcome!"], said)
+    check("…and only this customer's, at this business",
+          db.replies_by_others("web-others", B, limit=10) == []
+          and db.replies_by_others("web-someone-else", A, limit=10) == [])
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 1 if FAILED else 0
 

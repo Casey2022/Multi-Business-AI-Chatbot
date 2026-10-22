@@ -39,7 +39,7 @@ from pathlib import Path
 log = logging.getLogger("assistant")
 
 GUIDE_PATH = Path(__file__).resolve().parent / "admin" / "owner_guide.md"
-# The receptionist's model unless overridden (ASSISTANT_MODEL=claude-sonnet-5).
+# The receptionist's model unless overridden (ASSISTANT_MODEL=claude-sonnet-5-5).
 ASSISTANT_MODEL = os.environ.get("ASSISTANT_MODEL")
 MAX_QUESTION = 1000
 HISTORY_TURNS = 12          # the conversation the next reply sees (6 exchanges)

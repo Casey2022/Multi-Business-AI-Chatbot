@@ -70,6 +70,8 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
 
             slots   = get_slot_definitions(config)
             history = get_recent_messages(sender_id, business_id, limit=10)
+            from db import replies_by_others
+            others_said = replies_by_others(sender_id, business_id, limit=10)
             # The classifier sees what the bot just said, so an answer to
             # the bot's own question isn't read as a new order.
             previous_reply = next((m.get("content") for m in reversed(history)
@@ -87,8 +89,12 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
                 )
                 source = "scheduler"
             else:
-                reply_text = get_llm_reply(message, history, config, channel=channel)
-                source     = "llm"
+                import llm
+                reply_text = get_llm_reply(message, history, config, channel=channel,
+                                           others_said=others_said)
+                # A reply worked out by a tool is marked: next turn the model
+                # sees only the sentence, not the tool, and took one back.
+                source     = "llm_tool" if llm.turn_used_tools() else "llm"
 
         else:
             source = "rule"

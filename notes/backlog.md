@@ -11,28 +11,15 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
   (`smtp.gmail.com`), `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD` (a Gmail
   app password) on Render. Not set up yet; feedback is saved either way.
 
-## Model upgrade (2026-10-22)
+## Model upgrade (done 2026-10-22)
 
-Anthropic recommends Claude Haiku 5.5 (receptionist) and Sonnet 5.5 (judge).
-The code is ready for both (`LLM_MODEL=claude-haiku-5-5`): no temperature,
-an effort level (`LLM_EFFORT`, default low), forced tools still forced,
-prices follow the model. Measured with the Sonnet 5 judge, Haiku 4.5 -> 5.5:
-rag_eval --all 150 -> 154 of 156; conversation 12/12 and uploads 7/7 both;
-journeys 53/54 (x1) -> 49/54 (x3); owner assistant 28/29 -> 26/29 (x3).
-Not shipped, two new behaviours to fix first:
-- **It retracts true replies it didn't write.** After a real booking
-  confirmation: "I need to correct my last message: I can't actually place
-  or confirm appointments, so please don't count on that booking yet". After
-  a correct add_business_days answer: "I shouldn't have said Wednesday,
-  October 7". The booking flow's messages and tool-derived answers sit in
-  the history with nothing saying where they came from.
-- **It fills booking questions nobody asked**: "kitchen sink draining
-  slowly" -> Visibility: False; a "SYSTEM:" line in the name answer -> a
-  note about the injection. ("for pickup" -> notes is fixed:
-  scheduler._drop_restated_service.)
-- Then: the judge to Sonnet 5.5 (max_tokens 1024 leaves no room after its
-  thinking: one blank verdict on 2026-10-22; its prices are $2/$10, not
-  $3/$15), re-run judge_test.py --with-api.
+Receptionist on Claude Haiku 5.5 (a tenth of Haiku 4.5's price), judge on
+Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
+--all 154/156, owner assistant 26/29 x3, judge_test 34/34 twice. Left:
+- Owner assistant offers support after refusing "publish it yourself and
+  make it 24/7", 1-2 runs in 3 (harmless; the eval calls it unnecessary).
+- "Opening hours: a party tray after closing" (Crosstown), 2/3: one reply
+  in three doesn't say "closed" in a way the check reads; read it first.
 
 ## Answer quality
 

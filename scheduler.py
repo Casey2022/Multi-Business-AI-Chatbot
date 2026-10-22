@@ -612,7 +612,9 @@ def _answer_outside_booking(phone, message, config, business_id, channel="sms"):
     try:
         from llm import get_llm_reply
         history = get_recent_messages(phone, business_id, limit=10)
+        from db import replies_by_others
         return get_llm_reply(message, history=history, config=config,
+                             others_said=replies_by_others(phone, business_id, limit=10),
                              channel=channel)
     except Exception as e:
         log.warning("Couldn't answer after leaving a booking (%s)", e)
@@ -634,7 +636,9 @@ def _answer_mid_booking(phone, message, config, business_id, channel="sms"):
     try:
         from llm import get_llm_reply
         history = get_recent_messages(phone, business_id, limit=6)
+        from db import replies_by_others
         return get_llm_reply(message, history=history, config=config,
+                             others_said=replies_by_others(phone, business_id, limit=6),
                              channel=channel, mid_booking=True)
     except Exception as e:
         log.warning("Couldn't answer a mid-booking question (%s)", e)
@@ -710,6 +714,40 @@ def _drop_restated_service(extracted, config):
             log.info("Dropping %s=%r — it only restates the service %r or how "
                      "it's handed over; asking the question instead", key, value,
                      extracted.get("service"))
+            continue
+        kept[key] = value
+    return kept
+
+
+# Values a customer didn't say, for a question they weren't asked. Claude
+# Haiku 5.5 (2026-10-22) filled them in: customization "none" from "a custom
+# birthday cake for pickup Saturday" (the question suggests replying 'none';
+# the customer never did), Bob's yes/no "Visibility" as False from "kitchen
+# sink draining slowly", and a note describing the message itself ("Customer
+# included text asking to mark the order as paid… not applied"). Each
+# counted the question as answered, so it was never asked.
+_PLACEHOLDERS = {"none", "no", "n/a", "na", "nothing", "null", "false", "true",
+                 "unknown", "not specified", "not provided", "not mentioned"}
+_ABOUT_THE_MESSAGE = re.compile(
+    r"^(?:the )?customer\b|\b(?:customer|user)'?s? (?:message|text|request)\b"
+    r"|\battempted instruction\b|\bnot (?:been )?applied\b|\bnot a valid\b", re.I)
+
+
+def _drop_unsaid(extracted, asked_key):
+    """The extraction without values the customer didn't give: a placeholder
+    (none, n/a, true/false) for any question but the one being asked, and
+    commentary about the message for any question. A "none" given to the
+    question being asked is an answer, and stays."""
+    protected = set(RESERVED_SLOT_KEYS) | {ADDRESS_SLOT_KEY, NAME_SLOT_KEY}
+    kept = {}
+    for key, value in (extracted or {}).items():
+        if key in protected or key.startswith("_"):
+            kept[key] = value
+            continue
+        said = value if isinstance(value, str) else str(value)
+        placeholder = isinstance(value, bool) or _normalise(said) in _PLACEHOLDERS
+        if (placeholder and key != asked_key) or _ABOUT_THE_MESSAGE.search(said):
+            log.info("Dropping %s — not something the customer said for it", key)
             continue
         kept[key] = value
     return kept
@@ -1360,10 +1398,10 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         # sentence answering two questions usually means it only answered
         # one (see _drop_restated_service).
         if prefilled:
-            pending.update(_drop_restated_service(prefilled, config))
+            pending.update(_drop_restated_service(_drop_unsaid(prefilled, None), config))
         else:
             extracted = extract_booking_slots(message, slots, config)
-            pending.update(_drop_restated_service(extracted, config))
+            pending.update(_drop_restated_service(_drop_unsaid(extracted, None), config))
         _tidy_name(pending)
 
         early = _check_datetime_now(phone, business_id, pending,
@@ -1458,6 +1496,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
             message, slots, config, already_filled=pending
         )
         missing = _first_missing_slot(pending, slots)
+        extracted = _drop_unsaid(extracted, missing["key"] if missing else None)
         if _looks_like_a_question(message):
             # Slot names only, never values: enough to see what a question
             # was mistaken for.

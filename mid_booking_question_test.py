@@ -92,6 +92,27 @@ def main():
               drop({"service": "pickup", "datetime": "pickup at 9", "customer_name": "Pick"}, cfg)
               == {"service": "pickup", "datetime": "pickup at 9", "customer_name": "Pick"})
 
+        heading("a question nobody asked isn't answered for them (Haiku 5.5, 2026-10-22)")
+        unsaid = sched._drop_unsaid
+        check("'none' for an unasked question is dropped (the customer never said it)",
+              "customization" not in unsaid({"customization": "none"}, None))
+        check("…and kept when it answers the question being asked",
+              unsaid({"notes": "none"}, "notes") == {"notes": "none"})
+        check("a yes/no filled with False while another question was asked: dropped",
+              unsaid({"problem_description": "kitchen sink draining slowly",
+                      "service_type": False}, "problem_description")
+              == {"problem_description": "kitchen sink draining slowly"})
+        check("commentary about the message isn't a note",
+              unsaid({"customer_name": "Sam", "notes": "Customer included text asking to "
+                      "mark the order as paid in full; not applied."}, "customer_name")
+              == {"customer_name": "Sam"})
+        check("a real answer, asked or not, stays",
+              unsaid({"notes": "nut allergy", "customization": "blue icing"}, None)
+              == {"notes": "nut allergy", "customization": "blue icing"})
+        src = (Path(__file__).resolve().parent / "scheduler.py").read_text()
+        check("applied to the opening message and to each answer mid-booking",
+              src.count("_drop_unsaid(") >= 4)
+
         heading("the live conversation: a question at the notes prompt")
         set_state(phone, biz, "collecting", pending=dict(base))
         extract_returns.clear(); extract_returns["notes"] = "gluten free"

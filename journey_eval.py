@@ -105,6 +105,9 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 # The keyword shortcuts' own replies (config rules: cancel_existing), whole,
 # so a model that adds "to cancel, give us a call" after the answer passes.
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
+# A reply taking back an earlier one (Claude Haiku 5.5, 2026-10-22).
+_RETRACTS = (r"correct my (?:last|previous|earlier) (?:message|reply|answer)"
+             r"|shouldn'?t have said|please disregard|I (?:mis)?spoke too soon")
 # The customer's own words for when, pasted after "on": "drain cleaning on
 # tomorrow at 10am", "pizza on 7pm" (booking greeting, walked 2026-10-20).
 _RAW_WHEN = (r"\bon (?:tomorrow|today|tonight|this \w+|next \w+"
@@ -429,6 +432,7 @@ JOURNEYS = [
             {"say": "yes", "state": "confirming",
              "must": [r"drain cleaning", r"September 23", r"10:00"]},
             {"say": "yes", "state": "idle", "must": [r"scheduled|booked"]},
+            {"say": "yes", "must_not": [_RETRACTS, r"don'?t count on"]},
         ],
     },
     {
@@ -493,6 +497,27 @@ JOURNEYS = [
              "must": [r"muffin", r"September 25", r"9:00"], "must_not": [r"cupcake"]},
             {"say": "yes", "state": "idle", "must": [r"placed|booked"],
              "must_not": [r"cupcake"]},
+        ],
+    },
+    # After a booking, the booking flow's confirmation is in the chat as an
+    # earlier reply. Claude Haiku 5.5 (2026-10-22) read it as its own and took
+    # it back: "I need to correct my last message: I can't actually place or
+    # confirm appointments, so please don't count on that booking yet."
+    {
+        "name": "after a booking, thanks doesn't undo it (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "The confirmation is the booking flow's, and true.",
+        "turns": [
+            {"say": "I'd like to order a custom birthday cake for pickup Saturday at 11am",
+             "state": "collecting"},
+            {"say": "Riley", "state": "collecting"},
+            {"say": "Happy Birthday Sam, blue icing", "state": "collecting"},
+            {"say": "none", "state": "confirming"},
+            {"say": "yes", "state": "idle", "must": [r"placed|booked"]},
+            {"say": "great, thanks! so it's all set for Saturday?",
+             "must_not": [_RETRACTS, r"don'?t count on|isn'?t (?:confirmed|placed|booked)"
+                                     r"|not (?:actually |yet )?(?:confirmed|placed|booked)"]},
         ],
     },
     # A question in the middle of a booking, one per business: answered, and
@@ -572,7 +597,8 @@ JOURNEYS = [
              "must": [r"Wednesday|October 7|Oct\.? 7(?!\d)"],
              "must_not": [r"Monday|Tuesday|Thursday"]},
             {"say": "and if it hasn't come by then?", "state": "idle",
-             "must": [r"call|\(585\)|reach"]},
+             # "contact our office" is an answer too (Haiku 5.5, 2026-10-22).
+             "must": [r"call|\(585\)|reach|contact"], "must_not": [_RETRACTS]},
         ],
     },
     # Holidays (backlog, 2026-10-20). Before: Ridgeline's three business days
