@@ -751,6 +751,15 @@ JOURNEYS = [
                    "must_not": [r"\$0\b|no charge|free of charge|waive"]}],
     },
     {
+        "name": "same-day cut and colour (Belmont)",
+        "slug": "belmont_hair_studio", "clock": (2026, 9, 22, 11, 0),    # Tuesday
+        "why": "Arithmetic says 11am + 2.5 hours clears the 3pm colour cutoff; the "
+               "document says same-day usually can't be fitted (rag_eval row 30, "
+               "'it's tight, text appointment', 3/3 on 2026-10-20).",
+        "turns": [{"say": "it's 11am, can I get a cut and colour this afternoon",
+                   "rubric": rubrics.CUT_AND_COLOUR_SAME_DAY, "rubric_when": "idle"}],
+    },
+    {
         "name": "it's 6pm, muffins guaranteed for 8am (Sunrise)",
         "slug": "sunrise_bakery_and_cafe",
         "clock": (2026, 9, 22, 18, 0),                                   # Tuesday

@@ -488,6 +488,19 @@ def check_notice(needed_by, notice_hours, what, config=None, now=None,
             result["latest_open_before"] = when(before)
         if after is not None:
             result["next_open_after"] = when(after)
+    elif in_time and notice == 0 and not cut:
+        # No notice period and no cutoff: notice says nothing about whether
+        # it can be done. "The notice is no time, so there is enough time"
+        # turned Belmont's "we can't usually fit a cut and colour in on the
+        # same day" into "it's tight, book by 3pm", 3 runs in 3; without the
+        # tool, 3 in 3 said "usually can't" (rag_eval row 30, 2026-10-20).
+        result["enough_notice"] = None
+        result["say"] = (f"The facts give no notice period for {what}, so notice "
+                         f"doesn't limit it, and this says nothing about whether it "
+                         f"can be done at {clock_time(needed)}. Answer from what the "
+                         f"facts say about it (how long it takes, the last time it "
+                         f"starts, anything they say usually can't be done the same "
+                         f"day), not from this.")
     elif in_time:
         result["say"] = (f"From now ({when(now)}) to {when(needed)} is "
                          f"{span(available)}. The notice for {what} is "

@@ -253,6 +253,22 @@ def main():
     # and check_notice takes its numbers from it (2026-10-20).
     sun = yaml_config("sunrise_bakery_and_cafe")
     cross = yaml_config("crosstown_pizza")
+    # Zero notice says nothing either way (rag_eval row 30, 2026-10-20):
+    # "the notice is no time, so there is enough time" made "we can't usually
+    # fit a cut and colour in the same day" into "it's tight, book by 3pm".
+    from datetime import datetime as _dt2
+    bel = yaml_config("belmont_hair_studio")
+    r = policy.check_notice("2026-09-22T17:00", 0, "cut and colour", bel,
+                            now=_dt2(2026, 9, 22, 11, 0))
+    check("no notice period: not 'enough time', and not a yes",
+          r["enough_notice"] is None and "enough time" not in r["say"]
+          and "says nothing about whether it can be done" in r["say"], r["say"])
+    check("…and it points back to the facts ('usually can't')",
+          "usually can't" in r["say"], r["say"])
+    r = policy.check_notice("2026-09-22T17:00", 3, "a party tray", yaml_config("crosstown_pizza"),
+                            now=_dt2(2026, 9, 22, 11, 0))
+    check("a real notice that's met still says there's enough time",
+          r["enough_notice"] is True and "enough time" in r["say"], r["say"])
     check("the generated line for custom cakes",
           policy.notice_line_for("Custom Birthday Cakes (Topics: x)", sun)
           == "Notice for custom birthday cakes: at least 3 days (72 hours).",
