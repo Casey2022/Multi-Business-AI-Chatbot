@@ -22,15 +22,15 @@ google-auth-httplib2==0.4.1
 httplib2==0.32.0
 # Reads the text out of an uploaded PDF menu (photo_import.pdf_text). Pure
 # Python. Without it, PDFs still work: the model reads them as scans.
-pypdf==6.18.0
+pypdf==6.21.2
 # Takes the page pictures out of a scanned PDF (photo_import.page_images), so
 # the model reads what's visible, not the PDF's text layer. Arrives with
 # chromadb anyway; named because we import it ourselves.
-Pillow==12.3.0
+Pillow==13.0.0
 # Fetches an owner's web page with the address it checked pinned
 # (web_import._open). Arrives with requests anyway; named because we
 # import it ourselves.
-urllib3==2.7.0
+urllib3==2.8.0
 
 # Security floors on transitive dependencies. Neither is imported by our
 # code; both arrive underneath twilio, voyageai and chromadb, and the
@@ -39,5 +39,20 @@ urllib3==2.7.0
 # on a known-bad build, which is why they're floors (>=) and not pins.
 #   aiohttp <3.14.3 — 14 advisories, client-side parser and header bugs
 #   anyio   <4.14.2 — CVE-2026-63374, TLS host name spoofing via IDNA 2003
-aiohttp>=3.14.3
+# pip-audit, 2026-10-23 (notes/security.md, "Dependencies"): 101 advisories
+# across these and the pins above (Pillow 37, pypdf 17, PyJWT 15, aiohttp 8,
+# ...), each floor the lowest version that clears all of a package's.
+# OpenTelemetry's api, sdk and exporter pin each other exactly, so they move
+# together. chromadb has 5 with no fix; all are in its HTTP server, which we
+# don't run (rag.py uses the embedded PersistentClient).
+aiohttp>=3.14.4
 anyio>=4.14.2
+werkzeug>=3.1.9
+PyJWT>=2.15.0
+certifi>=2026.10.19
+filelock>=4.2.1
+multidict>=6.9.1
+oauthlib>=4.0.0
+opentelemetry-api>=1.45.1
+opentelemetry-sdk>=1.45.1
+opentelemetry-exporter-otlp-proto-grpc>=1.45.1
