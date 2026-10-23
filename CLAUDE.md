@@ -109,6 +109,9 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
 - `admin/`: owner and operator portal (`routes.py`, `support_routes.py`,
   templates). `support.py`: Help requests and demo feedback → Support inbox
   (+ email when SMTP env vars are set).
+- `preview.py`: Preview answers (Now vs After you publish). `grounding.py`:
+  marks a fact in an answer that nothing it read says (numbers in code,
+  claims by Sonnet 5.5); measured by `grounding_eval.py`.
 - `rag.py`, `import_documents.py`, `db.py`, `config.py`, `demo.py`.
 - Deeper reading: `notes/codebase_walkthrough.md`,
   `notes/debugging_lessons.md`, `notes/conversation_defects.md`.

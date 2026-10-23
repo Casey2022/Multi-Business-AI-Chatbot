@@ -335,6 +335,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 }
 .chip-booked  { color: var(--booked);  background: var(--booked-wash);  border-color: var(--booked); }
 .chip-pending { color: var(--pending); background: var(--pending-wash); border-color: var(--pending); }
+.chip-warn { color: var(--pending); background: transparent; border-color: var(--pending); border-style: dashed; }
 .chip-refused { color: var(--refused); background: var(--refused-wash); border-color: var(--refused); }
 .chip-quiet   { color: var(--ink-soft); background: var(--surface-sunk); border-color: var(--rule-strong); }
 
@@ -732,6 +733,12 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .fact-change {
   background: var(--pending-wash); color: inherit;
   border-bottom: 2px solid var(--pending); padding: 0 2px; border-radius: 2px;
+}
+/* Preview: a phrase in "After you publish" that nothing the assistant read
+   says (grounding.py). Dashed, so it doesn't read as a changed fact. */
+.not-in-info {
+  background: var(--pending-wash); color: inherit;
+  border-bottom: 2px dashed var(--pending); padding: 0 2px; border-radius: 2px;
 }
 .fact-changes {
   margin: var(--s2) 0 0 18px; font-size: var(--text-sm); color: var(--ink-soft);

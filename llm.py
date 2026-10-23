@@ -101,6 +101,23 @@ _price = next((v for k, v in _PRICES.items() if MODEL.startswith(k)), (1.00, 5.0
 PRICE_IN_PER_MTOK  = float(os.environ.get("LLM_PRICE_IN",  _price[0]))
 PRICE_OUT_PER_MTOK = float(os.environ.get("LLM_PRICE_OUT", _price[1]))
 
+
+def prices_for(model):
+    """($ per million in, out) for the model a call actually used. Before
+    (2026-10-22), every call was priced as the receptionist's model, so a
+    Sonnet call (ASSISTANT_MODEL, UPLOAD_MODEL, the grounding check) counted
+    a twentieth of its cost against a demo's daily budget. A model this
+    table doesn't know is priced as the dearest one it does."""
+    if not model or model == MODEL:
+        return PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK
+    known = next((v for k, v in _PRICES.items() if model.startswith(k)), None)
+    return known or max(_PRICES.values())
+
+
+def cost_of(model, tokens_in, tokens_out):
+    price_in, price_out = prices_for(model)
+    return tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out
+
 # Per-turn totals. A ContextVar for the same reason the log's turn id is
 # one: the four call sites below are scattered across this module and none
 # of them knows which customer message it belongs to.
@@ -116,7 +133,7 @@ def turn_used_tools():
 
 def start_turn_accounting():
     """Begin counting API spend for one inbound customer message."""
-    _turn_usage.set({"calls": 0, "in": 0, "out": 0})
+    _turn_usage.set({"calls": 0, "in": 0, "out": 0, "dollars": 0.0})
 
 
 def _note_usage(response, purpose):
@@ -133,6 +150,9 @@ def _note_usage(response, purpose):
             running["calls"] += 1
             running["in"]    += tokens_in
             running["out"]   += tokens_out
+            model = getattr(response, "model", None)
+            running["dollars"] = running.get("dollars", 0.0) + cost_of(
+                model if isinstance(model, str) else MODEL, tokens_in, tokens_out)
     except Exception as e:                      # pragma: no cover
         log.debug("Could not record usage for %s: %s", purpose, e)
 
@@ -142,8 +162,7 @@ def turn_cost_summary():
     running = _turn_usage.get()
     if not running or not running["calls"]:
         return None
-    dollars = (running["in"] / 1e6 * PRICE_IN_PER_MTOK
-               + running["out"] / 1e6 * PRICE_OUT_PER_MTOK)
+    dollars = running.get("dollars", 0.0)
     return (f"{running['calls']} call(s), {running['in']:,} in / "
             f"{running['out']:,} out ≈ ${dollars:.5f}")
 
@@ -178,8 +197,8 @@ def _sent(call):
         log.warning("The model declined (%s)", getattr(details, "category", None))
     try:
         usage = response.usage
-        budget.record(usage.input_tokens / 1e6 * PRICE_IN_PER_MTOK
-                      + usage.output_tokens / 1e6 * PRICE_OUT_PER_MTOK)
+        budget.record(cost_of(call.get("model", MODEL), usage.input_tokens,
+                              usage.output_tokens))
     except Exception as e:                      # bookkeeping never breaks a reply
         log.debug("Couldn't price a call: %s", e)
     return response
@@ -1051,7 +1070,8 @@ def _reply_using_tools(call, config, now, results_seen=None):
 
 
 def get_llm_reply(message, history=None, config=None, channel="sms",
-                  mid_booking=False, temperature=None, now=None, others_said=None):
+                  mid_booking=False, temperature=None, now=None, others_said=None,
+                  sources=None):
     """Send the customer's message to Claude with full context and return reply.
 
     Context assembled per-request:
@@ -1071,6 +1091,11 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
     A one-question swing then reads as a regression when it is the weather.
     rag_eval pins it to 0 so a difference between runs is a difference in
     the system.
+
+    `sources`, if a list, gets everything the reply could rely on: the whole
+    system prompt (business facts and the excerpts), the conversation, and
+    each tool result. Preview answers checks the reply against it
+    (grounding.py). Nothing else passes it.
     """
     if config is None:
         raise ValueError("get_llm_reply requires a config dict — "
@@ -1184,6 +1209,11 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
             call["temperature"] = temperature
         tool_results = []
         reply = _reply_using_tools(call, config, now, tool_results)
+        if sources is not None:
+            sources.append(effective_system)
+            sources.extend(m["content"] for m in messages
+                           if isinstance(m.get("content"), str))
+            sources.extend(json.dumps(r) for r in tool_results)
         if not reply:
             # Every round spent on tool calls and nothing said. Rare, but a
             # blank bubble is worse than an honest "try again".

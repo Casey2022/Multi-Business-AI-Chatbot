@@ -16,10 +16,16 @@ With no questions typed, it suggests a few from the sections that changed
 since the last publish (found by comparing the draft's chunks with the live
 index's), so an owner who edits one section gets questions about that
 section.
+
+Each "After" answer is also checked against everything it read
+(grounding.py): a price, time, number or claim that nothing in the
+business's information contains is marked "not in your information", so a
+made-up fact is caught before a customer acts on it.
 """
 
 import copy
 import logging
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 
@@ -30,6 +36,11 @@ MAX_QUESTION_CHARS = 200
 # Each question is two replies; four at a time keeps five questions well
 # inside the worker's 60-second limit.
 PARALLEL = 4
+# The model behind the grounding check's claims half. Sonnet 5.5 caught
+# 18/18 with no false flags on evals/grounding_cases.json, twice; Haiku 5.5
+# 16-17/18 with a flag on a true sentence most runs (grounding_eval.py,
+# 2026-10-22). About $0.007 an answer.
+GROUNDING_MODEL = os.environ.get("GROUNDING_MODEL", "claude-sonnet-5-5")
 
 
 def parse_questions(text):
@@ -224,42 +235,59 @@ def compare_facts(question, now, after):
         return {"changed": True, "differences": [], "method": "exact"}
 
 
-def highlight_segments(text, phrases):
-    """[(piece, highlighted)] covering `text`, with each phrase that appears
-    in it word for word (any case) highlighted. A phrase that doesn't appear
-    exactly is ignored rather than guessed at."""
+def highlight_segments(text, phrases, unsupported=()):
+    """[(piece, mark)] covering `text`: each phrase that appears in it word
+    for word (any case) marked True (a changed fact), and each unsupported
+    phrase marked "unsupported" where it doesn't overlap one. A phrase that
+    doesn't appear exactly is ignored rather than guessed at."""
     text = text or ""
     spans = []
     lowered = text.lower()
-    for phrase in sorted({p.strip() for p in phrases if p and p.strip()},
-                         key=len, reverse=True):
-        start = lowered.find(phrase.lower())
-        while start != -1:
-            end = start + len(phrase)
-            if not any(s < end and start < e for s, e in spans):
-                spans.append((start, end))
-            start = lowered.find(phrase.lower(), end)
+    for group, mark in ((phrases, True), (unsupported, "unsupported")):
+        for phrase in sorted({p.strip() for p in group if p and p.strip()},
+                             key=len, reverse=True):
+            start = lowered.find(phrase.lower())
+            while start != -1:
+                end = start + len(phrase)
+                if not any(s < end and start < e for s, e, _ in spans):
+                    spans.append((start, end, mark))
+                start = lowered.find(phrase.lower(), end)
     segments, at = [], 0
-    for s, e in sorted(spans):
+    for s, e, mark in sorted(spans):
         if s > at:
             segments.append((text[at:s], False))
-        segments.append((text[s:e], True))
+        segments.append((text[s:e], mark))
         at = e
     if at < len(text) or not segments:
         segments.append((text[at:], False))
     return segments
 
 
-def _answer(question, config):
+def _answer(question, config, sources=None):
     """One reply, pinned (temperature 0) like the evals: unpinned, "Now" and
-    "After" would differ in wording when nothing that matters changed."""
+    "After" would differ in wording when nothing that matters changed.
+    `sources`, if a list, gets what the reply could rely on (grounding.py)."""
     from llm import get_llm_reply
+    extra = {} if sources is None else {"sources": sources}
     try:
         return get_llm_reply(question, [], config, channel="webchat",
-                             temperature=0)
+                             temperature=0, **extra)
     except Exception as e:
         log.warning("Preview answer failed: %s", e)
         return f"(Couldn't get an answer: {type(e).__name__})"
+
+
+def _unsupported(reply, sources):
+    """grounding.unsupported for one After answer; [] when the answer has
+    nothing to check against (it failed before reading anything)."""
+    import grounding
+    if not sources:
+        return []
+    try:
+        return grounding.unsupported(reply, sources, GROUNDING_MODEL)
+    except Exception as e:
+        log.warning("Grounding check failed: %s", e)
+        return []
 
 
 def run_preview(config, business_id, questions):
@@ -279,27 +307,36 @@ def run_preview(config, business_id, questions):
         if draft:
             draft_config.setdefault("business", {})["collection"] = draft
         with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
+            read = [[] for _ in questions]
             now = [pool.submit(_answer, q, config) for q in questions]
-            after = [pool.submit(_answer, q, draft_config) for q in questions]
+            after = [pool.submit(_answer, q, draft_config, r)
+                     for q, r in zip(questions, read)]
             answers = [(q, n.result(), a.result())
                        for q, n, a in zip(questions, now, after)]
             checks = [pool.submit(compare_facts, q, n, a) for q, n, a in answers]
+            grounded = [pool.submit(_unsupported, a, r)
+                        for (_, _, a), r in zip(answers, read)]
             results = []
-            for (q, n, a), c in zip(answers, checks):
+            for (q, n, a), c, g in zip(answers, checks, grounded):
                 facts = c.result()
+                unsupported = g.result()
                 # The owner's own test question and the two replies: no
                 # customer data. Logged so a preview can be reviewed from
                 # logs/app.log without a screenshot.
-                log.info("Preview %r: %s (%s) %s | now=%r | after=%r", q,
+                log.info("Preview %r: %s (%s) %s | now=%r | after=%r | "
+                         "not in their information: %s", q,
                          "FACTS CHANGE" if facts["changed"] else "same facts",
-                         facts["method"], facts["differences"], n, a)
+                         facts["method"], facts["differences"], n, a,
+                         [f["phrase"] for f in unsupported])
                 results.append({
                     "question": q, "now": n, "after": a,
                     "changed": facts["changed"],
                     "differences": facts["differences"],
                     "compared_by": facts["method"],
+                    "unsupported": unsupported,
                     "after_segments": highlight_segments(
-                        a, [d["after"] for d in facts["differences"]]),
+                        a, [d["after"] for d in facts["differences"]],
+                        [f["phrase"] for f in unsupported]),
                 })
         return results
     finally:

@@ -53,7 +53,7 @@
           <tr>
             <td class="cell-strong">{{ r.question }}</td>
             <td>{{ r.now }}</td>
-            <td>{% for piece, marked in r.after_segments %}{% if marked %}<mark class="fact-change">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}
+            <td>{% for piece, marked in r.after_segments %}{% if marked == "unsupported" %}<mark class="not-in-info">{{ piece }}</mark>{% elif marked %}<mark class="fact-change">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}
               <div class="mt-4">
                 {% if r.changed %}<span class="chip chip-pending">Facts change</span>
                 {% else %}<span class="chip chip-quiet">Same facts</span>{% endif %}
@@ -68,6 +68,16 @@
               {% elif r.changed and r.compared_by == "exact" %}
               <div class="cell-sub">Couldn't compare the facts just now; the wording differs.</div>
               {% endif %}
+              {% if r.unsupported %}
+              <div class="mt-4">
+                <span class="chip chip-warn">Not in your information</span>
+                <ul class="fact-changes">
+                  {% for f in r.unsupported %}
+                  <li><span class="cell-strong">“{{ f.phrase }}”</span>{% if f.why %}: {{ f.why }}{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -78,7 +88,10 @@
       {% if preview_suggested %}These questions were suggested from the
       sections you changed. {% endif %}"Facts change" means a price, time,
       condition or yes/no differs, and the new wording is highlighted; a
-      reworded reply with the same facts is "Same facts". Not what you meant? Edit the section
+      reworded reply with the same facts is "Same facts". "Not in your
+      information" marks a price, time or claim that nothing in your
+      knowledge base, settings or rules says: the assistant made it up or
+      worked it out, so check it before customers see it. Not what you meant? Edit the section
       and preview again, or use <strong>Discard all changes</strong> at the top to
       go back to the published wording. Nothing changes for customers until
       you publish.

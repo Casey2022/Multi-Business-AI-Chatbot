@@ -284,8 +284,9 @@ def main():
                     say(f"      ✗ {p}")
             failed += bool(problems)
 
-    cost = ((usage["in"] + usage["cache_write"] * 1.25 + usage["cache_read"] * 0.1)
-            / 1e6 * llm.PRICE_IN_PER_MTOK + usage["out"] / 1e6 * llm.PRICE_OUT_PER_MTOK)
+    cost = llm.cost_of(assistant.ASSISTANT_MODEL or llm.MODEL,
+                       usage["in"] + usage["cache_write"] * 1.25 + usage["cache_read"] * 0.1,
+                       usage["out"])
     print(f"\n{len(chosen) - failed}/{len(chosen)} cases pass. Tokens: {usage['in']:,} in, "
           f"{usage['cache_read']:,} cached, {usage['cache_write']:,} cache writes, "
           f"{usage['out']:,} out ≈ ${cost:.3f} ({assistant.ASSISTANT_MODEL or llm.MODEL})")

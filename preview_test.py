@@ -140,8 +140,11 @@ def main():
     fake.get_or_create_collection("test_pizza").add(live, ["a", "b", "c"], [{}, {}, {}])
     asked = []
     def fake_reply(message, history=None, config=None, channel="sms",
-                   mid_booking=False, temperature=None, now=None):
+                   mid_booking=False, temperature=None, now=None, sources=None):
         coll = config["business"]["collection"]
+        if sources is not None:
+            sources.append("Gluten-free crust: $3 extra on a 10-inch personal only. "
+                           "Delivery covers up to 6 miles.")
         asked.append((message, coll, temperature, list(history or [])))
         if "deliver" in message:          # same facts, reworded
             return ("Delivery covers up to 6 miles." if coll.endswith("__preview_7")
@@ -195,9 +198,55 @@ def main():
           and "test_pizza__preview_7" in fake.deleted)
     check("the live index is untouched", "test_pizza" in fake.collections
           and fake.collections["test_pizza"].docs == live)
+    heading("a fact nothing it read says is marked (grounding.py)")
+    def making_up(message, history=None, config=None, channel="sms",
+                  mid_booking=False, temperature=None, now=None, sources=None):
+        if sources is not None:
+            sources.append("Gluten-free crust: $3 extra on a 10-inch personal only.")
+        return "Only the 10-inch, $3 extra, or $5 on a large, and free garlic knots."
+    graded = []
+    def claims(**call):
+        content = call["messages"][0]["content"]
+        if "business_information" in content:
+            graded.append(call.get("model"))
+            data = {"unsupported": [{"quote": "free garlic knots", "why": "not offered"},
+                                    {"quote": "words the reply never said", "why": "x"}]}
+        else:
+            data = {"facts_changed": False, "differences": []}
+        return types.SimpleNamespace(usage=None, content=[types.SimpleNamespace(
+            type="text", text=_json.dumps(data))])
+    llm.get_llm_reply, llm._create = making_up, claims
+    try:
+        made_up = preview.run_preview(config, biz, ["gluten free on a large?"])[0]
+    finally:
+        llm.get_llm_reply, llm._create = real_reply, real_create
+    phrases = [f["phrase"] for f in made_up["unsupported"]]
+    check("a price nobody wrote down is flagged, by code", "$5" in phrases, phrases)
+    check("a claim nobody made is flagged, by the model", "free garlic knots" in phrases, phrases)
+    check("…but not a quote that isn't in the reply, or a supported fact",
+          "words the reply never said" not in phrases and "$3" not in phrases
+          and not any("10-inch" in p for p in phrases), phrases)
+    check("both are marked in the After reply",
+          ("$5", "unsupported") in made_up["after_segments"]
+          and ("free garlic knots", "unsupported") in made_up["after_segments"],
+          made_up["after_segments"])
+    check("the claims check runs on the grounding model (Sonnet 5.5 unless set)",
+          graded == [preview.GROUNDING_MODEL]
+          and 'os.environ.get("GROUNDING_MODEL", "claude-sonnet-5-5")'
+          in (ROOT / "preview.py").read_text(), graded)
+    check("an answer with nothing read (it failed) isn't checked",
+          preview._unsupported("(Couldn't get an answer: TypeError)", []) == [])
+    seg = preview.highlight_segments("Only $3, or $5.", ["only $3"], ["$3", "$5"])
+    check("a changed fact wins where the two overlap; the rest is marked unsupported",
+          seg == [("Only $3", True), (", or ", False), ("$5", "unsupported"), (".", False)], seg)
+    page = (ROOT / "admin" / "templates" / "admin" / "knowledge.html").read_text()
+    check("the page marks them apart and lists them with the reason, escaped",
+          '<mark class="not-in-info">{{ piece }}</mark>' in page
+          and "Not in your information" in page and "{{ f.why }}" in page)
+
     src = (ROOT / "preview.py").read_text()
     check("each comparison is logged for review (question, label, replies)",
-          'log.info("Preview %r: %s (%s) %s | now=%r | after=%r"' in src)
+          'log.info("Preview %r: %s (%s) %s | now=%r | after=%r | "' in src)
     check("the caller's config still points at the live index",
           config["business"]["collection"] == "test_pizza")
 

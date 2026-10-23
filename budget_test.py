@@ -286,12 +286,44 @@ def test_door_routes(client, demo):
     check("neither asked the model", len(SENT) == before)
 
 
+def test_priced_by_model(demo):
+    """A call is charged at the prices of the model it used. Before
+    (2026-10-22), every call was priced as the receptionist's model, so a
+    Sonnet call (ASSISTANT_MODEL, UPLOAD_MODEL, Preview's grounding check)
+    counted a twentieth of its cost."""
+    heading("each call is charged at its own model's prices")
+    real_day = budget._day
+    budget._day = lambda: "2099-02-02"                 # a fresh day, nothing spent
+    try:
+        key = budget._key(demo["slug"])
+        for model in (llm.MODEL, "claude-sonnet-5-5", "a-model-nobody-priced"):
+            with app.test_request_context(f"/chat/{demo['slug']}"):
+                app.preprocess_request()
+                before = spent(key)
+                llm._create(messages=[{"role": "user", "content": "x"}], max_tokens=5,
+                            model=model)
+                charged = spent(key) - before
+            want = llm.cost_of(model, FAKE_IN, FAKE_OUT)
+            check(f"{model}: charged ${want:.2f}", abs(charged - want) < 1e-6,
+                  (charged, want))
+            db.add_model_spend(key, budget._day(), -charged * 1e6)
+            db.add_model_spend(budget.ALL_DEMOS, budget._day(), -charged * 1e6)
+        check("Sonnet 5.5 costs 20 times Haiku 5.5's",
+              abs(llm.cost_of("claude-sonnet-5-5", FAKE_IN, FAKE_OUT)
+                  - 20 * llm.cost_of("claude-haiku-5-5", FAKE_IN, FAKE_OUT)) < 1e-9)
+        check("a model the table doesn't know is priced as the dearest it does",
+              llm.prices_for("a-model-nobody-priced") == max(llm._PRICES.values()))
+    finally:
+        budget._day = real_day
+
+
 def main():
     client, demo = test_counting_and_caps()
     test_crossing_message()
     test_the_call_itself(demo)
     test_door_routes(client, demo)
     test_every_route(client, demo)
+    test_priced_by_model(demo)
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 1 if FAILED else 0
 

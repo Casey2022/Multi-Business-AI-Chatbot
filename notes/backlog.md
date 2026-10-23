@@ -37,13 +37,23 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
   "we open at 11, so a noon tray can't be promised; call". Noon is open;
   the chat takes orders before opening.
+- Bob's, after-hours emergency at 11pm (Preview's grounding check,
+  2026-10-22): "call (585) 555-0124 if you need help right away", the main
+  line; the Emergency Service section says after hours it's 555-0123.
+- Crosstown "how much is a large pepperoni": the menu tool says pepperoni
+  isn't a listed topping (the menu has "topping", not each one), and the
+  model adds $22 + $2.75 itself. Probably right, never looked up; Preview
+  now flags "$24.75". Same gap as row 32 below.
+- Local DB: Bob's Emergency Service says a $90 after-hours fee, the seed
+  says $75 (a local edit? the live site has $75). Demos copied locally get $90.
+- Preview's Now/After comparison (`preview.compare_facts`) got unreadable
+  JSON once (2026-10-23) and fell back to "wording differs"; the grounding
+  check now reads the object after any preamble, and this could too.
 - Crosstown rag_eval row 32 ("a medium with two toppings, delivered"):
   "$25-26" for $24.50, once on 2026-10-22; no tool on that path.
 
 ## Owner portal
 
-- A "not in your documents" flag in Preview answers: a fact the assistant
-  states that the knowledge base doesn't contain.
 - A contradiction check across knowledge-base sections.
 - A guide page owners can read.
 - The Knowledge page's rename doesn't warn that menu prices attach by section
@@ -74,9 +84,8 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
   password should end other sessions. Re-check login throttling.
 - **Abuse and cost:** push on the existing rate limits (chat, demo creation,
   uploads, support). Demo spend is capped (`budget.py`: $0.50 a demo, $5
-  all demos, a day). It prices every call at `LLM_PRICE_IN`/`OUT`, so if
-  `ASSISTANT_MODEL` or `UPLOAD_MODEL` is set to a pricier model, those calls
-  are under-counted. The upload routes' budget checks aren't exercised by
+  all demos, a day), each call at its own model's prices
+  (`llm.cost_of`, 2026-10-23). The upload routes' budget checks aren't exercised by
   `budget_test.py`'s sweep (they need a file or a fetched page first);
   `llm._create` still refuses their calls past the budget.
 - **Secrets:** a real secrets story (`notes/security.md`, "Still to do"); the
