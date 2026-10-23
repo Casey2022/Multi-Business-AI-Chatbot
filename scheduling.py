@@ -151,6 +151,71 @@ def _in_block(start, end, sched):
     return any(start < b_end and end > b_start for b_start, b_end in sched.get("blocks", []))
 
 
+_DAY_SHORT = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+_DAY_PLURAL = ("Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays",
+               "Saturdays", "Sundays")
+
+
+def weekly_hours(table):
+    """The weekly hours as {weekday 0-6: ("HH:MM", "HH:MM")}, whatever the
+    keys are (YAML ints, or strings from a saved override)."""
+    out = {}
+    for day, span in (table or {}).items():
+        try:
+            day = int(day)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= day <= 6 and span and len(span) == 2:
+            out[day] = (str(span[0]), str(span[1]))
+    return out
+
+
+def _clock(hhmm):
+    """ "07:00" -> "7am", "09:30" -> "9:30am", "22:00" -> "10pm"."""
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    suffix = "am" if hour < 12 else "pm"
+    hour = hour % 12 or 12
+    return f"{hour}:{minute:02d}{suffix}" if minute else f"{hour}{suffix}"
+
+
+def hours_text(table):
+    """The hours as customers are told them, made from the weekly table:
+    "Tue-Sun, 7am-3pm (closed Mondays)". The table is the only copy
+    (YAML review, 2026-10-23): the text used to be typed separately, owners
+    could edit it and not the table, and an owner who changed one told
+    customers one closing time while bookings followed the other.
+
+    Days in a row with the same hours are one group; groups are separated
+    by "; ". Closed days are named after, starting from the day after the
+    last open one ("closed Sun & Mon"), except a Monday-Friday business's
+    weekend, which "Mon-Fri" already says."""
+    week = weekly_hours(table)
+    if not week:
+        return ""
+    groups = []
+    for day in range(7):
+        if day not in week:
+            continue
+        if groups and groups[-1]["last"] == day - 1 and groups[-1]["span"] == week[day]:
+            groups[-1]["last"] = day
+        else:
+            groups.append({"first": day, "last": day, "span": week[day]})
+    parts = []
+    for g in groups:
+        days = (_DAY_SHORT[g["first"]] if g["first"] == g["last"]
+                else f"{_DAY_SHORT[g['first']]}-{_DAY_SHORT[g['last']]}")
+        parts.append(f"{days}, {_clock(g['span'][0])}-{_clock(g['span'][1])}")
+    text = "; ".join(parts)
+    last_open = max(week)
+    closed = [(last_open + i) % 7 for i in range(1, 8) if (last_open + i) % 7 not in week]
+    if not closed or (set(closed) == {5, 6} and set(week) == {0, 1, 2, 3, 4}):
+        return text
+    if len(closed) == 1:
+        return f"{text} (closed {_DAY_PLURAL[closed[0]]})"
+    names = [_DAY_SHORT[d] for d in closed]
+    return f"{text} (closed {', '.join(names[:-1])} & {names[-1]})"
+
+
 def within_business_hours(dt, duration_min, sched):
     """True if [dt, dt+duration] falls inside open hours and outside blackouts."""
     hours = sched["business_hours"]

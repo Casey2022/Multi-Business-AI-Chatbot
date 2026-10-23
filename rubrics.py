@@ -331,11 +331,12 @@ COLOUR_IS_NOT_CUT_AND_COLOUR = Rubric(
 # notice and says nothing about opening hours, so in each of these the
 # notice is MET and the shop is shut at the time wanted. The hours are in
 # the prompt on every message; these measure whether the reply uses them.
-_SUNRISE_HOURS = ("We're open Tuesday through Sunday, 7am to 3pm, closed Mondays. "
+# The business facts' hours line, made from the weekly table since 2026-10-23.
+_SUNRISE_HOURS = ("- Hours: Tue-Sun, 7am-3pm (closed Mondays)",
                   "Cake pickup is available anytime during open hours")
 
 CLOSED_MONDAY_CAKE = Rubric(
-    quote=("Notice for custom birthday cakes: at least 3 days (72 hours).", _SUNRISE_HOURS),
+    quote=("Notice for custom birthday cakes: at least 3 days (72 hours).", *_SUNRISE_HOURS),
     criteria="""It is Thursday at 10am. Monday at 10am is 96 hours away, so the
     72 hours' notice is met, but the bakery is closed on Mondays, so the cake
     can't be picked up then. The reply must say they're closed Mondays (or
@@ -344,7 +345,7 @@ CLOSED_MONDAY_CAKE = Rubric(
     works, or only talks about the notice being met.""")
 
 AFTER_CLOSING_MUFFINS = Rubric(
-    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", _SUNRISE_HOURS),
+    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", *_SUNRISE_HOURS),
     criteria="""It is Saturday at 1pm. Sunday at 5pm is 28 hours away, so the
     24 hours' notice is met, but the bakery closes at 3pm, so 5pm pickup isn't
     possible. The reply must say they close at 3pm (or that 5pm is after
@@ -354,7 +355,7 @@ AFTER_CLOSING_MUFFINS = Rubric(
     it doesn't say Sunday itself is closed. Fails if it agrees to 5pm.""")
 
 EARLIEST_PICKUP_TUESDAY = Rubric(
-    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", _SUNRISE_HOURS),
+    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", *_SUNRISE_HOURS),
     criteria="""It is Sunday at 1pm. With 24 hours' notice the muffins could be
     ready Monday at 1pm, but the bakery is closed on Mondays, so the earliest
     pickup is Tuesday when they open at 7am. Fails if it offers Monday, or
@@ -362,8 +363,8 @@ EARLIEST_PICKUP_TUESDAY = Rubric(
 
 TRAY_AFTER_CLOSE = Rubric(
     quote=("Notice for party tray: at least 3 hours, and on Fridays and Saturdays it must be ordered by 4pm.",
-           "We're open Tuesday to Sunday, 11am to 10pm, closed Mondays. The "
-           "kitchen stops taking orders at 9:45pm."),
+           "- Hours: Tue-Sun, 11am-10pm (closed Mondays)",
+           "The kitchen stops taking orders at 9:45pm."),
     criteria="""It is Tuesday at 10am and they want a party tray on Thursday at
     11pm. The three hours' notice is met and the 4pm cutoff is only for Friday
     and Saturday, but Crosstown closes at 10pm (the kitchen stops taking
@@ -376,7 +377,7 @@ BLOCKED_SUNDAY = Rubric(
     # 2026-10-18: Sunday blocked off on the Calendar page (the reason is the
     # owner's, private). check_notice and the booking flow both treat it as
     # unavailable.
-    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", _SUNRISE_HOURS),
+    quote=("Notice for muffins by the dozen: at least 24 hours.", "order a dozen ahead to guarantee it.", *_SUNRISE_HOURS),
     criteria="""It is Saturday at 9am. Sunday at 11am is 26 hours away, so the
     24 hours' notice is met, but the bakery isn't available on Sunday (the
     owner has blocked the day off), and it is closed Mondays, so the earliest

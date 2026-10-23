@@ -61,7 +61,7 @@
     <div class="card-title">Business details</div>
 
     {% for field in ['business.name', 'business.phone', 'business.emergency_phone',
-                     'business.address', 'business.hours', 'business.service_area'] %}
+                     'business.address', 'business.service_area'] %}
       {% set parts = field.split('.') %}
       <div class="field">
         <label for="f-{{ loop.index }}">{{ fields[field].label }}</label>
@@ -71,6 +71,31 @@
           hours go here; everything else to the phone above. Leave it blank to use one number.</p>{% endif %}
       </div>
     {% endfor %}
+
+    {% set hf = 'calendar.scheduling.business_hours' %}
+    <div class="field" id="hours">
+      <div class="field-title">{{ fields[hf].label }}</div>
+      <p class="hint">Bookings follow these, and customers are told
+        “{{ config.business.hours }}”.</p>
+      <input type="hidden" name="{{ hf }}.posted" value="1">
+      <div class="hours-table">
+        {% for d in hours_rows %}
+        <div class="inline-fields hours-row">
+          <label class="chip-check hours-day">
+            <input type="checkbox" name="{{ hf }}[{{ d.index }}].open" value="1"
+                   {% if d.open %}checked{% endif %}> {{ d.name }}
+          </label>
+          <input type="time" name="{{ hf }}[{{ d.index }}].from" value="{{ d.start }}"
+                 aria-label="{{ d.name }}: opens at" class="w-auto">
+          <span>to</span>
+          <input type="time" name="{{ hf }}[{{ d.index }}].to" value="{{ d.end }}"
+                 aria-label="{{ d.name }}: closes at" class="w-auto">
+        </div>
+        {% endfor %}
+      </div>
+      <p class="hint">Untick a day you're closed. Holidays and one-off closures go on the
+        <a href="{{ url_for('admin.calendar_view', business_id=business.id) }}">Calendar</a>.</p>
+    </div>
 
     {% set limiting = choice_values['business.service_radius.enabled'] == 'yes' %}
     <div class="field">

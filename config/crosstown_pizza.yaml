@@ -22,7 +22,6 @@ business:
   slug: "crosstown_pizza"
   phone: "(585) 555-0177"
   address: "88 Culver Rd, Rochester NY"
-  hours: "Tue-Sun, 11am-10pm (closed Mondays)"
   service_area: "Delivery within 6 miles; pickup anytime at the counter"
   service_radius:
     enabled: true
@@ -112,7 +111,7 @@ calendar:
     buffer_minutes: 0
     slot_granularity: 15            # people say "7:15", not "7:30"
     max_alternatives: 3
-    business_hours:
+    business_hours:                 # the only copy: the hours text customers are told is made from it (scheduling.hours_text)
       1: ["11:00", "22:00"]
       2: ["11:00", "22:00"]
       3: ["11:00", "22:00"]

@@ -47,8 +47,7 @@ ready in 20 minutes. There's no minimum and no fee. This chat is set
 up for delivery orders, so for pickup, give the shop a ring.
 
 ## Hours and Busy Times (Topics: hours, open, closed, busy, wait)
-We're open Tuesday to Sunday, 11am to 10pm, closed Mondays. The
-kitchen stops taking orders at 9:45pm. Friday and Saturday between
+The kitchen stops taking orders at 9:45pm. Friday and Saturday between
 6pm and 8pm is the busiest stretch of the week and everything takes
 longer then — order early if you're feeding a crowd.
 

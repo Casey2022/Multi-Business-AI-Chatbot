@@ -175,7 +175,10 @@ TESTS = {
         ("is delivery free?",                     "Pickup, Delivery",  ["$15", ("tray", "trays")]),
         ("do you charge to deliver a pastry tray", "Pickup, Delivery", ("free", "no charge", "no fee")),
         ("how much is cake delivery",             "Pickup, Delivery",  "$15"),
-        ("are you open Mondays",                  "Pickup, Delivery",  "closed"),
+        # "ANSWER_ONLY" since 2026-10-23: the hours left the documents (every
+        # prompt states them, made from the weekly table), so there is no
+        # section to retrieve. The answer is still scored.
+        ("are you open Mondays",                  "ANSWER_ONLY",       "closed"),
         ("do you sell coffee beans",                "ANSWER_ONLY",       DECLINE),
         ("can I book a table for breakfast",        "ANSWER_ONLY",       DECLINE),
         ("do you make cookies",                   "ANSWER_ONLY",       DECLINE),
@@ -464,7 +467,9 @@ HARD = {
         ("can I book Marcus for my balayage",     "Stylists",          [("Priya", "Dana"), "confirm"]),
         # --- Added 2026-10-07: prices and totals ---
         ("do I pay anything up front for balayage",
-                                                  "Colour Deposits",   ["$30", ("off the final bill", "comes off")]),
+                                                  "Colour Deposits",   ["$30", ("off the final bill", "comes off",
+                                                                         # "taken off your final bill" (2026-10-23)
+                                                                         "off your final bill")]),
         ("I had a full cut here two weeks ago, how much to tidy my fringe",
                                                   "Haircuts",          "free"),
     ],
@@ -644,6 +649,13 @@ def validate_tests():
                     line = policy.notice_line_for(title, loaded)
                     if line:
                         document += "\n\n" + line
+            # And the hours, which every prompt states (from the weekly
+            # table) and the documents no longer do, since 2026-10-23.
+            import scheduling
+            hours = scheduling.hours_text(
+                (loaded.get("calendar") or {}).get("scheduling", {}).get("business_hours"))
+            if hours:
+                document += f"\n\n- Hours: {hours}"
         lowered  = document.lower()
         headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", document, re.M)]
 

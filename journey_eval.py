@@ -835,6 +835,35 @@ JOURNEYS = [
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
         ],
     },
+    # Hours lived twice: the text customers are told (business.hours) and the
+    # weekly table bookings follow (calendar.scheduling.business_hours).
+    # Owners could edit the text, not the table, and nothing kept them in
+    # step (YAML review, 2026-10-23). Here the owner has moved Sunrise's
+    # close to 5pm every day it opens.
+    {
+        "name": "hours: the owner moved closing to 5pm (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "business_hours": {d: ["07:00", "17:00"] for d in range(1, 7)},
+        "why": "The hours text still said 3pm while bookings took 4pm.",
+        "turns": [
+            {"say": "what time do you close on Saturday?",
+             "must": [r"\b5\s*(?:pm|p\.m\.)|5:00"], "must_not": [r"\b3\s*(?:pm|p\.m\.)|3:00"]},
+            {"say": "I'd like to order a dozen muffins for pickup Saturday at 4pm",
+             "state": "collecting", "must_not": [r"\bclosed\b"]},
+        ],
+    },
+    {
+        "name": "hours: asked without the hours words, after a change (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "business_hours": {d: ["07:00", "17:00"] for d in range(1, 7)},
+        "why": "The model reads the hours text too.",
+        "turns": [
+            {"say": "is 4:30 on a Saturday too late to swing by for a coffee?",
+             "must_not": [r"\b3\s*(?:pm|p\.m\.)|3:00", r"\bclosed\b|too late"]},
+        ],
+    },
     # After hours, an emergency goes to the on-call line, not the main one.
     # Preview's grounding check, 2026-10-22: at 11pm Bob's said "call (585)
     # 555-0124 if you need help right away", the main line (an owner
@@ -1040,6 +1069,13 @@ def _short(value, limit=260):
 
 def run(journey, verbose=False):
     shutil.copy(_PRISTINE, db.DB_PATH)
+    if journey.get("business_hours"):
+        # The weekly hours an owner saved on Settings, for this journey only:
+        # an override in this run's copy of the database, read by
+        # load_config like any owner's, so the hours text is made from it.
+        owner = db.get_business_by_slug(journey["slug"])
+        db.set_config_override(owner["id"], "calendar.scheduling.business_hours",
+                               {str(d): span for d, span in journey["business_hours"].items()})
     config = prepare(config_for(journey["slug"]))
     if journey.get("business"):
         # Owner settings for this journey only (a main phone that isn't the

@@ -32,8 +32,7 @@ croissants, danishes, scones, and mini muffins. Trays can be delivered:
 see Pickup, Delivery, and Hours for when it's free.
 
 ## Pickup, Delivery, and Hours (Topics: delivery, delivery fee, free delivery, pickup)
-We're open Tuesday through Sunday, 7am to 3pm, closed Mondays. Cake
-pickup is available anytime during open hours; we recommend pickup at
+Cake pickup is available anytime during open hours; we recommend pickup at
 least 2 hours before you need the cake. Delivery is available for orders
 over $50 within a 5-mile radius: pastry trays are delivered free, and cakes
 have a $15 delivery fee.

@@ -360,6 +360,11 @@ tbody tr:hover td { background: var(--surface-sunk); }
    wonders where the distance went is worse off than one who can see it
    sitting there, greyed, next to the answer that would wake it up. */
 .field.is-inert > label { opacity: .5; }
+/* Settings: the weekly hours, a row per day (the only copy of the hours;
+   the text customers are told is made from it). Wraps on a phone. */
+.field-title { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: .01em; }
+.hours-table { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s2) 0; }
+.hours-row .hours-day { min-width: 8.5rem; }
 .field.is-inert > select,
 .field.is-inert > input { opacity: .5; cursor: not-allowed; background: var(--surface-sunk); }
 

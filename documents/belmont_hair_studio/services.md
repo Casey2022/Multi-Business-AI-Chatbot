@@ -57,8 +57,7 @@ rebook the service, since the next client is already on their way.
 
 ## Payment and Hours (Topics: payment, cards, cash, tipping, hours, walk-in)
 We take all major cards, cash, and contactless. Tips are welcome in
-cash or on the card. We're open Tuesday to Saturday, 9am to 6pm, and
-closed Sunday and Monday. The last colour appointment of the day goes
+cash or on the card. The last colour appointment of the day goes
 in at 3pm, because a colour takes two hours and we don't rush it.
 We take walk-ins when a chair is free, but booking ahead is the only
 way to be sure of a slot.

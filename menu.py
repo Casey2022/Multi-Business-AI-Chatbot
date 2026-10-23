@@ -264,7 +264,10 @@ def price_lines_for(title, config):
 def section_lines_for(title, config):
     """Everything generated under a section: its price lines (the menu) and
     its notice line (booking.notice, policy.notice_line_for). Both tables
-    are the only copy of their numbers, so the prose doesn't state them."""
+    are the only copy of their numbers, so the prose doesn't state them.
+    (Opening hours aren't here: every prompt states them, from the weekly
+    table, and a line in the index would go stale the moment an owner saved
+    new hours, until the next Publish; journey_eval, 2026-10-23.)"""
     # Notice first: it reads on from the section's own text, which explains
     # it (Crosstown: "past the order-by time, pizzas … can still be ordered").
     # After the prices, it followed a list of trays, and 2 runs in 9 offered

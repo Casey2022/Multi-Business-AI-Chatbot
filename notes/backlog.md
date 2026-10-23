@@ -46,8 +46,30 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   check now reads the object after any preamble, and this could too.
 - Local DB: Bob's has a "Drywall Repair" section the seed doesn't (left in
   place on 2026-10-23, when the rest of Bob's was reset to the seed).
+- Belmont rag_eval row 32 ("do I pay anything up front for balayage"), once
+  on 2026-10-23: the $30 deposit right, then "the info I have doesn't confirm
+  whether balayage counts as a colour service". It's a lightening service;
+  the Colour Deposits section says "colour services over $100".
 - Crosstown rag_eval row 32 ("a medium with two toppings, delivered"):
   "$25-26" for $24.50, once on 2026-10-22; no tool on that path.
+
+## Config structure (YAML review, 2026-10-23)
+
+Keep YAML; fix how facts spread across it. Done: opening hours have one
+copy (the weekly table; owners edit it on Settings). Next, in order:
+- **Stable service IDs.** Notice, durations, cancellation rules, booking
+  questions and menu sections link by service name, and owners can rename
+  services on Settings: renaming "custom birthday cakes" silently drops its
+  72-hour notice (only a startup log line says so). A fixed key per service,
+  the name as a label; until then, warn on Settings before a rename.
+- **Shared defaults.** The SMS/voice/webchat channel rules are identical in
+  all five YAMLs; the universal guardrails are 24-54% alike. One defaults
+  file, each business keeping only what differs (prompts measured the same).
+- **Local vs seed check / reset command** (`rag_eval` warns; a command that
+  lists and resets the differences would have saved this week's detours).
+- **Schema check at load**, surfaced in the portal, not only the log.
+- **Persistence on Render** before a real business: the disk is wiped on
+  each deploy, so owner overrides vanish.
 
 ## Owner portal
 

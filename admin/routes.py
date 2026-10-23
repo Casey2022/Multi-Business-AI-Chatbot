@@ -281,6 +281,24 @@ def settings(business_id):
         for field, spec in EDITABLE_FIELDS.items():
             # Extra questions post one input per row rather than a single
             # named field, so they're read from the whole form.
+            if spec["type"] == "hours":
+                from config import parse_weekly_hours
+                import scheduling
+                value, errors = parse_weekly_hours(request.form, field)
+                if value is None:
+                    continue        # this form doesn't carry the hours table
+                if errors:
+                    for message in errors:
+                        flash(f"Opening hours: {message}.", "error")
+                    had_error = True
+                    continue
+                if scheduling.weekly_hours(value) == scheduling.weekly_hours(
+                        get_nested(base, field)):
+                    clear_config_override(business_id, field)
+                else:
+                    set_config_override(business_id, field, value,
+                                        updated_by=user["email"])
+                continue
             if spec["type"] == "questions":
                 value, errors = parse_extra_questions(
                     request.form,
@@ -406,6 +424,7 @@ def settings(business_id):
         # longer has them.
         policy_lines = policy_text(config).splitlines(),
         notice_lines = notice_form.describe(config),
+        hours_rows = weekly_hours_rows(config),
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
         max_extra_questions = MAX_EXTRA_QUESTIONS,
@@ -553,6 +572,20 @@ def pending_changes(business):
     except Exception:
         pass
     return lines or ["knowledge-base changes"]
+
+
+def weekly_hours_rows(config):
+    """The Settings hours table: a row per weekday, ticked when open. A
+    closed day shows the hours of the nearest open day, so ticking it
+    starts from something sensible."""
+    import scheduling
+    from config import WEEKDAY_NAMES
+    week = scheduling.weekly_hours(
+        ((config.get("calendar") or {}).get("scheduling") or {}).get("business_hours"))
+    usual = next(iter(week.values()), ("09:00", "17:00"))
+    return [{"index": d, "name": WEEKDAY_NAMES[d], "open": d in week,
+             "start": week.get(d, usual)[0], "end": week.get(d, usual)[1]}
+            for d in range(7)]
 
 
 def section_price_lines(business, sections):

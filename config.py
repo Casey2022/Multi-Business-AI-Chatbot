@@ -25,8 +25,12 @@ EDITABLE_FIELDS = {
     "business.emergency_phone": {"label": "After-hours emergency line (if you have one)",
                                  "type": "text"},
     "business.address":     {"label": "Address",         "type": "text"},
-    "business.hours":       {"label": "Hours (as shown to customers)",
-                             "type": "text"},
+    # The weekly hours: bookings follow them, and the hours customers are
+    # told ("Tue-Sun, 7am-3pm") are made from them (scheduling.hours_text).
+    # Before 2026-10-23 that text was a field of its own, and an owner who
+    # edited it told customers one thing while bookings followed another.
+    "calendar.scheduling.business_hours": {"label": "Opening hours",
+                                           "type": "hours"},
     "business.service_area":{"label": "Service area",    "type": "text"},
     "services":             {"label": "Services offered","type": "list"},
     "booking.noun":         {"label": "What you call a booking",
@@ -306,6 +310,40 @@ def parse_extra_questions(form, field="booking.extra_questions",
     return questions, errors
 
 
+_TIME = re.compile(r"([01]?\d|2[0-3]):([0-5]\d)")
+WEEKDAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                 "Saturday", "Sunday")
+
+
+def parse_weekly_hours(form, field="calendar.scheduling.business_hours"):
+    """Read the Settings hours table back into {"0": ["HH:MM", "HH:MM"], ...}.
+
+    Each day posts 'field[d].open' (a tick), 'field[d].from' and
+    'field[d].to'. An unticked day is closed. Returns (table, errors), or
+    (None, []) when the form doesn't carry the table at all."""
+    if f"{field}.posted" not in form:
+        return None, []
+    table, errors = {}, []
+    for day, name in enumerate(WEEKDAY_NAMES):
+        if not form.get(f"{field}[{day}].open"):
+            continue
+        start = (form.get(f"{field}[{day}].from") or "").strip()
+        end = (form.get(f"{field}[{day}].to") or "").strip()
+        a, b = _TIME.fullmatch(start), _TIME.fullmatch(end)
+        if not a or not b:
+            errors.append(f"{name}: give an opening and a closing time")
+            continue
+        start = f"{int(a.group(1)):02d}:{a.group(2)}"
+        end = f"{int(b.group(1)):02d}:{b.group(2)}"
+        if end <= start:
+            errors.append(f"{name}: closing time has to be after opening time")
+            continue
+        table[str(day)] = [start, end]
+    if not table and not errors:
+        errors.append("Open at least one day: with none, nothing can be booked")
+    return table, errors
+
+
 def _set_nested(config, dotted_field, value):
     """Set a dotted path into a nested dict: 'business.phone' → config['business']['phone']."""
     parts = dotted_field.split(".")
@@ -411,6 +449,17 @@ def load_config(config_path, business_id=None):
             # is: it has to be unreachable from anything anyone can type.
             if row.get("is_demo"):
                 config.setdefault("calendar", {})["provider"] = "simulated"
+
+    # The hours customers are told, made from the weekly table bookings
+    # follow (after the owner's overrides): one copy, so the two can't
+    # disagree. Its keys are made 0-6 ints whatever JSON stored them as.
+    import scheduling
+    sched = config.setdefault("calendar", {}).setdefault("scheduling", {})
+    if sched.get("business_hours"):
+        sched["business_hours"] = {d: list(span) for d, span in
+                                   scheduling.weekly_hours(sched["business_hours"]).items()}
+        config.setdefault("business", {})["hours"] = scheduling.hours_text(
+            sched["business_hours"])
 
     # Resolve the persona preset into actual persona text.
     preset = config.get("bot", {}).get("persona_preset")

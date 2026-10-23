@@ -12,7 +12,6 @@ business:
   # phone here, but an owner can change either one.
   emergency_phone: "(585) 555-0123"
   address: "123 Main St, Rochester NY"
-  hours: "Mon-Fri, 9am-5pm"
   service_area: "Greater Rochester, within 20 miles"
   # Structured form of the line above, used for the address check.
   # Origin defaults to business.address when omitted. Businesses
@@ -40,7 +39,7 @@ calendar:
     buffer_minutes: 45        # travel/cleanup between jobs
     slot_granularity: 30      # offer alternatives on :00 and :30
     max_alternatives: 3
-    business_hours:           # 0 = Monday ... 6 = Sunday; omit = closed
+    business_hours:           # the only copy (scheduling.hours_text makes the text); 0 = Monday ... 6 = Sunday; omit = closed
       0: ["09:00", "17:00"]
       1: ["09:00", "17:00"]
       2: ["09:00", "17:00"]

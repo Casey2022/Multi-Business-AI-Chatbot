@@ -13,7 +13,6 @@ business:
   slug: "belmont_hair_studio"
   phone: "(585) 555-0142"
   address: "212 Monroe Ave, Rochester NY"
-  hours: "Tue-Sat, 9am-6pm (closed Sun & Mon)"
   service_area: "Walk-in studio on Monroe Ave — no travel"
 
 services:
@@ -126,7 +125,7 @@ calendar:
     buffer_minutes: 0          # the next client sits in the same chair
     slot_granularity: 30
     max_alternatives: 3
-    business_hours:            # 0 = Monday ... 6 = Sunday; omit = closed
+    business_hours:            # the only copy (scheduling.hours_text makes the text); 0 = Monday ... 6 = Sunday; omit = closed
       1: ["09:00", "18:00"]
       2: ["09:00", "18:00"]
       3: ["09:00", "18:00"]

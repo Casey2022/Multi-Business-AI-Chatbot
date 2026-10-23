@@ -70,7 +70,9 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
   byte-identical. Offering extra tools changed unrelated answers.
 - **One source of truth.** Cancellation rules live only in
   `policies.cancellation` (YAML or the owner's override), menu prices only in
-  `menu:`. Don't state the same fact in two knowledge-base sections.
+  `menu:`, opening hours only in `calendar.scheduling.business_hours` (the
+  text customers hear is made from it; documents don't state hours). Don't
+  state the same fact in two knowledge-base sections.
 - **Owner changes are drafts until Publish** (`*_draft` config overrides,
   `documents_dirty`); Preview answers uses drafts.
 - **Keyword shortcuts** (`rules:` in each YAML, `rules.py`) answer before the

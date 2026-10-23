@@ -8,7 +8,6 @@ business:
   slug: "sunrise_bakery_and_cafe"
   phone: "(585) 555-0188"
   address: "47 Park Ave, Rochester NY"
-  hours: "Tue-Sun, 7am-3pm (closed Mondays)"
   service_area: "Pickup at the shop, delivery within 5 miles for orders over $50"
 
 services:
@@ -129,7 +128,7 @@ calendar:
     buffer_minutes: 0               # no travel time — they're behind a counter
     slot_granularity: 30
     max_alternatives: 3
-    business_hours:                 # Tue-Sun 7am-3pm, closed Monday
+    business_hours:                 # the only copy (scheduling.hours_text makes the text); 0 = Monday ... 6 = Sunday; omit = closed
       1: ["07:00", "15:00"]
       2: ["07:00", "15:00"]
       3: ["07:00", "15:00"]
