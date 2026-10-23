@@ -79,7 +79,9 @@ def changed_sections(config, business_id, live=None):
     shows everything as changed, since its chunks were cut differently."""
     import rag
     import menu
-    chunks, _ids, _metas = rag.db_chunks(business_id, menu.with_draft(config, business_id))
+    import notice_form
+    chunks, _ids, _metas = rag.db_chunks(business_id, notice_form.with_draft(
+        menu.with_draft(config, business_id), business_id))
     live = live_chunks(config) if live is None else live
     live_set = {c.strip() for c in live}
     changed = [c for c in chunks if c.strip() not in live_set]
@@ -268,9 +270,11 @@ def run_preview(config, business_id, questions):
     import policy_form
     try:
         # "After" uses the draft menu too (the menu tool and the price lines),
-        # and the draft cancellation rules (the cancellation tool).
-        draft_config = copy.deepcopy(policy_form.with_draft(
-            menu.with_draft(config, business_id), business_id))
+        # the draft cancellation rules (the cancellation tool), and the
+        # draft booking notice (check_notice and the generated lines).
+        import notice_form
+        draft_config = copy.deepcopy(notice_form.with_draft(policy_form.with_draft(
+            menu.with_draft(config, business_id), business_id), business_id))
         draft = build_draft(draft_config, business_id)
         if draft:
             draft_config.setdefault("business", {})["collection"] = draft

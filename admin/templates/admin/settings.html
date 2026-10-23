@@ -197,6 +197,23 @@
     </div>
   </div>
 
+  <div class="card" id="notice">
+    <div class="card-title">Booking notice</div>
+    <div class="guidance card-pad">
+      {% if notice_lines %}
+      <p>How far ahead each service has to be booked. Bookings follow these, and the
+        assistant answers from them.</p>
+      <ul>
+        {% for line in notice_lines %}<li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No service needs notice yet: any open time can be booked.</p>
+      {% endif %}
+      <a class="btn mt-3" href="{{ url_for('admin.booking_notice', business_id=business.id) }}">{{ 'Change booking notice' if notice_lines else 'Set up booking notice' }}</a>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Booking</div>
 

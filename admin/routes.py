@@ -393,6 +393,7 @@ def settings(business_id):
     # owner can't see or set, so they're the only ones that have to say so.
     from geocode import key_configured
     from policy import policy_text
+    import notice_form
     return render_template(
         "admin/settings.html",
         address_check_ready = key_configured(),
@@ -404,6 +405,7 @@ def settings(business_id):
         # see exactly what the assistant applies, and the Knowledge page no
         # longer has them.
         policy_lines = policy_text(config).splitlines(),
+        notice_lines = notice_form.describe(config),
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
         max_extra_questions = MAX_EXTRA_QUESTIONS,
@@ -454,7 +456,8 @@ def _knowledge_page(business, conflict=None, status=200):
 # Where Publish and Discard send you back to: the page you pressed them on.
 # Only these named pages, never a URL from the form (an open redirect).
 _BACK_TO = {"knowledge": "admin.knowledge", "menu": "admin.menu_page",
-            "settings": "admin.settings", "cancellation": "admin.cancellation_rules"}
+            "settings": "admin.settings", "cancellation": "admin.cancellation_rules",
+            "notice": "admin.booking_notice"}
 
 
 def _back_to(business_id):
@@ -542,9 +545,11 @@ def pending_changes(business):
         lines.append("deleted: " + ", ".join(changes["deleted"]))
     lines += [f"menu: {line}" for line in menu_changes_waiting(fresh)]
     import policy_form
+    import notice_form
     try:
-        lines += policy_form.waiting_lines(load_config(fresh["config_path"], fresh["id"]),
-                                           fresh["id"])
+        live = load_config(fresh["config_path"], fresh["id"])
+        lines += policy_form.waiting_lines(live, fresh["id"])
+        lines += notice_form.waiting_lines(live, fresh["id"])
     except Exception:
         pass
     return lines or ["knowledge-base changes"]
@@ -572,8 +577,11 @@ def section_notice_lines(business, sections):
     of the numbers (notes/booking_notice.md), so an owner who saw a cake
     section with no notice in it shouldn't type the number back in."""
     import policy
+    import notice_form
     try:
-        config = load_config(business["config_path"], business["id"])
+        # The draft, like the price lines: the owner sees what Publish will do.
+        config = notice_form.with_draft(load_config(business["config_path"], business["id"]),
+                                        business["id"])
     except Exception:
         return {}
     return {s["id"]: line for s in sections
@@ -1153,6 +1161,52 @@ def cancellation_rules(business_id):
         price_word=(editing or {}).get("price", "the price"))
 
 
+@admin_bp.route("/business/<int:business_id>/notice", methods=["GET", "POST"])
+@login_required
+def booking_notice(business_id):
+    """How much notice each service needs (notice_form). Saving makes a
+    draft: customers and the booking flow keep the published notice until
+    Publish, which also rebuilds the knowledge base's generated lines."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import notice_form
+    from db import get_documents
+    from admin.auth import current_user
+
+    live_config = load_config(business["config_path"], business_id)
+    editing = notice_form.with_draft(live_config, business_id)
+    errors, posted = [], {}
+
+    if request.method == "POST":
+        new, errors = notice_form.parse(request.form, editing)
+        if not errors:
+            if notice_form.describe({"booking": {"notice": new}}) == \
+                    notice_form.describe(live_config):
+                notice_form.discard_draft(business_id)
+                flash("That's what customers are told now, so there's nothing to publish.",
+                      "info")
+            else:
+                notice_form.save_draft(business_id, new, updated_by=current_user()["email"])
+                flash("Saved as a draft. Bookings and answers keep the current notice until "
+                      "you press Publish changes; Preview answers on the Knowledge base page "
+                      "shows how the assistant will answer with the new one.", "success")
+            return redirect(url_for("admin.booking_notice", business_id=business_id))
+        posted = request.form
+
+    has_draft = notice_form.draft(business_id) is not None
+    sections = get_documents(business_id)
+    return render_template(
+        "admin/notice.html", business=business, errors=errors, posted=posted,
+        rows=notice_form.rows(editing), days=notice_form.DAYS,
+        section_titles=[s["title"] for s in sections],
+        now_lines=notice_form.describe(live_config),
+        after_lines=notice_form.describe(editing) if has_draft else [],
+        has_draft=has_draft,
+        overlapping=notice_form.sections_stating_notice(sections))
+
+
 @admin_bp.route("/business/<int:business_id>/knowledge/discard", methods=["POST"])
 @login_required
 def knowledge_discard(business_id):
@@ -1167,21 +1221,23 @@ def knowledge_discard(business_id):
 
     import menu
     import policy_form
-    had_menu_draft = menu.draft_menu(business_id) is not None
-    had_rules_draft = policy_form.draft(business_id) is not None
+    import notice_form
+    had = [name for name, waiting in (("menu", menu.draft_menu(business_id)),
+                                      ("cancellation-rule", policy_form.draft(business_id)),
+                                      ("booking-notice", notice_form.draft(business_id)))
+           if waiting is not None]
     menu.discard_draft(business_id)
     policy_form.discard_draft(business_id)
+    notice_form.discard_draft(business_id)
     if discard_document_changes(business_id, updated_by=current_user()["email"]):
-        flash("Changes discarded — the sections, menu and cancellation rules are back "
-              "to what customers see. Anything you'd written is still in each "
-              "section's History.", "success")
-    elif had_menu_draft or had_rules_draft:
+        flash("Changes discarded — the sections, menu, cancellation rules and booking "
+              "notice are back to what customers see. Anything you'd written is still "
+              "in each section's History.", "success")
+    elif had:
         changes = unpublished_changes(get_business_by_id(business_id))
         if not (changes["edited"] or changes["new"] or changes["deleted"]):
             set_documents_clean(business_id)
-        flash(("Menu and cancellation-rule" if had_menu_draft and had_rules_draft else
-               "Menu" if had_menu_draft else "Cancellation-rule") + " changes discarded.",
-              "success")
+        flash((" and ".join(had).capitalize()) + " changes discarded.", "success")
     else:
         flash("There's no published version saved to go back to yet. Publish "
               "once, and Discard will work from then on.", "error")
@@ -1313,10 +1369,14 @@ def knowledge_publish(business_id):
     try:
         # A menu change from a photo is a draft until now: build with it,
         # and make it the live menu only once the rebuild has succeeded.
-        config = menu.with_draft(load_config(business["config_path"], business_id),
-                                 business_id)
+        # The booking notice's generated lines are in each section's chunk
+        # too, so a notice draft is built in the same way.
+        import notice_form
+        config = notice_form.with_draft(menu.with_draft(
+            load_config(business["config_path"], business_id), business_id), business_id)
         ingest_documents(config, business_id=business_id)
         menu.publish_draft(business_id)
+        notice_form.publish_draft(business_id)
         # Cancellation rules aren't in the index (the tool reads them from
         # config), so they only need promoting, once the rest has worked.
         import policy_form

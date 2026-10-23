@@ -1,0 +1,136 @@
+{% extends "admin/base.html" %}
+{% import "admin/_macros.html" as ui %}
+
+{% block title %}Booking notice — {{ business.name }}{% endblock %}
+
+{% macro amount(prefix, value, unit, label) %}
+  <input type="text" id="{{ prefix }}" name="{{ prefix }}_amount" class="w-num" inputmode="decimal"
+         aria-label="{{ label }}" value="{{ posted.get(prefix ~ '_amount', value) if posted else value }}">
+  {% set u = posted.get(prefix ~ '_unit', unit) if posted else unit %}
+  <select name="{{ prefix }}_unit" aria-label="Hours or days" class="w-auto">
+    <option value="hours" {% if u == 'hours' %}selected{% endif %}>hours</option>
+    <option value="days" {% if u == 'days' %}selected{% endif %}>days</option>
+  </select>
+{% endmacro %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('admin.dashboard') }}">Businesses</a> ›
+  <a href="{{ url_for('admin.settings', business_id=business.id) }}">{{ business.name }}</a> ›
+  Booking notice
+</div>
+
+<div class="page-header">
+  <h1>Booking notice</h1>
+  <div class="subtitle">How far ahead each service has to be booked. The booking flow won't
+    take a time inside it and offers the earliest that works instead, and the assistant
+    answers notice questions from these numbers. Changes are drafts until you publish them.</div>
+</div>
+
+{{ ui.destinations(business, 'settings') }}
+
+{{ ui.unpublished_banner(business, 'notice') }}
+
+{% if errors %}
+<div class="flash flash-error" role="alert">
+  <strong>Not saved.</strong> {{ errors | join('. ') }}.
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-title">What customers are told</div>
+  <div class="card-pad rules-compare">
+    <div>
+      <div class="cell-sub">Now</div>
+      {% if now_lines %}<ul class="rules-lines">{% for line in now_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% else %}<p class="hint">No service needs notice: any open time can be booked.</p>{% endif %}
+    </div>
+    {% if has_draft %}
+    <div>
+      <div class="cell-sub">After you publish</div>
+      {% if after_lines %}<ul class="rules-lines">{% for line in after_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% else %}<p class="hint">No service needs notice: any open time can be booked.</p>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if overlapping %}
+<div class="banner" role="note">
+  <div><strong>Your knowledge base also states a notice period</strong>
+    ({{ overlapping | join(', ') }}). If it says something different from this page,
+    customers could be told two different things. The numbers here are added to the right
+    section for you, so take the number out of
+    {{ 'that section' if overlapping | length == 1 else 'those sections' }}.</div>
+</div>
+{% endif %}
+
+{% if not rows %}
+<div class="card">
+  <div class="card-pad guidance">
+    <p>This business has no services listed yet, so there's nothing to set notice for.</p>
+  </div>
+</div>
+{% else %}
+<form method="POST" class="stack">
+  <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+  {% for r in rows %}
+  {% set p = r.slug %}
+  <div class="card rule-card" id="notice-{{ p }}">
+    <div class="card-title rule-card-title"><span>{{ r.name[:1] | upper }}{{ r.name[1:] }}</span></div>
+    <div class="card-pad rule-card-body">
+      <div class="inline-fields rule-line">
+        <label for="{{ p }}">Needs at least</label>
+        {{ amount(p, r.amount, r.unit, r.name ~ ': notice') }}
+        <span>notice.</span>
+      </div>
+      <p class="hint">Leave it blank for no notice.</p>
+
+      <div class="inline-fields rule-line">
+        <label for="{{ p }}_order_by">And ordered by</label>
+        <input type="time" id="{{ p }}_order_by" name="{{ p }}_order_by" class="w-auto"
+               value="{{ posted.get(p ~ '_order_by', r.order_by) if posted else r.order_by }}">
+        <span>on</span>
+      </div>
+      <div class="chip-row" role="group" aria-label="{{ r.name }}: days the order-by time applies">
+        {% for d in days %}
+        {% set on = posted.get(p ~ '_day_' ~ d) if posted else d in r.order_by_days %}
+        <label class="chip-check">
+          <input type="checkbox" name="{{ p }}_day_{{ d }}" value="1" {% if on %}checked{% endif %}>
+          {{ d[:3] | capitalize }}
+        </label>
+        {% endfor %}
+      </div>
+      <p class="hint">Optional: a same-day cutoff, like party trays ordered by 4pm on Fridays.
+        No days ticked means every day.</p>
+
+      {% for v in r.variants %}
+      {% set vp = p ~ '_v' ~ loop.index0 %}
+      <div class="inline-fields rule-line">
+        <label for="{{ vp }}">{{ v.name[:1] | upper }}{{ v.name[1:] }}: at least</label>
+        {{ amount(vp, v.amount, v.unit, v.name ~ ': notice') }}
+      </div>
+      <p class="hint">Applies when the order says “{{ v.words }}”. Clear it to drop it.</p>
+      {% endfor %}
+
+      <div class="inline-fields rule-line">
+        <label for="{{ p }}_section">Shown in the knowledge base under</label>
+        {% set chosen = posted.get(p ~ '_section', r.section) if posted else r.section %}
+        <select id="{{ p }}_section" name="{{ p }}_section" class="w-auto">
+          <option value="" {% if not chosen %}selected{% endif %}>Not shown in a section</option>
+          {% for t in section_titles %}
+          {% set core = t.split(' (')[0] %}
+          <option value="{{ core }}" {% if chosen and (chosen == core or chosen == t) %}selected{% endif %}>{{ core }}</option>
+          {% endfor %}
+        </select>
+        <p class="hint">The assistant reads the notice with this section when a customer asks.</p>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div><button class="btn btn-primary" type="submit">Save as draft</button></div>
+</form>
+{% endif %}
+{% endblock %}

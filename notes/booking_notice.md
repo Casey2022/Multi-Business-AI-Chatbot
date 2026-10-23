@@ -4,8 +4,8 @@ Decided 2026-10-20. Status: version 1 built the same day (tables for
 Sunrise and Crosstown; the booking flow refuses and filters), then the
 duplication removed: generated knowledge-base lines (notice first, before
 prices: after them, "Friday at five" offered trays 2 runs in 9), and
-`check_notice` reading the table as a floor. Not yet: variants and an owner
-page (see the backlog).
+`check_notice` reading the table as a floor. Version 2 (2026-10-22):
+variants and an owner page, below.
 
 ## The gap
 
@@ -86,3 +86,35 @@ cake booked for tomorrow (72h needed) and a Crosstown tray at 5pm on a
 Friday. After: each refused with the earliest time; the alternatives all
 meet the notice; every existing booking journey still clean, x3. Mutation-
 test the lookup and the alternatives filter.
+
+## Version 2 (2026-10-22): variants and an owner page
+
+**Variants.** An entry can list `variants:`, each `{words, hours, name,
+sections}`. `policy.notice_for(service, config, details)` takes the order's
+own words and returns the longest notice they name (with `variant`: its
+name, for the refusal). The booking flow's words are `scheduler._order_details`:
+the customer's opening message (`_asked`, kept because the extractor files
+"a dozen gluten-free muffins" as "muffins by the dozen") plus every answer,
+so a "gluten free" given at the notes question is caught by the check
+before the read-back. `details` travels with `service` through
+`calendar_sync` → backend → `scheduling`. The generated line names each
+variant, and a variant's `sections` get a line of their own (gluten-free
+sponge under Flavors, gluten-free muffins under Allergens). The prose no
+longer states 96 or 72.
+
+Before: three journeys, 0/3 each (gluten-free muffins Thursday, a themed
+display Thursday, gluten-free said at the notes question). After: 3/3.
+
+Not matched: a negation ("not gluten free") still names the variant, so
+it can refuse a time it didn't need to; the refusal names the rule, so the
+customer can say so. Say if it happens.
+
+**Owner page** (`notice_form.py`, `/admin/business/<id>/notice`, linked
+from Settings and from each generated line on the Knowledge page). A card
+per service: hours or days, an order-by time and its days, each variant's
+hours, and the section that shows the line. A draft like the cancellation
+rules (`notice_draft` → `notice` on Publish); Publish rebuilds the index
+with it, since the lines are in the chunks. Which words name a service or
+a variant stay the operator's (copied through untouched). A variant
+shorter than its service is refused (it would never apply). Not yet:
+adding a new variant from the page.

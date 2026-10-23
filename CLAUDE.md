@@ -103,6 +103,7 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
   `scheduler.py`: the booking flow. `rules.py`: keyword shortcuts.
 - `policy.py`: rule tools, opening hours and blocks, reply checks.
   `policy_form.py`: the owner's cancellation-rules form (per-service cards).
+  `notice_form.py`: the owner's booking-notice form (`booking.notice`).
 - `menu.py`, `menu_form.py`: menus as data. `photo_import.py`,
   `web_import.py`: uploads (photos, PDFs, web pages).
 - `admin/`: owner and operator portal (`routes.py`, `support_routes.py`,

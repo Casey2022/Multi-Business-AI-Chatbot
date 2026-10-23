@@ -346,6 +346,11 @@ def load_config(config_path, business_id=None):
                 # "cancellation_draft" is ignored here the same way).
                 import policy_form
                 policy_form.apply_live(config, value)
+            elif field == "notice":
+                # The owner's published booking notice (notice_form;
+                # "notice_draft" is ignored here the same way).
+                import notice_form
+                notice_form.apply_live(config, value)
             elif field == "holidays" and isinstance(value, list):
                 # The holidays the owner closes for (Calendar page). Live at
                 # once, like the page's blocks; the YAML's list is the default.

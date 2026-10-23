@@ -30,13 +30,9 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 - "A day the owner blocked off", ~1 run in 10: the model says "closed on
   Sundays and Mondays", and `policy.one_off_said_as_one` turns it into "not
   available this Sunday and Mondays", which the judge rightly fails.
-- **Booking notice, after version 1** (`notes/booking_notice.md`). The
-  table is the only copy now: each section's notice line is generated from
-  `booking.notice`, the prose no longer states the numbers, and
-  `check_notice` takes them from the table (as a floor). Still to do:
-  (1) variants: themed cupcake displays 72h, gluten-free 96h, still in the
-  prose; (2) an owner page to edit notice (the Knowledge page shows it
-  read-only).
+- Booking notice: adding a new variant from the owner page (version 2 edits
+  existing ones only); a negated variant ("not gluten free") still counts
+  (`notes/booking_notice.md`).
 - Crosstown, Friday 5pm, "noon tray tomorrow, when do I order by?": 1 run
   in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
   "we open at 11, so a noon tray can't be promised; call". Noon is open;

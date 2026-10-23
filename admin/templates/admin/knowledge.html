@@ -177,7 +177,7 @@
       {% endif %}
       {% if notice_lines and notice_lines.get(s.id) %}
       <div class="menu-prices">
-        <div class="cell-sub">Notice, from your booking settings (the assistant reads this with this section, and bookings follow it):</div>
+        <div class="cell-sub">Notice, from your <a href="{{ url_for('admin.booking_notice', business_id=business.id) }}">booking notice</a> (the assistant reads this with this section, and bookings follow it):</div>
         <div>{{ notice_lines[s.id] }}</div>
       </div>
       {% endif %}
