@@ -92,8 +92,10 @@ def main():
     check("the check says it differs (exit code 1)", seed_check.main(["bobs_plumbing"]) == 1)
 
     heading("reset: back to the seed, after a backup")
+    before = set((ROOT / "backups").glob("chatbot-*.db"))
     done = seed_check.main(["bobs_plumbing", "--reset", "--yes", "--no-index"])
-    backups = sorted((ROOT / "backups").glob("chatbot-*.db"))
+    ours = sorted(set((ROOT / "backups").glob("chatbot-*.db")) - before)
+    backups = ours
     check("it ran", done == 0)
     check("the database was copied to backups/ first", backups and backups[-1].stat().st_size > 0)
     diff = seed_check.differences(db.get_business_by_slug("bobs_plumbing"))
@@ -128,9 +130,8 @@ def main():
     check("an unknown business is refused", seed_check.main(["nobody_here"]) == 2)
     check("backups/ is never committed",
           "backups/" in (ROOT / ".gitignore").read_text())
-    for b in (ROOT / "backups").glob("chatbot-*.db"):
-        if b.stat().st_mtime >= backups[-1].stat().st_mtime and b.parent == ROOT / "backups":
-            b.unlink()                   # this test's own copy of its throwaway database
+    for b in ours:
+        b.unlink()                       # only the copy this test made of its throwaway database
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
