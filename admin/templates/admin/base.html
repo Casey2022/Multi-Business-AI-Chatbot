@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% import "admin/_macros.html" as ui %}
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -41,7 +42,8 @@
       {# The way to see what a change did. An owner who edits a greeting
          wants to watch the bot say it. #}
       <a class="btn btn-primary" target="_blank" rel="noopener"
-         href="{{ url_for('chat_page', slug=business.slug) }}">Chat as a customer</a>
+         href="{{ url_for('chat_page', slug=business.slug) }}"{{ ui.tip(business.is_demo, 3, "See what changed",
+         "Opens the customer chat in a new tab, so you can try each change the way a customer would.") }}>Chat as a customer</a>
 
       {% if business.is_demo %}
         <a class="nav-link" href="{{ url_for('demo_picker') }}">Try a different business</a>
@@ -64,7 +66,8 @@
         <a class="nav-link" href="{{ url_for('admin.support_inbox') }}">Support{% if open_count %}
           <span class="nav-count">{{ open_count }}</span>{% endif %}</a>
       {% else %}
-        <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': request.path}) }}">{{ 'Help & feedback' if business is defined and business and business.is_demo else 'Help' }}</a>
+        <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': request.path}) }}"{{ ui.tip(business is defined and business and business.is_demo, 10, "Tell us what you think",
+           "Something confusing, broken or impressive? This goes straight to the person who built Simon Says.") }}>{{ 'Help & feedback' if business is defined and business and business.is_demo else 'Help' }}</a>
       {% endif %}
     {% endif %}
 
@@ -84,6 +87,7 @@
         {% if displaced_user %}
           You're signed in as this demo, not as {{ displaced_user }}.
         {% endif %}
+        <button type="button" class="tour-again" data-tour-restart hidden>Show the tour again</button>
       </span>
     </div>
   {% endif %}
@@ -130,6 +134,10 @@
 <script src="{{ url_for('static', filename='row-order.js') }}" defer></script>
 <script src="{{ url_for('static', filename='busy-submit.js') }}" defer></script>
 <script src="{{ url_for('static', filename='assistant-pop.js') }}" defer></script>
+{# Tips for demo visitors; a real owner's page doesn't load it. #}
+{% if business is defined and business and business.is_demo %}
+<script src="{{ url_for('static', filename='demo-tour.js') }}" defer></script>
+{% endif %}
 
 </body>
 </html>

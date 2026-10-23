@@ -72,7 +72,8 @@
 </p>
 
 <div class="card" id="block">
-  <div class="card-title">Block off time</div>
+  <div class="card-title"{{ ui.tip(business.is_demo, 9, "Close a day",
+       "Block off a day or an afternoon here, and tick the holidays you close for below. The assistant stops offering those times.") }}>Block off time</div>
   <form method="POST" action="{{ url_for('admin.calendar_block_add', business_id=business.id) }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <div class="field">

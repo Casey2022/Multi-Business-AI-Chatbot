@@ -34,6 +34,14 @@
   </div>
 {% endmacro %}
 
+{% macro tip(on, step, title, text) %}
+  {#- One stop on the demo tour (static/demo-tour.js), written as attributes
+      on the element it points at. `on` is "this is a demo": a real owner's
+      page gets nothing. `step` names the tip and orders it; pages that share
+      a tip (the nav's) use the same number, so it's seen once. -#}
+  {%- if on %} data-tour-step="{{ step }}" data-tour-title="{{ title }}" data-tour-text="{{ text }}"{% endif -%}
+{% endmacro %}
+
 {% macro destination_links(business) %}
   {# The same places, small, for a row in the Businesses list. #}
   {% set has_menu = menu_switched_on(business) %}

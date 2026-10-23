@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% import "admin/_macros.html" as ui %}
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -15,11 +16,13 @@
   <a class="wordmark" href="{{ url_for('demo_picker') }}">Simon<em> Says</em></a>
   <span class="nav-links">
     {% if is_demo %}
-      <a class="btn btn-primary" href="{{ url_for('admin.settings', business_id=business.id) }}">Open the owner&rsquo;s portal</a>
+      <a class="btn btn-primary" href="{{ url_for('admin.settings', business_id=business.id) }}"{{ ui.tip(is_demo, 2, "Now be the owner",
+         "Change a price or a rule in the portal, then come back here and ask again.") }}>Open the owner&rsquo;s portal</a>
       <a class="nav-link" href="{{ url_for('demo_picker') }}">Try a different business</a>
       {# Feedback round (2026-10-19): the Help page's "Ask a person" form,
          which emails the operator. A demo visitor is already signed in. #}
-      <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': '/chat/' ~ business.slug}) }}#support">Send feedback</a>
+      <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': '/chat/' ~ business.slug}) }}#support"{{ ui.tip(is_demo, 10, "Tell us what you think",
+         "Something confusing, broken or impressive? This goes straight to the person who built Simon Says.") }}>Send feedback</a>
     {% endif %}
   </span>
 </nav>
@@ -29,6 +32,7 @@
     <p class="footnote chatnote">
       This is your own copy of {{ business.name }}. Chat with it as a customer,
       then change what it says as the owner.
+      <button type="button" class="tour-again" data-tour-restart hidden>Show the tour again</button>
     </p>
   {% endif %}
 
@@ -44,7 +48,8 @@
       <div class="msg msg-from-bot"><div class="bubble">{{ greeting }}</div></div>
     </div>
 
-    <form class="chatform" id="chatForm">
+    <form class="chatform" id="chatForm"{{ ui.tip(is_demo, 1, "Be the customer",
+          "Ask what a customer would: a price, the hours, or “can I book Friday at 2?”. It answers from this business's own facts.") }}>
       <label class="sr-only" for="msgInput">Your message</label>
       <input id="msgInput" type="text" placeholder="Type a message…" autocomplete="off"
              maxlength="1000" autofocus>
@@ -53,6 +58,7 @@
   </div>
 </div>
 
+{% if is_demo %}<script src="{{ url_for('static', filename='demo-tour.js') }}" defer></script>{% endif %}
 <script nonce="{{ csp_nonce() }}">
   const slug = {{ business.slug | tojson }};
 

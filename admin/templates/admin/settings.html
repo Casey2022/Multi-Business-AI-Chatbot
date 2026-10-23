@@ -181,7 +181,8 @@
   </div>
 
   <div class="card" id="cancellation">
-    <div class="card-title">{{ policy_lines[0].rstrip(':') if policy_lines else 'Cancellation rules' }}</div>
+    <div class="card-title"{{ ui.tip(business.is_demo, 7, "Rules it applies exactly",
+         "Cancellation charges and booking notice are worked out by code, not guessed by the model. Change one, then ask the chat about it.") }}>{{ policy_lines[0].rstrip(':') if policy_lines else 'Cancellation rules' }}</div>
     <div class="guidance card-pad">
       {% if policy_lines %}
       <p>The assistant applies these rules exactly, working out the timing and the

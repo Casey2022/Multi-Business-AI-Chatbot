@@ -22,7 +22,8 @@
 
 {% if sections %}
 <div class="card" id="preview">
-  <div class="card-title">Preview answers</div>
+  <div class="card-title"{{ ui.tip(business.is_demo, 5, "Try before you publish",
+       "Ask a few questions and see today's answer beside the answer after you publish.") }}>Preview answers</div>
   <div class="card-pad">
     <div class="guidance">
       See how the assistant would answer with your edits, before any customer
@@ -132,7 +133,8 @@
 </div>
 
 {% for s in sections %}
-<div class="card" id="section-{{ s.id }}">
+<div class="card" id="section-{{ s.id }}"{{ ui.tip(business.is_demo and loop.first, 4, "Everything it knows",
+     "Each section is facts the assistant answers from. Edits stay drafts until you press Publish, so customers never see half-finished work.") }}>
   {% if conflict and conflict.id == s.id %}
   <div class="banner section-conflict" role="alert">
     <div><strong>Not saved: this section changed after you opened the page</strong>

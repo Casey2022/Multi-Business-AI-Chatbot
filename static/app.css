@@ -1278,3 +1278,46 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   padding: var(--s3) var(--s4); border-top: 1px solid var(--rule);
 }
 .block-list .eyebrow + .block-row { border-top: 0; }
+
+/* ---------------------------------------------------------------------- *
+ * Demo tour (static/demo-tour.js): one tip at a time, pointing at the
+ * thing it's about. Demo pages only. Placed by the script in page
+ * coordinates; the width never exceeds the screen less a margin, so a
+ * phone gets no sideways scroll.
+ * ---------------------------------------------------------------------- */
+.tour-tip {
+  position: absolute; z-index: 60; top: 0; left: 0;
+  padding: var(--s4); border-radius: var(--radius);
+  border: 1px solid var(--pen);
+  background: var(--surface-solid); color: var(--ink);
+  box-shadow: var(--shadow);
+  opacity: 0;
+}
+.tour-tip[hidden] { display: none; }
+.tour-tip.is-shown { opacity: 1; }
+.tour-tip:focus { outline: none; }
+.tour-arrow {
+  position: absolute; top: -7px; width: 12px; height: 12px; margin-left: -6px;
+  background: var(--surface-solid);
+  border-left: 1px solid var(--pen); border-top: 1px solid var(--pen);
+  transform: rotate(45deg);
+}
+.tour-tip.is-above .tour-arrow { top: auto; bottom: -7px; transform: rotate(225deg); }
+.tour-count {
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
+}
+.tour-title { font-family: var(--display); font-size: var(--display-md); margin-top: var(--s1); }
+.tour-text { margin: var(--s2) 0 0; font-size: var(--text-sm); color: var(--ink-soft); line-height: 1.5; }
+.tour-actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
+.tour-target { outline: 2px solid var(--pen); outline-offset: 4px; border-radius: var(--radius-sm); }
+/* "Show the tour again" in the demo bar: a button that reads as a link. */
+.tour-again {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--pen);
+  text-decoration: underline; cursor: pointer;
+}
+.tour-again[hidden] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .tour-tip { transform: translateY(6px); transition: opacity .2s ease, transform .2s ease; }
+  .tour-tip.is-shown { transform: none; }
+}

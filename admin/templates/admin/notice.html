@@ -38,7 +38,8 @@
 {% endif %}
 
 <div class="card">
-  <div class="card-title">What customers are told</div>
+  <div class="card-title"{{ ui.tip(business.is_demo, 8, "Notice, service by service",
+       "How far ahead each service must be booked. The booking flow refuses times inside it, and the assistant explains why.") }}>What customers are told</div>
   <div class="card-pad rules-compare">
     <div>
       <div class="cell-sub">Now</div>

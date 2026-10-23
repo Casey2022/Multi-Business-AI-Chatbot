@@ -42,6 +42,9 @@ ADDED_BY_SCRIPT = {
     "assistant-refresh",  # assistant-pop.js, "Refreshing the page…" / unsaved-edits note
     "sms", "sms-in", "sms-out", "sms-bubble", "sms-meta",   # text.html's script, per text
     "sms-typing", "sms-notice", "sms-failed",
+    # demo-tour.js: the tip it builds, and the ring on what it points at
+    "tour-tip", "tour-arrow", "tour-count", "tour-title", "tour-text", "tour-actions",
+    "tour-target", "is-shown", "is-above",
 }
 
 PASSED, FAILED = [], []

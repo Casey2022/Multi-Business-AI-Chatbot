@@ -131,7 +131,8 @@
 </div>
 
 {% for c in cards %}
-<div class="card" id="item-{{ c.index }}">
+<div class="card" id="item-{{ c.index }}"{{ ui.tip(business.is_demo and loop.first, 6, "Prices are data",
+     "Each price is stored as data, so the assistant quotes it exactly, and says so when something isn't on the menu.") }}>
   <form method="POST" action="{{ url_for('admin.menu_item_save', business_id=business.id, index=c.index) }}" data-track-edits="any">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="original" value="{{ c.original }}">
