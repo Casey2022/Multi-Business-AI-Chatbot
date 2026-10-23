@@ -223,9 +223,8 @@ def main():
 
     heading("Every question can be read back as a question")
     import glob
-    for path in sorted(glob.glob("config/*.yaml")):
-        if "personas" in path:
-            continue
+    from config import business_config_paths
+    for path in map(str, business_config_paths()):
         cfg = yaml.safe_load(Path(path).read_text())
         for q in ((cfg.get("booking") or {}).get("extra_questions") or []):
             # Without a prompt the read-back silently falls back to the

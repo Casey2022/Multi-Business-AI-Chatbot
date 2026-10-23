@@ -355,6 +355,49 @@ def _set_nested(config, dotted_field, value):
     target[parts[-1]] = value
 
 
+# Shared files in config/, not businesses: the persona presets and what
+# every business is told (defaults.yaml, 2026-10-23).
+SHARED_FILES = {"personas.yaml", "defaults.yaml"}
+
+
+def business_config_paths(folder="config"):
+    """Every business's YAML, sorted; never a shared file."""
+    return sorted(p for p in Path(folder).glob("*.yaml") if p.name not in SHARED_FILES)
+
+
+def _with_defaults(config):
+    """config/defaults.yaml under the business's own settings, and the
+    universal guardrails assembled: each "- rule: name" item is that shared
+    rule with its blanks filled from bot.words, each text item the
+    business's own, joined in order. The prompt is byte-identical to the
+    single block each business used to carry (defaults_test.py)."""
+    path = Path(__file__).resolve().parent / "config" / "defaults.yaml"
+    defaults = yaml.safe_load(path.read_text()) if path.exists() else {}
+    shared = (defaults.get("bot") or {})
+    bot = config.setdefault("bot", {})
+    guardrails = bot.get("guardrails")
+    if isinstance(guardrails, dict) or guardrails is None:
+        guardrails = bot.setdefault("guardrails", {})
+        for channel, text in (shared.get("guardrails") or {}).items():
+            guardrails.setdefault(channel, text)
+        universal = guardrails.get("universal")
+        if isinstance(universal, list):
+            words = {str(k): str(v) for k, v in (bot.get("words") or {}).items()}
+
+            class _Blank(dict):
+                def __missing__(self, key):
+                    return "{" + key + "}"     # {phone} and friends: filled later
+            rules = shared.get("guardrail_rules") or {}
+            parts = []
+            for item in universal:
+                if isinstance(item, dict) and "rule" in item:
+                    parts.append(rules[item["rule"]].format_map(_Blank(words)))
+                else:
+                    parts.append(str(item))
+            guardrails["universal"] = "".join(parts)
+    return config
+
+
 def load_personas():
     """Load the shared persona presets."""
     with open("config/personas.yaml", "r") as f:
@@ -373,6 +416,7 @@ def load_config(config_path, business_id=None):
     path = Path(config_path)
     with open(path, "r") as f:
         config = yaml.safe_load(f)
+    _with_defaults(config)
 
     if business_id is not None:
         from db import get_config_overrides

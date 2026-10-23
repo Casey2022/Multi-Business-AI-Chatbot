@@ -67,7 +67,7 @@ def main():
 
     heading("no business config carries an FAQ")
     for path in sorted((ROOT / "config").glob("*.yaml")):
-        if path.name == "personas.yaml":
+        if path.name in ("personas.yaml", "defaults.yaml"):
             continue
         data = yaml.safe_load(path.read_text()) or {}
         check(f"{path.name}: no faq:", "faq" not in data)
@@ -130,7 +130,7 @@ def main():
     import policy
     import menu
     for path in sorted((ROOT / "config").glob("*.yaml")):
-        if path.name == "personas.yaml":
+        if path.name in ("personas.yaml", "defaults.yaml"):
             continue
         cfg = load_config(str(path))
         slug = path.stem

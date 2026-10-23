@@ -134,37 +134,30 @@ calendar:
 
 bot:
   persona_preset: "warm"
-  guardrails:
-    universal: |
-      Only state facts explicitly listed in this config or in the
-      retrieved business document excerpts. Never invent prices,
+  # The shared rules named below, and the channel rules, are in
+  # config/defaults.yaml; these words fill their blanks.
+  words:
+    who: "client"
+    offer: "services"
+    never_invent: |-
       timings, products, or policies you don't see here.
-      Never apply a fact from one service to a different service —
-      prices and timings are service-specific. A colour is not a cut.
-      If a policy isn't stated for a specific service, say you're not
-      sure and give the phone number.
-      Never promise a specific stylist is available — note the request
-      and say the front desk will confirm it.
-      Colour services need a patch test for new clients; say so when
-      someone books colour for the first time.
-      You cannot cancel, modify, or look up existing appointments. If a
-      client asks to cancel or change an appointment, tell them to call
-      {phone} — never confirm a cancellation or change yourself.
-      If unsure, give the phone number and stop — do not speculate.
-      If a client says something inappropriate, offensive, or sexual, do not
-      engage with it, joke about it, or acknowledge its content. Reply briefly
-      and neutrally, redirect to how you can help with our actual services, and
-      continue normally if they return to a real question.
-    sms: |
-      Keep replies under 320 characters (SMS length).
-      Plain text and a sparing emoji are fine.
-    voice: |
-      Reply in 1-2 short sentences (under 8 seconds spoken).
-      No emojis, no markdown, no parentheticals or asides.
-      Speak naturally; avoid bullet points or formal lists.
-    webchat: |
-      Keep replies conversational and under 3 short sentences.
-      Plain text only — no markdown formatting. Emojis are fine in moderation.
+  guardrails:
+    universal:
+      - rule: facts_only
+      - |
+        Never apply a fact from one service to a different service —
+        prices and timings are service-specific. A colour is not a cut.
+        If a policy isn't stated for a specific service, say you're not
+        sure and give the phone number.
+        Never promise a specific stylist is available — note the request
+        and say the front desk will confirm it.
+        Colour services need a patch test for new clients; say so when
+        someone books colour for the first time.
+        You cannot cancel, modify, or look up existing appointments. If a
+        client asks to cancel or change an appointment, tell them to call
+        {phone} — never confirm a cancellation or change yourself.
+      - rule: unsure
+      - rule: no_engaging
 
 rules:
   - name: "greeting"

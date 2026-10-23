@@ -38,9 +38,8 @@ def heading(text):
 def configs():
     from config import load_config
     out = {}
-    for path in sorted(Path("config").glob("*.yaml")):
-        if path.stem == "personas":      # shared personas, not a business
-            continue
+    from config import business_config_paths
+    for path in business_config_paths():
         cfg = load_config(str(path))
         cfg.setdefault("business", {})["id"] = 1
         cfg.setdefault("calendar", {})["enabled"] = False

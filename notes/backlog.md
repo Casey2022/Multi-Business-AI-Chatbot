@@ -57,10 +57,8 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 
 Keep YAML; fix how facts spread across it. Done: opening hours have one
 copy (the weekly table; owners edit it on Settings), and each service has
-a fixed key, so a rename keeps its links (services.py). Next, in order:
-- **Shared defaults.** The SMS/voice/webchat channel rules are identical in
-  all five YAMLs; the universal guardrails are 24-54% alike. One defaults
-  file, each business keeping only what differs (prompts measured the same).
+a fixed key, so a rename keeps its links (services.py), and what every
+business is told lives once in config/defaults.yaml. Next, in order:
 - **Local vs seed check / reset command** (`rag_eval` warns; a command that
   lists and resets the differences would have saved this week's detours).
 - **Schema check at load**, surfaced in the portal, not only the log.

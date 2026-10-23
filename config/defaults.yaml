@@ -1,0 +1,42 @@
+# config/defaults.yaml — what every business's assistant is told, once.
+#
+# Merged under each business's YAML by config.load_config (the business
+# wins wherever it says something itself). Before 2026-10-23 these lived in
+# every business file: the channel rules word for word five times, and the
+# shared guardrails copied and drifted (24-54% alike). A fix now happens
+# here, once.
+#
+# The built prompts are byte-identical to before (defaults_test.py checks
+# every business, channel and booking state against a saved copy).
+
+bot:
+  guardrails:
+    # How long and in what form, per channel. A business can still set its
+    # own under bot.guardrails.<channel>.
+    sms: |
+      Keep replies under 320 characters (SMS length).
+      Plain text and a sparing emoji are fine.
+    voice: |
+      Reply in 1-2 short sentences (under 8 seconds spoken).
+      No emojis, no markdown, no parentheticals or asides.
+      Speak naturally; avoid bullet points or formal lists.
+    webchat: |
+      Keep replies conversational and under 3 short sentences.
+      Plain text only — no markdown formatting. Emojis are fine in moderation.
+
+  # Rules a business's bot.guardrails.universal names ("- rule: unsure"), in
+  # its own order. {blanks} are filled from the business's bot.words, so the
+  # same rule reads "a client" at the salon and "a customer" at the pizzeria.
+  # Line breaks are part of the prompt: keep them.
+  guardrail_rules:
+    facts_only: |
+      Only state facts explicitly listed in this config or in the
+      retrieved business document excerpts. Never invent prices,
+      {never_invent}
+    unsure: |
+      If unsure, give the phone number and stop — do not speculate.
+    no_engaging: |
+      If a {who} says something inappropriate, offensive, or sexual, do not
+      engage with it, joke about it, or acknowledge its content. Reply briefly
+      and neutrally, redirect to how you can help with our actual {offer}, and
+      continue normally if they return to a real question.

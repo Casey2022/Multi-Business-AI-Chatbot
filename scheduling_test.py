@@ -168,7 +168,7 @@ def main():
     # service is invisible in production and free to catch here.
     import yaml
     for path in sorted(Path("config").glob("*.yaml")):
-        if path.name == "personas.yaml":
+        if path.name in ("personas.yaml", "defaults.yaml"):
             continue
         config = yaml.safe_load(path.read_text())
         stale = scheduling.unknown_duration_services(config)
@@ -241,7 +241,7 @@ def main():
 
     heading("Every configured condition names a service that exists")
     for path in sorted(Path("config").glob("*.yaml")):
-        if path.name == "personas.yaml":
+        if path.name in ("personas.yaml", "defaults.yaml"):
             continue
         config = yaml.safe_load(path.read_text())
         orphaned = scheduling.unknown_condition_services(config)

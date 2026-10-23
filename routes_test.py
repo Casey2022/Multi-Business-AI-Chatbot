@@ -244,7 +244,7 @@ def main():
     import yaml as _yaml
     seed_src = (ROOT / "seed_businesses.py").read_text(encoding="utf-8")
     for path in sorted((ROOT / "config").glob("*.yaml")):
-        if path.name == "personas.yaml":
+        if path.name in ("personas.yaml", "defaults.yaml"):
             continue
         cfg = _yaml.safe_load(path.read_text(encoding="utf-8"))
         stated = (cfg.get("business") or {}).get("slug")
