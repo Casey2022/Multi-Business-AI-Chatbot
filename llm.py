@@ -699,10 +699,11 @@ examples, however it is phrased.
             return {"intent": "question"}
 
         if intent == "book" and (answers_previous_question(message, previous_reply)
-                                 or about_existing_order(message, history)):
+                                 or about_existing_order(message, history)
+                                 or policy.asks_order_deadline(message)):
             log.info("Classifier said book; it continues the conversation "
-                     "(an answer to the bot, or about an existing order), so "
-                     "it's a question")
+                     "(an answer to the bot, or about an existing order) or "
+                     "asks when to order by, so it's a question")
             return {"intent": "question"}
 
         valid_keys = {s["key"] for s in slots}
@@ -900,7 +901,11 @@ OTHERS_SAID_NOTE = (
 _RETRACTION = re.compile(
     r"\b(?:correct my (?:last|previous|earlier) (?:message|reply|answer)"
     r"|shouldn'?t have (?:said|given|told)|please disregard|don'?t count on"
-    r"|(?:spoke|said that) too soon|ignore (?:my|that) (?:last|previous|earlier))", re.I)
+    r"|(?:spoke|said that) too soon|ignore (?:my|that) (?:last|previous|earlier)"
+    # Crosstown, 2026-10-22: "I need to correct something: I don't have a
+    # 9:00 AM order-by time for party trays, so please don't rely on that",
+    # after check_notice had worked it out (noon less 3 hours).
+    r"|need to correct|(?:don'?t|not) rely on (?:that|it|this))", re.I)
 
 
 def without_retraction(reply, others_said, config):

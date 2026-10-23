@@ -107,7 +107,10 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
 # A reply taking back an earlier one (Claude Haiku 5.5, 2026-10-22).
 _RETRACTS = (r"correct my (?:last|previous|earlier) (?:message|reply|answer)"
-             r"|shouldn'?t have said|please disregard|I (?:mis)?spoke too soon")
+             r"|shouldn'?t have said|please disregard|I (?:mis)?spoke too soon"
+             # Crosstown, 2026-10-22: "I need to correct something: I don't
+             # have a 9:00 AM order-by time … so please don't rely on that."
+             r"|need to correct|(?:don'?t|not) (?:rely|count) on (?:that|it|this)")
 # The customer's own words for when, pasted after "on": "drain cleaning on
 # tomorrow at 10am", "pizza on 7pm" (booking greeting, walked 2026-10-20).
 _RAW_WHEN = (r"\bon (?:tomorrow|today|tonight|this \w+|next \w+"
@@ -518,6 +521,21 @@ JOURNEYS = [
             {"say": "great, thanks! so it's all set for Saturday?",
              "must_not": [_RETRACTS, r"don'?t count on|isn'?t (?:confirmed|placed|booked)"
                                      r"|not (?:actually |yet )?(?:confirmed|placed|booked)"]},
+        ],
+    },
+    # After check_notice worked out an order-by time, the next reply took it
+    # back (Claude Haiku 5.5, 2026-10-22, playing "Friday at five" through):
+    # "I need to correct something: I don't have a 9:00 AM order-by time for
+    # party trays, so please don't rely on that." Noon less 3 hours is 9am.
+    {
+        "name": "a tray's order-by time isn't taken back (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 25, 17, 0),                                   # a Friday
+        "why": "check_notice's order-by time is the tool's, and true.",
+        "turns": [
+            {"say": "I need a party tray for noon tomorrow, when do I have to order it by?",
+             "state": "idle", "tool": "check_notice", "must": [r"9(?::00)?\s*(?:am|a\.m\.)"]},
+            {"say": "ok got it, thanks", "state": "idle", "must_not": [_RETRACTS]},
         ],
     },
     # A question in the middle of a booking, one per business: answered, and

@@ -841,6 +841,14 @@ def main():
           llm.without_retraction("I need to correct my last reply: I shouldn't have given you "
                                  "a date.", ["by Wednesday, October 7"], phone_cfg)
           .startswith("Anything else I can help with?"))
+    # Crosstown, 2026-10-22, after check_notice's "ordered by 9:00 AM Saturday".
+    tray = ("Got it, Sam! I need to correct something: I don't have a 9:00 AM order-by "
+            "time for party trays, so please don't rely on that. Pickup orders are "
+            "placed by phone.")
+    out = llm.without_retraction(tray, ["as long as it's ordered by 9:00 AM Saturday"],
+                                 phone_cfg)
+    check("'I need to correct something … don't rely on that' goes too",
+          out == "Got it, Sam! Pickup orders are placed by phone.", out)
     check("the model correcting its own earlier guess is left alone (nothing by others)",
           llm.without_retraction(live, [], phone_cfg) == live)
     check("an ordinary reply is untouched", llm.without_retraction(

@@ -1168,6 +1168,26 @@ FOLLOW_UP_TURNS = 2
 _ASKS_EARLIEST = re.compile(r"\b(?:earliest|soonest|how soon|as soon as possible)\b", re.I)
 _GIVES_NOTICE = re.compile(r"\bnotice\b", re.I)
 
+# When the customer has to order by: a question about the rules, not an
+# order. Claude Haiku 5.5, 2026-10-22: "I need a party tray for noon
+# tomorrow, when do I have to order it by?" started an order and asked for
+# a name, 4 runs in 6; check_notice never ran. "Can I order a tray for
+# noon?" is still an order: these all ask about the deadline itself.
+_ORDERING = r"(?:order|book|place|reserve|get (?:it|my order|the order) in)"
+_ASKS_DEADLINE = re.compile(
+    r"\b(?:(?:when|what time|how (?:late|far (?:ahead|in advance)|long before))\b"
+    r"[^.?!]{0,40}\b(?:have to|need to|must|should|got to|gotta)\b[^.?!]{0,30}\b" + _ORDERING +
+    r"|(?:what'?s|what is) the latest (?:I|we|you) can\b[^.?!]{0,20}\b" + _ORDERING +
+    r"|too late to " + _ORDERING +
+    r"|how much notice"
+    r"|" + _ORDERING + r"\b[^.?!]{0,20}\bby (?:when|what time))", re.I)
+
+
+def asks_order_deadline(text):
+    """The message asks when an order has to be in: a question, never a
+    request to start one."""
+    return bool(_ASKS_DEADLINE.search(text or ""))
+
 
 def _wants_tools(text, config):
     """Which tools one message calls for: a set of "notice", "cancellation".

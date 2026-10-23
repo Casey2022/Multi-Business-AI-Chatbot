@@ -313,6 +313,31 @@ def main():
     check("the slot extractor is told", rule in " ".join(seen[0].split()))
     check("the classifier is told", rule in " ".join(seen[1].split()))
 
+    heading("'when do I have to order it by?' asks the rule, it isn't an order")
+    # Claude Haiku 5.5, 2026-10-22: started an order 4 runs in 6. The fake
+    # model says "book", as it did; code makes it a question.
+    llm._create = lambda **call: types.SimpleNamespace(content=[types.SimpleNamespace(
+        type="text", text='{"intent": "book", "service": "party tray"}')], usage=None)
+    try:
+        slots = sched.get_slot_definitions(pizza)
+        for message in ("I need a party tray for noon tomorrow, when do I have to order it by?",
+                        "how far ahead do I need to order a tray?",
+                        "what's the latest I can order a party tray for Saturday?",
+                        "is it too late to order a tray for tonight?",
+                        "how much notice do you need for 3 trays?",
+                        "I'd order by what time for a noon delivery?"):
+            got = llm.classify_and_extract(message, slots, pizza)
+            check(f"a question: {message!r}", got == {"intent": "question"}, got)
+        for message in ("I'd like to order a party tray for noon tomorrow",
+                        "can I order a tray for Saturday at 1pm?",
+                        "it's Friday at 5, I need food for 20 people",
+                        "I need it by 6pm, can I order 3 large pizzas?",
+                        "when can you deliver? I want to order 2 pizzas"):
+            got = llm.classify_and_extract(message, slots, pizza)
+            check(f"still an order: {message!r}", got.get("intent") == "book", got)
+    finally:
+        llm._create = real
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")
