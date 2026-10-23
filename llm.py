@@ -844,6 +844,54 @@ def referred_recently(history, config):
                for t in earlier)
 
 
+# A reply that says it doesn't know something. Narrow on purpose: a reply
+# that answers ("We don't offer vegan cakes") isn't one.
+_DONT_KNOW = re.compile(
+    r"\b(?:I don'?t have (?:[\w-]+ ){0,3}(?:info|information|details|documented|anything)"
+    r"|I(?:'m| am) not sure|I can'?t (?:say|confirm|tell)"
+    r"|(?:isn'?t|not) something I have|(?:would|will) need to confirm|no documented"
+    r"|isn'?t (?:listed|documented|covered) (?:in|here|anywhere))", re.I)
+# Somewhere to go: the number, calling, contacting, asking the team, or
+# ordering here.
+_WAY_FORWARD = re.compile(
+    r"\bcall\b|\bphone\b|\bring us\b|\breach (?:us|out|the|our)|\bcontact\b"
+    r"|\bask (?:us|the|our)|let us know|\btext ['\"]?\w", re.I)
+
+
+def with_way_forward(reply, history, config):
+    """A reply that says it doesn't know something and leaves the customer
+    nowhere, with one sentence on how to find out.
+
+    The other side of defect #6 (every miss became a phone number): once a
+    reply has given the number, REFERRAL_RULE says not to refer again, and
+    "and if it hasn't come by then?" got "our office would need to confirm
+    what happens next" and nothing more, 2 runs in 6; "is there parking
+    near the shop?", a turn after the number, got "I don't have any parking
+    information" alone, 4 runs in 6 (journey_eval, 2026-10-23). The first
+    question about an unknown was always fine (6/6): the standing "if
+    unsure, give the phone number" holds until the rule against repeating
+    it takes over.
+
+    The number goes in only if no recent reply gave it; otherwise "give us
+    a call", which without_repeated_number allows. A reply with any way
+    forward, or that doesn't say it doesn't know, is left alone."""
+    # A dead end leads with not knowing ("I don't have any parking
+    # information…"). A reply that answers first isn't one: qa_eval,
+    # 2026-10-23, a delivery answer followed by "I can't confirm our
+    # gluten-free flavors" got "give us a call" added, two referrals in a row.
+    first = re.split(r"(?<=[.!?])\s+", (reply or "").strip(), maxsplit=1)[0]
+    if not reply or not _DONT_KNOW.search(first) or _WAY_FORWARD.search(reply):
+        return reply
+    phone = ((config or {}).get("business") or {}).get("phone")
+    pattern = _phone_pattern(phone)
+    if pattern and pattern.search(reply):
+        return reply
+    log.info("A dead-end reply: added how to find out")
+    if phone and not referred_recently(history, config):
+        return f"{reply.rstrip()} Give us a call at {phone} and we can tell you."
+    return f"{reply.rstrip()} Give us a call and the team can tell you."
+
+
 def without_repeated_number(reply, history, message, config):
     """Stop a reply sending the customer to the phone again.
 
@@ -1241,7 +1289,9 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
         reply = without_unmade_promise(reply, message,
                                        [c for c, _ in (retrieved_chunks or [])], config)
         reply = plain_text(reply)
-        return without_repeated_number(reply, history, message, config)
+        reply = without_repeated_number(reply, history, message, config)
+        # Never a dead end: an "I don't know" with nowhere to go gets one.
+        return with_way_forward(reply, history, config)
 
     except Exception as e:
         log.error(f"ERROR calling Claude: {e}")

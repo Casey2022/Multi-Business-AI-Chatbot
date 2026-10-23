@@ -961,7 +961,7 @@ def main():
     check("the reply goes through it, with this turn's cancellation results, before it's sent",
           "policy.without_false_hope(reply, tool_results, config)" in llm_src
           and 'use.name == "cancellation_outcome"' in llm_src
-          and llm_src.index("without_false_hope(") < llm_src.index("return without_repeated_number("))
+          and llm_src.index("without_false_hope(") < llm_src.index("reply = without_repeated_number("))
 
     heading("which service: from the customer's words (eval 2026-10-17)")
     kind = lambda args, *texts: policy.kind_from_words(args, list(texts), colour48).get("kind")

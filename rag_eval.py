@@ -220,7 +220,10 @@ TESTS = {
         ("what about a bathroom",                 "Bathroom Remodels",  ("$12,000", "$38,000")),
         ("how much is a composite deck per square foot", "Decks",       ("$55", "$80")),
         ("do you pull the permit",                ("Decks", "Licensing"), "permit"),
-        ("can you finish my basement if it gets water", "Basement",     ("will not", "won't")),
+        # "Not if there's an active water problem … we don't take the job"
+        # is the same refusal (2026-10-23).
+        ("can you finish my basement if it gets water", "Basement",     ("will not", "won't",
+                                                                         "not if", "don't take")),
         ("what does a roof cost",                 "Roofing",            ("$9,000", "$22,000")),
         ("do you do small repairs",               "General Repairs",    "$350"),
         ("are you licensed and insured",          "Licensing",          ("licensed", "insured")),

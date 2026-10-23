@@ -154,7 +154,42 @@ def main():
           "2 * 3 trays at $15 each — 5*4 is 20, *not* bold")
     check("empty stays empty", plain("") == "" and plain(None) is None)
     check("every model reply goes through it, before the referral check",
-          llm_src.index("reply = plain_text(reply)") < llm_src.index("return without_repeated_number("))
+          llm_src.index("reply = plain_text(reply)") < llm_src.index("reply = without_repeated_number("))
+
+    heading("never a dead end (2026-10-23)")
+    # The other side of defect #6: once the number was given, "don't refer
+    # again" left "I don't have any parking information" with nothing more,
+    # 4 runs in 6 (journey "way forward: ... after a referral").
+    import llm as _llm
+    way = _llm.with_way_forward
+    cfg = {"business": {"phone": "(585) 555-0188"}}
+    gave = [{"role": "assistant", "content": "Call us at (585) 555-0188 for that."}]
+    got = way("I don't have any parking information for the shop.", [], cfg)
+    check("a dead end, number not given yet: the number is added",
+          got.endswith("Give us a call at (585) 555-0188 and we can tell you."), got)
+    got = way("I don't have any parking information for the shop.", gave, cfg)
+    check("…given a turn ago: pointed back to us without the digits (defect #6)",
+          got.endswith("Give us a call and the team can tell you.") and "555-0188" not in got, got)
+    got = way("I don't have a documented follow-up step for a quote that arrives late, "
+              "so our office would need to confirm what happens next.", gave, cfg)
+    check("Ridgeline's 'our office would need to confirm' gets a way forward too",
+          "Give us a call" in got, got)
+    for reply in ("I'm not sure about parking. Please call us.",
+                  "I can't confirm that, so text 'order' and the team will check.",
+                  "I don't have that listed; contact the office."):
+        check(f"left alone: it already has a way forward ({reply[:28]}…)",
+              way(reply, gave, cfg) == reply)
+    for reply in ("We don't currently offer vegan cakes.", "We don't have parking, sorry.",
+                  "A 6-inch cake is $45 and serves 6-8."):
+        check(f"left alone: it answers ({reply[:28]}…)", way(reply, [], cfg) == reply)
+    reply = ("Delivery is within 5 miles, for orders over $50. Correction to my last "
+             "message: I can't confirm our gluten-free cake flavors.")
+    check("left alone: it answers first, whatever it says after (qa_eval, 2026-10-23)",
+          way(reply, gave, cfg) == reply)
+    check("empty stays empty", way("", [], cfg) == "" and way(None, [], cfg) is None)
+    a, b = (llm_src.find("reply = without_repeated_number("),
+            llm_src.find("return with_way_forward(reply, history, config)"))
+    check("it runs last, after the repeat check (so that can't strip it)", -1 < a < b, (a, b))
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:

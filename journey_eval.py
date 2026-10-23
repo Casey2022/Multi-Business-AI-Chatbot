@@ -105,6 +105,12 @@ _FREE = r"no charge|free of charge|won'?t be charged|not be charged|no (?:fee|co
 # The keyword shortcuts' own replies (config rules: cancel_existing), whole,
 # so a model that adds "to cancel, give us a call" after the answer passes.
 _BELMONT_CANNED = r"give us a call at \S+ \S+ and we'?ll sort it out"
+# A way forward for something the bot can't answer: the number, or calling,
+# contacting, asking the team, or ordering here (2026-10-23).
+_WAY_FORWARD = (r"\(585\)|\bcall\b|\breach (?:us|out|the|our)|\bcontact\b|\bask (?:us|the|our)"
+                r"|let us know|text ['\"]?(?:order|book|appointment|estimate)")
+# The number itself again (the first turn gave it).
+_NUMBER_TWICE = r"555-0188"
 # A reply taking back an earlier one (Claude Haiku 5.5, 2026-10-22).
 _RETRACTS = (r"correct my (?:last|previous|earlier) (?:message|reply|answer)"
              r"|shouldn'?t have said|please disregard|I (?:mis)?spoke too soon"
@@ -835,6 +841,32 @@ JOURNEYS = [
              # Not offered: naming the asked-for time as too soon is right.
              "must_not": [NAME_ASK,
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
+        ],
+    },
+    # Never a dead end, and never the number twice (defect #6's other side,
+    # 2026-10-23). After a reply that gave the number, REFERRAL_RULE says
+    # not to refer again "unless they ask how to reach us"; "and if it hasn't
+    # come by then?" got "our office would need to confirm what happens
+    # next", no way forward at all, ~1 run in 6.
+    {
+        "name": "way forward: something we don't know, first question (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "Not in the documents: say so, and how to find out.",
+        "turns": [
+            {"say": "is there wheelchair access at the shop?", "state": "idle",
+             "must": [_WAY_FORWARD]},
+        ],
+    },
+    {
+        "name": "way forward: something we don't know, after a referral (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "The number was given a turn ago: point back to us, don't repeat it.",
+        "turns": [
+            {"say": "can you make a vegan wedding cake?", "state": "idle"},
+            {"say": "ok, and is there parking near the shop?", "state": "idle",
+             "must": [_WAY_FORWARD], "must_not": [_NUMBER_TWICE]},
         ],
     },
     # Toppings by name (2026-10-23). The menu knew one add-on, "topping",
