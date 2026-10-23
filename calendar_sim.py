@@ -84,7 +84,7 @@ def _busy_periods(config, window_start, window_end):
 # The same questions, answered from the same rules
 # ---------------------------------------------------------------------------
 
-def is_slot_available(config, start_iso, busy=None, service=None):
+def is_slot_available(config, start_iso, busy=None, service=None, details=None):
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         # The window has to start far enough back to catch a booking that
@@ -93,22 +93,22 @@ def is_slot_available(config, start_iso, busy=None, service=None):
         # day it doesn't, the business has bigger problems than this query.
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.is_slot_available(config, start_iso, busy, service)
+    return scheduling.is_slot_available(config, start_iso, busy, service, details)
 
 
-def find_alternatives(config, desired_iso, service=None):
+def find_alternatives(config, desired_iso, service=None, details=None):
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
     busy = _busy_periods(config, desired - timedelta(days=8),
                          desired + timedelta(days=8))
-    return scheduling.find_alternatives(config, desired_iso, busy, service)
+    return scheduling.find_alternatives(config, desired_iso, busy, service, details)
 
 
-def slot_rejection_reason(config, start_iso, busy=None, service=None):
+def slot_rejection_reason(config, start_iso, busy=None, service=None, details=None):
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.slot_rejection_reason(config, start_iso, busy, service)
+    return scheduling.slot_rejection_reason(config, start_iso, busy, service, details)
 
 
 # ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ log_cal = logging.getLogger("calendar")
 # Bookkeeping the booking flow keeps in `pending` that is not a customer
 # answer. Prefixed so it can never collide with a slot key an owner invents.
 INTERNAL_PENDING_KEYS = ("_checks", "_address_confirm", "_address_attempts",
-                         "_offered", "_reasked")
+                         "_offered", "_reasked", "_asked")
 
 # How many times we'll ask a customer to clarify an address before giving up
 # and booking it as typed. Two is a compromise: enough to recover a typo or a
@@ -255,8 +255,8 @@ def _finalize_booking(phone, business_id, pending, config):
             # The service decides how long this booking runs, so it has to
             # travel with every availability question — a two-hour job asked
             # about as a forty-five-minute one gets a yes it shouldn't.
-            if not calendar_sync.is_slot_available(config, parsed,
-                                                   service=service):
+            if not calendar_sync.is_slot_available(config, parsed, service=service,
+                                                   details=_order_details(pending)):
                 _save_state(phone, business_id, "idle", pending={})
                 return ("Sorry — that time was just taken while we were "
                         "talking. Please start again and I'll find you "
@@ -984,11 +984,12 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
     if calendar_sync.is_enabled(config):
         try:
             service = pending.get("service")
+            details = _order_details(pending)
             reason = calendar_sync.slot_rejection_reason(config, parsed,
-                                                         service=service)
+                                                         service=service, details=details)
             if reason:
                 alts = calendar_sync.find_alternatives(config, parsed,
-                                                       service=service)
+                                                       service=service, details=details)
                 pending.pop("datetime", None)
                 pending.pop("datetime_parsed", None)
                 # Record what we're about to offer BEFORE saving: anything
@@ -996,7 +997,7 @@ def _ask_next_or_finalize(phone, business_id, pending, config, slots,
                 pending["_offered"] = list(alts)
                 _save_state(phone, business_id, "collecting", pending=pending)
                 return _unavailable_message(parsed, alts, config, reason=reason,
-                                            service=service)
+                                            service=service, details=details)
         except Exception as e:
             log_cal.warning(f"Availability check failed (continuing): {e}")
 
@@ -1194,7 +1195,17 @@ def _confirmation_question(pending, config, lead=None):
         lines.insert(0, lead.strip())
     return substitute(" ".join(lines), config)
 
-def _unavailable_message(desired_iso, alternatives, config, reason=None, service=None):
+def _order_details(pending):
+    """The order's own words, for a notice variant they name
+    (policy.notice_for): what the customer first asked for (`_asked`: the
+    extractor files "a dozen gluten-free muffins" as "muffins by the dozen",
+    and the "gluten-free" was gone) and every answer since."""
+    skip = {"datetime_parsed", *INTERNAL_PENDING_KEYS} - {"_asked"}
+    return " ".join(str(v) for k, v in pending.items() if v and k not in skip)
+
+
+def _unavailable_message(desired_iso, alternatives, config, reason=None, service=None,
+                         details=None):
     """Explain why a slot doesn't work, and offer nearby openings.
 
     The reason matters: "we're closed then" and "that time is taken" call
@@ -1227,8 +1238,8 @@ def _unavailable_message(desired_iso, alternatives, config, reason=None, service
         # so the customer knows what any other time has to meet.
         import policy
         late = policy.too_soon(service, _dt.strptime(desired_iso, "%Y-%m-%d %H:%M"),
-                               config) or {}
-        what = service or "that"
+                               config, details=details) or {}
+        what = late.get("variant") or service or "that"
         if reason == "cutoff" and late.get("cutoff"):
             cutoff = late["cutoff"]
             lead = (f"On {cutoff:%A}s, we need {what} orders by "
@@ -1285,17 +1296,18 @@ def _check_datetime_now(phone, business_id, pending, extracted, config):
 
     try:
         service = pending.get("service")
+        details = _order_details(pending)
         reason = calendar_sync.slot_rejection_reason(config, candidate,
-                                                     service=service)
+                                                     service=service, details=details)
         if not reason:
             return None
         alts = calendar_sync.find_alternatives(config, candidate,
-                                               service=service)
+                                               service=service, details=details)
         pending.pop("datetime", None)
         pending["_offered"] = list(alts)          # before the save, not after
         _save_state(phone, business_id, "collecting", pending=pending)
         return _unavailable_message(candidate, alts, config, reason=reason,
-                                    service=service)
+                                    service=service, details=details)
     except Exception as e:
         log_cal.warning(f"Early availability check failed: {e}")
         return None
@@ -1402,6 +1414,10 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         else:
             extracted = extract_booking_slots(message, slots, config)
             pending.update(_drop_restated_service(_drop_unsaid(extracted, None), config))
+        # The customer's own words for what they want: the service is filed
+        # in the business's wording, and a notice variant ("gluten-free")
+        # would be lost with the rest (_order_details).
+        pending["_asked"] = message.strip()[:300]
         _tidy_name(pending)
 
         early = _check_datetime_now(phone, business_id, pending,

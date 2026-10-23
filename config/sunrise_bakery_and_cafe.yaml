@@ -211,18 +211,35 @@ booking:
   # notes/booking_notice.md): the ONLY copy. The booking flow refuses a time
   # inside it; `section` is where the knowledge base shows its generated
   # line; `words` are how check_notice knows a question is about it (the
-  # number is a floor: a longer variant in the text, like gluten-free's 96
-  # hours, still wins). Keys match `services` above.
+  # number is a floor). Keys match `services` above.
+  # `variants`: the same service needing longer when the order's own words
+  # name it ("gluten free"), with the name it's said by and any other
+  # sections its line belongs in. The longest one named wins.
   notice:
-    custom birthday cakes: {hours: 72, section: "Custom Birthday Cakes",
-                            words: [custom cake, birthday cake]}
+    custom birthday cakes:
+      hours: 72
+      section: "Custom Birthday Cakes"
+      words: [custom cake, birthday cake]
+      variants:
+        - {words: [gluten free], hours: 96, name: "gluten-free cakes",
+           sections: ["Flavors and Fillings Available"]}
     wedding cakes: {hours: 336, section: "Wedding Cakes", words: [wedding cake]}
-    cupcake orders (dozen minimum): {hours: 24, section: "Cupcake Orders",
-                                     words: [cupcake]}
+    cupcake orders (dozen minimum):
+      hours: 24
+      section: "Cupcake Orders"
+      words: [cupcake]
+      variants:
+        - {words: [themed, display, arrangement], hours: 72,
+           name: "themed cupcake displays"}
     pastry trays for events: {hours: 48, section: "Pastry Trays for Events",
                               words: [pastry tray, breakfast tray, catering tray]}
-    muffins by the dozen: {hours: 24, section: "Muffins and Daily Pastries",
-                           words: [muffin]}
+    muffins by the dozen:
+      hours: 24
+      section: "Muffins and Daily Pastries"
+      words: [muffin]
+      variants:
+        - {words: [gluten free], hours: 96, name: "gluten-free muffins",
+           sections: ["Allergens and Dietary Notes"]}
   greeting: "Happy to help you place an order! What would you like? (e.g. {services_examples})"
   service_confirmation: "Got it — {service}."
   ask_datetime: "When would you like it ready? (e.g. 'Tuesday at 3pm' or 'next Friday morning')"

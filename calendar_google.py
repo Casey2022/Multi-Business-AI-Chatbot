@@ -193,31 +193,31 @@ def _busy_periods(config, window_start, window_end):
 # the busy periods come from. Signatures are unchanged, so every caller and
 # the calendar_sync facade carry on as before.
 
-def is_slot_available(config, start_iso, busy=None, service=None):
+def is_slot_available(config, start_iso, busy=None, service=None, details=None):
     """True if a booking can be made at start_iso. Fetches busy if not given."""
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.is_slot_available(config, start_iso, busy, service)
+    return scheduling.is_slot_available(config, start_iso, busy, service, details)
 
 
-def find_alternatives(config, desired_iso, service=None):
+def find_alternatives(config, desired_iso, service=None, details=None):
     """Up to max_alternatives nearby openings, mixing earlier and later."""
     desired = datetime.strptime(desired_iso, "%Y-%m-%d %H:%M")
     # One events call covers the whole search window.
     busy = _busy_periods(config, desired - timedelta(days=8),
                          desired + timedelta(days=8))
-    return scheduling.find_alternatives(config, desired_iso, busy, service)
+    return scheduling.find_alternatives(config, desired_iso, busy, service, details)
 
 
-def slot_rejection_reason(config, start_iso, busy=None, service=None):
+def slot_rejection_reason(config, start_iso, busy=None, service=None, details=None):
     """Why a slot is unavailable: 'past', 'closed', 'blackout', 'conflict', or None."""
     if busy is None:
         start = datetime.strptime(start_iso, "%Y-%m-%d %H:%M")
         busy = _busy_periods(config, start - timedelta(days=1),
                              start + timedelta(days=1))
-    return scheduling.slot_rejection_reason(config, start_iso, busy, service)
+    return scheduling.slot_rejection_reason(config, start_iso, busy, service, details)
 
 
 def delete_event(config, event_id):

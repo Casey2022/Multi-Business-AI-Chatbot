@@ -86,7 +86,9 @@ CUT_AND_COLOUR_SAME_DAY = Rubric(
 GLUTEN_FREE_MUFFIN_WEDNESDAY = Rubric(
     quote=("We have dedicated gluten-free batches on Wednesdays and Saturdays.",
            "Gluten-free muffins are not part of the daily selection but can be "
-           "made to order with 96 hours' notice."),
+           "made to order.",
+           # Generated from booking.notice (a variant) since 2026-10-22.
+           "Notice for gluten-free muffins: at least 4 days (96 hours)."),
     criteria="""Makes clear that gluten-free muffins are not part of the
     daily selection, so the customer shouldn't count on picking one up by
     walking in today, even though Wednesday is a gluten-free batch day, and

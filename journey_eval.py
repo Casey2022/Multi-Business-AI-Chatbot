@@ -833,6 +833,49 @@ JOURNEYS = [
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
         ],
     },
+    # Variants (notes/booking_notice.md, version 2): the order's own words
+    # can need longer than the service. Before, the table had only the
+    # service's hours, so the booking flow took these 3 in 3 (2026-10-22).
+    {
+        "name": "notice: gluten-free muffins for Thursday (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "why": "Gluten-free muffins need 96 hours, not a dozen's 24: the earliest "
+               "is Saturday the 26th at 10am.",
+        "turns": [
+            {"say": "I'd like to order a dozen gluten-free muffins for pickup Thursday at 10am",
+             "must": [r"96 hours|4 days", r"Saturday|September 26"],
+             "must_not": [NAME_ASK,
+                          r"I have:[^?]*(?:Thursday, September 24|Friday, September 25)"]},
+        ],
+    },
+    {
+        "name": "notice: a themed cupcake display for Thursday (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "why": "Themed displays need 72 hours, not cupcakes' 24: the earliest is "
+               "Friday the 25th at 10am.",
+        "turns": [
+            {"say": "I'd like a themed cupcake display, a number 5, for pickup Thursday at 11am",
+             "must": [r"72 hours|3 days", r"Friday|September 25"],
+             "must_not": [NAME_ASK, r"I have:[^?]*Thursday, September 24"]},
+        ],
+    },
+    {
+        "name": "notice: gluten-free said after the time was chosen (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "why": "Thursday was fine for plain muffins; once they're gluten-free it "
+               "isn't, and the read-back mustn't offer to book it.",
+        "turns": [
+            {"say": "I'd like to order a dozen muffins for pickup Thursday at 10am",
+             "state": "collecting"},
+            {"say": "Riley", "state": "collecting"},
+            {"say": "blueberry", "state": "collecting"},
+            {"say": "they need to be gluten free", "state": "collecting",
+             "must": [r"96 hours|4 days"], "must_not": [r"Just to confirm"]},
+        ],
+    },
     {
         "name": "notice: a party tray at 5pm on a Friday (Crosstown)",
         "slug": "crosstown_pizza",

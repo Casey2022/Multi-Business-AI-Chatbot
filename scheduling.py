@@ -182,7 +182,7 @@ def within_business_hours(dt, duration_min, sched):
     return True
 
 
-def is_slot_available(config, start_iso, busy, service=None):
+def is_slot_available(config, start_iso, busy, service=None, details=None):
     """True if a booking can be made at start_iso, given the busy periods.
 
     Honours the business's scheduling model:
@@ -190,7 +190,8 @@ def is_slot_available(config, start_iso, busy, service=None):
       - capacity:  fewer than slots_per_time overlapping events
 
     service decides how long the booking runs; omitting it means the
-    business's default length.
+    business's default length. details are the order's own words, for a
+    notice variant they name (policy.notice_for).
     """
     sched    = settings(config)
     duration = duration_for(config, service)
@@ -210,7 +211,7 @@ def is_slot_available(config, start_iso, busy, service=None):
     # Inside the service's notice, or after its order-by cutoff
     # (notes/booking_notice.md). Here, so find_alternatives never offers one.
     import policy
-    if policy.too_soon(service, start, config):
+    if policy.too_soon(service, start, config, details=details):
         return False
 
     if sched["model"] == "capacity":
@@ -228,7 +229,7 @@ def is_slot_available(config, start_iso, busy, service=None):
     return True
 
 
-def find_alternatives(config, desired_iso, busy, service=None):
+def find_alternatives(config, desired_iso, busy, service=None, details=None):
     """Return up to max_alternatives available slots, mixing earlier and later.
 
     Searches forward and backward independently, then interleaves the results
@@ -247,7 +248,7 @@ def find_alternatives(config, desired_iso, busy, service=None):
     # would find nothing near what was asked: search from the earliest time
     # the notice allows instead, on the step grid.
     import policy
-    late = policy.too_soon(service, desired, config, now)
+    late = policy.too_soon(service, desired, config, now, details)
     if late and late["why"] == "notice":
         earliest = late["earliest"].replace(second=0, microsecond=0)
         minutes = (earliest.hour * 60 + earliest.minute) % sched["granularity"]
@@ -263,7 +264,7 @@ def find_alternatives(config, desired_iso, busy, service=None):
             if candidate < now:
                 continue
             iso = candidate.strftime("%Y-%m-%d %H:%M")
-            if is_slot_available(config, iso, busy, service):
+            if is_slot_available(config, iso, busy, service, details):
                 out.append(iso)
                 if len(out) >= limit:
                     break
@@ -294,7 +295,7 @@ def find_alternatives(config, desired_iso, busy, service=None):
     return sorted(seen)
 
 
-def slot_rejection_reason(config, start_iso, busy, service=None):
+def slot_rejection_reason(config, start_iso, busy, service=None, details=None):
     """Why a slot is unavailable: 'past', 'closed', 'blackout', 'blocked'
     (the owner blocked it off), 'notice' or 'cutoff' (the service's notice,
     notes/booking_notice.md), 'conflict', or None."""
@@ -329,11 +330,11 @@ def slot_rejection_reason(config, start_iso, busy, service=None):
         return "blocked"
 
     import policy
-    late = policy.too_soon(service, start, config)
+    late = policy.too_soon(service, start, config, details=details)
     if late:
         return late["why"]                  # "notice" or "cutoff"
 
-    if not is_slot_available(config, start_iso, busy, service):
+    if not is_slot_available(config, start_iso, busy, service, details):
         return "conflict"
 
     return None

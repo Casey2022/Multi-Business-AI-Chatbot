@@ -304,6 +304,43 @@ def notice_checks():
                               "cakes, so Wednesday, September 23 at 2:00 PM is too soon."),
               lead)
 
+        heading("notice variants: the order's own words can need longer")
+        # journey_eval, 2026-10-22: gluten-free muffins for Thursday on a
+        # Tuesday (96 hours needed, 48 given) were taken, 3 runs in 3.
+        muffins, gf = "muffins by the dozen", "a dozen gluten-free muffins"
+        check("plain muffins Thursday 10am: fine (24 hours)",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-24 10:00", [], muffins) is None)
+        check("gluten-free muffins Thursday 10am: 'notice' (96 hours)",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-24 10:00", [], muffins, gf)
+              == "notice")
+        alts = scheduling.find_alternatives(sunrise, "2026-09-24 10:00", [], muffins, gf)
+        check("every alternative meets the 96 hours (Saturday 10am on)",
+              alts and all(a >= "2026-09-26 10:00" for a in alts), alts)
+        check("is_slot_available agrees",
+              not scheduling.is_slot_available(sunrise, "2026-09-24 10:00", [], muffins, gf))
+        lead = scheduler._unavailable_message("2026-09-24 10:00", alts, sunrise,
+                                              reason="notice", service=muffins, details=gf)
+        check("the refusal names the variant and its notice",
+              lead.startswith("We need 4 days (96 hours) of notice for gluten-free muffins, "
+                              "so Thursday, September 24 at 10:00 AM is too soon."), lead)
+        check("a themed cupcake display Thursday 11am: 'notice' (72 hours, not 24)",
+              scheduling.slot_rejection_reason(sunrise, "2026-09-24 11:00", [],
+                                               "cupcake orders (dozen minimum)",
+                                               "a themed display, a number 5") == "notice")
+        pending = {"service": muffins, "datetime": "Thursday at 10am",
+                   "datetime_parsed": "2026-09-24 10:00", "customer_name": "Riley",
+                   "notes": "they need to be gluten free", "_asked": "a dozen muffins",
+                   "_offered": ["gluten free decoy"]}
+        details = scheduler._order_details(pending)
+        check("the order's words: what was asked, and every answer",
+              "a dozen muffins" in details and "they need to be gluten free" in details
+              and muffins in details, details)
+        check("…but not the times we offered or the parsed time",
+              "decoy" not in details and "2026-09-24" not in details, details)
+        check("the booking flow keeps the customer's opening words",
+              'pending["_asked"] = message.strip()[:300]'
+              in (Path(__file__).resolve().parent / "scheduler.py").read_text())
+
         pin(2026, 9, 25, 17, 0)                                  # Friday 5pm
         tray = "party tray"
         check("a Friday 8pm tray at 5pm: 'cutoff' (order by 4pm)",

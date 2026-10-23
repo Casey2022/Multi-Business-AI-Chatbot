@@ -164,7 +164,10 @@ TESTS = {
         ("what's your cancellation policy",       "ANSWER_ONLY",
          ["7 days", ("forfeit", "lose it", "lose the deposit", "lose your deposit",
                      "deposit is gone", "keep the deposit", "not refunded",
-                     "lose the whole deposit", "whole deposit is forfeited")]),
+                     "lose the whole deposit", "whole deposit is forfeited",
+                     # Haiku 5.5, 2026-10-22: "48 hours to 7 days before:
+                     # the whole deposit is kept", true and failed.
+                     "deposit is kept")]),
         ("do you deliver",                        "Pickup, Delivery",  ("5-mile", "5 miles")),
         # Two delivery rules (2026-10-19): trays free, cakes $15. Kept in one
         # section so a bare "is delivery free?" gets both, not whichever
@@ -634,10 +637,13 @@ def validate_tests():
                 document += "\n\n" + prices
             # And notice (booking.notice), which each section's chunk carries
             # as a generated line (policy.notice_line_for) since 2026-10-20.
+            # A variant's line goes in its own sections too (2026-10-22).
             for entry in ((loaded.get("booking") or {}).get("notice") or {}).values():
-                line = policy.notice_line_for(entry.get("section"), loaded)
-                if line:
-                    document += "\n\n" + line
+                for title in [entry.get("section"), *[
+                        t for v in entry.get("variants") or [] for t in v.get("sections") or []]]:
+                    line = policy.notice_line_for(title, loaded)
+                    if line:
+                        document += "\n\n" + line
         lowered  = document.lower()
         headings = [h.strip() for h in re.findall(r"^##\s+(.+)$", document, re.M)]
 

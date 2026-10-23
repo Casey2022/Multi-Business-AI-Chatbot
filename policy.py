@@ -299,11 +299,18 @@ def _closed_sentence(config, needed, earliest, notice, what):
     return say, before, after, one_off
 
 
-def notice_for(service, config):
+def notice_for(service, config, details=None):
     """The notice a booked service needs (notes/booking_notice.md), from
     `booking.notice` in the config. Returns a dict shaped like the YAML
     entry, {"hours": 72} or {"hours": 3, "order_by": "16:00",
     "order_by_days": ["friday", "saturday"]}, or None when it needs none.
+
+    `details` are the order's own words (what the customer asked for, their
+    answers). A variant those words name ("gluten free": 96 hours for
+    muffins, not 24) is a longer notice, and the longest one named wins;
+    then the entry also says which: {"hours": 96, "variant": "gluten-free
+    muffins"}. Before, the variants lived only in the prose, and the booking
+    flow took gluten-free muffins for Thursday on a Tuesday, 3 runs in 3.
 
     The one lookup: the booking flow and check_notice both call this, so
     they can't disagree about a service's notice.
@@ -316,8 +323,21 @@ def notice_for(service, config):
     from scheduling import same_service
     for name, entry in table.items():
         if same_service(name, service) and isinstance(entry, dict):
-            return entry
+            return _with_variant(entry, details)
     return None
+
+
+def _with_variant(entry, details):
+    """The entry, with the longest variant `details` name, if longer."""
+    best = entry
+    for variant in entry.get("variants") or []:
+        if not isinstance(variant, dict):
+            continue
+        named = any(_phrase_in(w, details or "") for w in variant.get("words") or [])
+        if named and float(variant.get("hours") or 0) > float(best.get("hours") or 0):
+            best = dict(entry, hours=variant["hours"],
+                        variant=variant.get("name") or variant["words"][0])
+    return best
 
 
 def notice_line_for(title, config):
@@ -330,16 +350,32 @@ def notice_line_for(title, config):
     table = ((config or {}).get("booking") or {}).get("notice") or {}
     lines = []
     for service, entry in table.items():
-        if not isinstance(entry, dict) or menu.section_core(entry.get("section")) != core:
+        if not isinstance(entry, dict):
             continue
-        line = f"Notice for {service}: at least {span(float(entry.get('hours') or 0))}"
-        if entry.get("order_by"):
-            cutoff = datetime.strptime(entry["order_by"], "%H:%M")
-            days = [d.capitalize() for d in entry.get("order_by_days") or []]
-            line += (f", and on {' and '.join(d + 's' for d in days)}" if days else
-                     ", and every day") + f" it must be ordered by {clock_time(cutoff)}"
-        lines.append(line + ".")
+        variants = [v for v in entry.get("variants") or [] if isinstance(v, dict)]
+        if menu.section_core(entry.get("section")) == core:
+            line = f"Notice for {service}: at least {span(float(entry.get('hours') or 0))}"
+            if entry.get("order_by"):
+                cutoff = datetime.strptime(entry["order_by"], "%H:%M")
+                days = [d.capitalize() for d in entry.get("order_by_days") or []]
+                line += (f", and on {' and '.join(d + 's' for d in days)}" if days else
+                         ", and every day") + f" it must be ordered by {clock_time(cutoff)}"
+            lines.append(line + "." + "".join(
+                f" {_variant_name(v).capitalize()}: at least "
+                f"{span(float(v.get('hours') or 0))}." for v in variants))
+        # A variant's own sections (gluten-free sponge under Flavors): the
+        # line where a customer asking about it is likely to land.
+        for v in variants:
+            also = v.get("sections") or []
+            if any(menu.section_core(t) == core for t in also) and menu.section_core(
+                    entry.get("section")) != core:
+                lines.append(f"Notice for {_variant_name(v)}: at least "
+                             f"{span(float(v.get('hours') or 0))}.")
     return " ".join(lines)
+
+
+def _variant_name(variant):
+    return variant.get("name") or (variant.get("words") or ["this"])[0]
 
 
 def _phrase_in(phrase, text):
@@ -372,7 +408,9 @@ def notice_from_table(arguments, texts, config):
         found = latest if len(latest) == 1 else found[:1]
     if not found:
         return arguments
-    service, entry = found[0], entries[found[0]]
+    service = found[0]
+    entry = _with_variant(entries[service], " ".join(
+        [arguments.get("what") or "", (texts or [""])[0]]))
     hours = float(entry.get("hours") or 0)
     try:
         said = float(arguments.get("notice_hours"))
@@ -389,19 +427,20 @@ def notice_from_table(arguments, texts, config):
     return arguments
 
 
-def too_soon(service, start, config, now=None):
+def too_soon(service, start, config, now=None, details=None):
     """Why a booking of `service` at `start` (business-local) misses its
     notice, or None when it doesn't: {"why": "notice", "hours": 72,
     "earliest": datetime} or {"why": "cutoff", "cutoff": datetime}. The
     cutoff is check_notice's rule (_cutoff_on): one reading of "on Friday
     and Saturday nights, order by 4pm" for the chat and the booking flow."""
-    entry = notice_for(service, config)
+    entry = notice_for(service, config, details)
     if not entry:
         return None
     now = clock.business_now(config, now)
     hours = float(entry.get("hours") or 0)
     if start < now + timedelta(hours=hours):
-        return {"why": "notice", "hours": hours, "earliest": now + timedelta(hours=hours)}
+        return {"why": "notice", "hours": hours, "earliest": now + timedelta(hours=hours),
+                "variant": entry.get("variant")}
     cutoff = _cutoff_on(start, entry.get("order_by"), entry.get("order_by_days"))
     if cutoff is not None and now > cutoff:
         return {"why": "cutoff", "cutoff": cutoff}

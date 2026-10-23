@@ -269,16 +269,34 @@ def main():
                             now=_dt2(2026, 9, 22, 11, 0))
     check("a real notice that's met still says there's enough time",
           r["enough_notice"] is True and "enough time" in r["say"], r["say"])
-    check("the generated line for custom cakes",
+    check("the generated line for custom cakes, with its variant",
           policy.notice_line_for("Custom Birthday Cakes (Topics: x)", sun)
-          == "Notice for custom birthday cakes: at least 3 days (72 hours).",
+          == "Notice for custom birthday cakes: at least 3 days (72 hours). "
+             "Gluten-free cakes: at least 4 days (96 hours).",
           policy.notice_line_for("Custom Birthday Cakes (Topics: x)", sun))
+    check("a variant's line in its own section too (gluten-free sponge, Flavors)",
+          policy.notice_line_for("Flavors and Fillings Available", sun)
+          == "Notice for gluten-free cakes: at least 4 days (96 hours).")
     check("the tray line carries the cutoff",
           policy.notice_line_for("Party Trays (Topics: x)", cross)
           == "Notice for party tray: at least 3 hours, and on Fridays and Saturdays "
              "it must be ordered by 4pm.")
     check("a section with no entry gets no line",
-          policy.notice_line_for("Flavors and Fillings Available", sun) == "")
+          policy.notice_line_for("Pickup, Delivery, and Hours", sun) == "")
+    variants = {"booking": {"notice": {
+        "muffins by the dozen": {"hours": 24, "variants": [
+            {"words": ["gluten free"], "hours": 96, "name": "gluten-free muffins"}]},
+        "wedding cakes": {"hours": 336, "variants": [
+            {"words": ["gluten free"], "hours": 96}]}}}}
+    check("notice_for: the order's words name a variant: its hours, and its name",
+          policy.notice_for("muffins by the dozen", variants, "gluten-free blueberry")
+          == {"hours": 96, "variant": "gluten-free muffins", "variants": variants[
+              "booking"]["notice"]["muffins by the dozen"]["variants"]})
+    check("notice_for: no variant named, the service's own",
+          policy.notice_for("muffins by the dozen", variants, "blueberry")["hours"] == 24
+          and policy.notice_for("muffins by the dozen", variants)["hours"] == 24)
+    check("notice_for: a variant shorter than the service never lowers it",
+          policy.notice_for("wedding cakes", variants, "gluten free")["hours"] == 336)
     filled = lambda what, hours, said="", cfg=sun: policy.notice_from_table(
         {"what": what, "notice_hours": hours, "order_by": None}, [said], cfg)
     check("check_notice: a missing number comes from the table",
@@ -287,6 +305,10 @@ def main():
           filled("custom cake", 48)["notice_hours"] == 72)
     check("check_notice: a longer variant from the text is kept (gluten-free 96)",
           filled("gluten free muffins", 96)["notice_hours"] == 96)
+    check("check_notice: a variant the question names comes from the table",
+          filled("gluten free muffins", None)["notice_hours"] == 96
+          and filled("it", 24, said="can I get gluten-free muffins Friday?")["notice_hours"]
+          == 96)
     check("check_notice: the tray cutoff is filled in",
           filled("party tray", 3, cfg=cross)["order_by"] == "16:00"
           and filled("party tray", 3, cfg=cross)["order_by_days"] == ["friday", "saturday"])

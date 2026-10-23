@@ -81,21 +81,21 @@ def create_event(config, service_name, start_iso, customer_id, details=None,
     )
 
 
-def is_slot_available(config, start_iso, busy=None, service=None):
+def is_slot_available(config, start_iso, busy=None, service=None, details=None):
     return _backend(config).is_slot_available(
-        config, start_iso, busy=busy, service=service
+        config, start_iso, busy=busy, service=service, details=details
     )
 
 
-def find_alternatives(config, desired_iso, service=None):
+def find_alternatives(config, desired_iso, service=None, details=None):
     return _backend(config).find_alternatives(
-        config, desired_iso, service=service
+        config, desired_iso, service=service, details=details
     )
 
 
-def slot_rejection_reason(config, start_iso, busy=None, service=None):
+def slot_rejection_reason(config, start_iso, busy=None, service=None, details=None):
     return _backend(config).slot_rejection_reason(
-        config, start_iso, busy=busy, service=service
+        config, start_iso, busy=busy, service=service, details=details
     )
 
 

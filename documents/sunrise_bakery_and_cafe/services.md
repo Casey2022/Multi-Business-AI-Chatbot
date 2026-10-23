@@ -16,14 +16,14 @@ Our standard cake flavors are vanilla bean, chocolate fudge, lemon,
 red velvet, marble, and carrot. Fillings include buttercream (vanilla,
 chocolate, raspberry, strawberry), cream cheese, lemon curd, chocolate
 ganache, and fresh fruit. Gluten-free vanilla and chocolate sponge are
-available with 96 hours' notice. We do not currently offer vegan cakes.
+available to order ahead. We do not currently offer vegan cakes.
 
 ## Cupcake Orders (Topics: cupcakes, dozen, kids party)
 We make standard cupcakes, specialty filled cupcakes (lemon curd, salted
 caramel, raspberry jam) and mini cupcakes. Custom themed cupcake
 displays — like a number "5" arrangement for a kid's birthday — are made
-with 24 cupcakes. Custom themed displays need 72 hours' notice, the same
-as custom cakes.
+with 24 cupcakes. Custom themed displays need more notice than plain
+cupcakes.
 
 ## Pastry Trays for Events (Topics: corporate, breakfast, catering tray)
 Pastry trays for offices, breakfast meetings, and small events come in
@@ -43,8 +43,8 @@ Our kitchen handles wheat, eggs, dairy, soy, and tree nuts daily. We
 cannot guarantee any product is free from cross-contamination. We have
 dedicated gluten-free batches on Wednesdays and Saturdays. Those batches
 bake gluten-free orders placed ahead of time; they don't put gluten-free
-muffins in the case. Gluten-free muffins are made to order only, with 96
-hours' notice, whatever the day. Customers with severe allergies should call to discuss
+muffins in the case. Gluten-free muffins are made to order only,
+whatever the day. Customers with severe allergies should call to discuss
 before ordering.
 
 ## Muffins and Daily Pastries (Topics: muffins, scones, croissants, danish, breakfast)
@@ -54,4 +54,4 @@ poppyseed, and double chocolate; seasonal flavors change through the
 year. Same-day availability depends on what's baked that morning — call
 ahead to confirm a specific flavor, or order a dozen ahead to guarantee
 it. Gluten-free muffins are not part of the daily selection but can be
-made to order with 96 hours' notice.
+made to order.
