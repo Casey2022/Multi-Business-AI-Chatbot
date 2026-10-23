@@ -147,22 +147,38 @@ def file_request(user, business, message, contact, page, error_id, inbox_url=Non
 SMTP = smtplib.SMTP          # replaced in tests
 
 
-def email_settings():
-    """SMTP settings from the environment, or None when alerts aren't set up.
+def smtp_settings():
+    """How to send mail, from the environment, or None when it isn't set up.
 
-    SUPPORT_ALERT_EMAIL  who gets told (the operator)
     SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD, SMTP_FROM (= SMTP_USER)
     With Gmail: smtp.gmail.com, and an app password, not the account password.
     """
-    to = os.environ.get("SUPPORT_ALERT_EMAIL", "").strip()
     host = os.environ.get("SMTP_HOST", "").strip()
-    if not (to and host):
+    if not host:
         return None
     user = os.environ.get("SMTP_USER", "").strip()
-    return {"to": to, "host": host,
-            "port": int(os.environ.get("SMTP_PORT", "587") or 587),
+    return {"host": host, "port": int(os.environ.get("SMTP_PORT", "587") or 587),
             "user": user, "password": os.environ.get("SMTP_PASSWORD", ""),
-            "from": os.environ.get("SMTP_FROM", "").strip() or user or to}
+            "from": os.environ.get("SMTP_FROM", "").strip() or user}
+
+
+def send_mail(msg, settings):
+    """Send one message. Raises on failure; callers decide what that means."""
+    with SMTP(settings["host"], settings["port"], timeout=15) as server:
+        server.starttls()
+        if settings["user"]:
+            server.login(settings["user"], settings["password"])
+        server.send_message(msg)
+
+
+def email_settings():
+    """SMTP settings plus who gets support alerts (SUPPORT_ALERT_EMAIL, the
+    operator), or None when alerts aren't set up."""
+    to = os.environ.get("SUPPORT_ALERT_EMAIL", "").strip()
+    smtp = smtp_settings()
+    if not (to and smtp):
+        return None
+    return dict(smtp, to=to, **{"from": smtp["from"] or to})
 
 
 def alert_email(row, settings, inbox_url=None):
@@ -201,11 +217,7 @@ def alert_operator(request_id, inbox_url=None):
             return "email not set up"
         row = get_support_request(request_id)
         msg = alert_email(row, settings, inbox_url)
-        with SMTP(settings["host"], settings["port"], timeout=15) as server:
-            server.starttls()
-            if settings["user"]:
-                server.login(settings["user"], settings["password"])
-            server.send_message(msg)
+        send_mail(msg, settings)
         set_support_alert(request_id, "emailed")
         log.info("Support request #%s: operator emailed", request_id)
         return "emailed"

@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Set a new password{% endblock %}
+
+{% block navlinks %}{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card card">
+    <div class="card-title login-title">Set a new password</div>
+    {% if expired %}
+      <div class="field"><div class="flash flash-error">This link has expired or was already used.</div></div>
+      <p><a href="{{ url_for('admin.forgot_password') }}">Ask for a new link</a></p>
+    {% else %}
+    <form method="POST">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      {% if error %}
+        <div class="field"><div class="flash flash-error">{{ error }}</div></div>
+      {% endif %}
+      <p class="hint">For {{ email }}. Saving it signs you out everywhere; then sign in with
+        the new one.</p>
+      <div class="field">
+        <label for="password">New password (at least {{ min_length }} characters)</label>
+        <input type="password" id="password" name="password" autocomplete="new-password"
+               minlength="{{ min_length }}" required autofocus>
+      </div>
+      <div class="field">
+        <label for="confirm">The same again</label>
+        <input type="password" id="confirm" name="confirm" autocomplete="new-password"
+               minlength="{{ min_length }}" required>
+      </div>
+      <div class="field">
+        <button class="btn btn-primary w-full" type="submit">Save new password</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

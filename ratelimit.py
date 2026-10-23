@@ -209,6 +209,22 @@ def login_attempt(ip, email):
     ])
 
 
+RESET_PER_HOUR    = _limit("RESET_PER_HOUR", 3)
+RESET_IP_PER_HOUR = _limit("RESET_IP_PER_HOUR", 10)
+
+
+def reset_request(ip, email):
+    """Limits for "email me a reset link": a few an hour per address (so
+    nobody's inbox can be flooded through us), more per address of the
+    asker. Counted whether or not the account exists, so the limit itself
+    doesn't tell anyone which addresses have accounts."""
+    return check_all([
+        (f"reset-user:{email}", RESET_PER_HOUR, 3600),
+        (f"reset-ip:{ip}",      RESET_IP_PER_HOUR, 3600),
+        (f"reset-ip:{ip}",      LOGIN_PER_MINUTE, 60),
+    ])
+
+
 SUPPORT_PER_HOUR    = _limit("SUPPORT_PER_HOUR", 5)
 SUPPORT_PER_DAY     = _limit("SUPPORT_PER_DAY", 20)
 SUPPORT_IP_PER_HOUR = _limit("SUPPORT_IP_PER_HOUR", 10)

@@ -263,6 +263,73 @@ Re-run it before any deploy that changes `requirements.txt`:
 cd ~/chatbot && source venv/bin/activate && pip-audit
 ```
 
+**Round 2 (2026-10-23).** 101 advisories in 12 packages, a month of
+upstream fixes. Checked two ways: the virtualenv as installed, and
+`pip-audit -r requirements.txt`, which resolves a fresh install the way
+Render does. The fresh install had fewer (Pillow, pypdf, urllib3 and
+chromadb), because unpinned transitives already resolve to new builds;
+the floors make that deliberate, as in round 1.
+
+| package | advisories | how it arrives | action |
+|---|---|---|---|
+| Pillow 12.3.0 | 37 | pinned (scanned PDFs, photos) | pin 13.0.0 |
+| pypdf 6.18.0 | 17 | pinned (PDF text) | pin 6.21.2 |
+| PyJWT 2.13.0 | 15 (1 unfixed) | under twilio | floor 2.15.0 |
+| aiohttp 3.14.3 | 8 | under twilio, voyageai | floor raised to 3.14.4 |
+| chromadb 1.5.9 | 5 (all unfixed) | pinned | none: server-mode only, above |
+| urllib3 2.7.0 | 3 | pinned (web imports) | pin 2.8.0 |
+| oauthlib 3.3.1 | 2 | under the Google libraries | floor 4.0.0 |
+| werkzeug, certifi, filelock, multidict, opentelemetry-api | 1 each | under Flask, chromadb | floors |
+
+PyJWT's unfixed one is `decode()` changing a caller's `options` dict when
+the signature isn't verified; nothing here decodes a JWT. OpenTelemetry's
+api, sdk and exporter pin each other exactly, so all three move together.
+After: `pip check` clean; run_tests.py 2451 checks, upload_eval 7/7,
+rag_eval Crosstown 100%; the audit shows only chromadb's five.
+
+## Password reset (2026-10-23)
+
+Before, an owner who forgot their password had no way back in, and a
+session lived until its idle timeout whatever happened to the password
+(the cookie held only an email; shown with a password changed under a
+signed-in browser: it kept working).
+
+- "Forgot your password?" emails a one-time link: `secrets.token_urlsafe`,
+  valid 30 minutes, **only its SHA-256 hash stored**, so a copy of the
+  database can't be used to reset anyone. Asking again cancels the earlier
+  link; using it spends it.
+- The page says the same whether or not the address has an account, and
+  the rate limit (3 an hour per address, 10 per asker) is counted either
+  way, so it can't be used to find out who has one. Demo accounts
+  (`@demo.invalid`) never get mail. Without SMTP set up, nothing is sent
+  and the operator's log says so; the page still says the same.
+- Setting the new password goes through `password_problem` and bumps the
+  user's `session_version`; every session carries the version it signed in
+  under, so all of them end. The owner then signs in fresh.
+- The link is in the URL path, so it reaches the server's access log;
+  one use and 30 minutes are what make that acceptable. The page sends
+  `Referrer-Policy: strict-origin-when-cross-origin` like every page.
+
+`reset_test.py` (21 checks, mutation-tested 7 ways). Needs `SMTP_HOST`
+etc. on Render to send anything (`SUPPORT_ALERT_EMAIL` is no longer
+required for mail in general, only for support alerts).
+
+## The client address behind Render's proxy (found 2026-10-23, open)
+
+The per-IP limits (login, reset, chat, demo starts) take the **first**
+`X-Forwarded-For` entry. Render appends to a header the client sends
+rather than replacing it (community reports; no official doc found), so
+that first entry is whatever the client wrote: changing it each time
+slips the per-IP limit. The per-account limits still hold (5 a minute,
+30 an hour per login address), so guessing one account's password stays
+capped.
+
+The fix is to count hops from the right, but which entry Render adds (the
+client's address, or its own) decides how many, and guessing wrong puts
+every visitor in one bucket. To verify before changing it: log
+`len(X-Forwarded-For entries)` and `request.remote_addr` for one request
+on Render, from a known address, then take the entry just before Render's.
+
 ## Still to do
 
 - **A real secrets story.** `.env` on the box is fine for one deploy and

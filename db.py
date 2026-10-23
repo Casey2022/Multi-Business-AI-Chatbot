@@ -394,6 +394,26 @@ def init_db():
     _add_column_if_missing(conn, "conversation_state", "revision",
                            "INTEGER NOT NULL DEFAULT 0")
 
+    # A session carries the version it signed in under; changing the
+    # password bumps it, so every other session ends (password reset,
+    # 2026-10-23). Before, a session lived until its idle timeout whatever
+    # happened to the password: the cookie held only an email.
+    _add_column_if_missing(conn, "users", "session_version",
+                           "INTEGER NOT NULL DEFAULT 0")
+    # Password reset links: only a hash of each is kept, so a copy of the
+    # database can't be used to reset anyone's password.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            token_hash  TEXT    NOT NULL UNIQUE,
+            created_at  TEXT    NOT NULL,
+            expires_at  TEXT    NOT NULL,
+            used_at     TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     log.info("Database ready.")
@@ -1190,6 +1210,70 @@ def get_user_by_email(email):
     ).fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+RESET_MINUTES = 30
+
+
+def _token_hash(token):
+    import hashlib
+    return hashlib.sha256((token or "").encode("utf-8")).hexdigest()
+
+
+def create_password_reset(user_id):
+    """A new one-time reset token for this user (the only copy is returned;
+    its hash is stored). Any earlier unused link of theirs stops working."""
+    import secrets
+    from datetime import datetime as _dt, timedelta as _td
+    token = secrets.token_urlsafe(32)
+    now = _dt.utcnow()
+    conn = get_connection()
+    conn.execute("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+                 (now.isoformat(), user_id))
+    conn.execute("INSERT INTO password_resets (user_id, token_hash, created_at, expires_at) "
+                 "VALUES (?, ?, ?, ?)",
+                 (user_id, _token_hash(token), now.isoformat(),
+                  (now + _td(minutes=RESET_MINUTES)).isoformat()))
+    conn.commit()
+    conn.close()
+    return token
+
+
+def user_for_reset(token):
+    """The active user a reset token belongs to, if it's unused and not
+    expired; else None (a made-up token looks the same as an old one)."""
+    from datetime import datetime as _dt
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT u.* FROM password_resets r JOIN users u ON u.id = r.user_id "
+        "WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > ? AND u.active = 1",
+        (_token_hash(token), _dt.utcnow().isoformat())).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def reset_password(token, new_password):
+    """Set a new password through a reset link. Returns the user, or raises
+    ValueError (the reason, for the page) when the link is no good or the
+    password isn't allowed. Spends the link, cancels the user's other
+    links, and ends every session they have (session_version)."""
+    import bcrypt
+    from datetime import datetime as _dt
+    user = user_for_reset(token)
+    if not user:
+        raise ValueError("This link has expired or was already used.")
+    problem = password_problem(new_password, user["email"])
+    if problem:
+        raise ValueError(problem)
+    pw_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    conn = get_connection()
+    conn.execute("UPDATE users SET password_hash = ?, session_version = session_version + 1 "
+                 "WHERE id = ?", (pw_hash, user["id"]))
+    conn.execute("UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+                 (_dt.utcnow().isoformat(), user["id"]))
+    conn.commit()
+    conn.close()
+    return get_user_by_email(user["email"])
 
 
 def verify_password(email, password):

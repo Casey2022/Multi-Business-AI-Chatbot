@@ -21,9 +21,21 @@ log_sec = logging.getLogger("security")
 
 
 def current_user():
-    """Return the logged-in user dict, or None."""
+    """Return the logged-in user dict, or None.
+
+    A session also carries the version it signed in under. Changing the
+    password (a reset link) bumps the user's version, so every session from
+    before ends here (2026-10-23). A session from before versions existed
+    counts as version 0, which every account starts at."""
     email = session.get("user_email")
-    return get_user_by_email(email) if email else None
+    if not email:
+        return None
+    user = get_user_by_email(email)
+    if user and session.get("session_version", 0) != (user.get("session_version") or 0):
+        log_sec.info("Ended a session from before %s's password changed", user["email"])
+        session.pop("user_email", None)
+        return None
+    return user
 
 
 @admin_bp.context_processor
@@ -155,6 +167,7 @@ def login():
         user = verify_password(email, password)
         if user:
             session["user_email"] = user["email"]
+            session["session_version"] = user.get("session_version") or 0
             # permanent=True is what arms PERMANENT_SESSION_LIFETIME. It
             # reads backwards: permanent=False means a browser-session
             # cookie, which sounds safer but has no timeout at all — it
@@ -171,6 +184,95 @@ def login():
         log.warning(f"Failed login attempt for {email!r}")
 
     return render_template("admin/login.html", error=error)
+
+
+# ---------------------------------------------------------------------------
+# Password reset (2026-10-23)
+# ---------------------------------------------------------------------------
+
+SAME_REPLY = ("If an account exists for that address, we've emailed a link to set a "
+              "new password. It works once, for {minutes} minutes.")
+
+
+def _reset_email(user, link):
+    from email.message import EmailMessage
+    from db import RESET_MINUTES
+    msg = EmailMessage()
+    msg["Subject"] = "Set a new password for Simon Says"
+    msg["To"] = user["email"]
+    msg.set_content(
+        "Someone asked to set a new password for this Simon Says account.\n\n"
+        f"To set one, open this link (it works once, for {RESET_MINUTES} minutes):\n"
+        f"{link}\n\n"
+        "If that wasn't you, ignore this email: your password hasn't changed.\n")
+    return msg
+
+
+@admin_bp.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    """Ask for a reset link. The reply is the same whether or not the
+    address has an account, and so is the rate limit, so this page can't be
+    used to find out who has one. A demo account (no real inbox) never gets
+    mail. Without SMTP set up nothing can be sent: that's logged for the
+    operator, and the page still says the same."""
+    from db import RESET_MINUTES, create_password_reset
+    if request.method == "GET":
+        return render_template("admin/forgot.html", sent=None)
+    import ratelimit
+    import support
+    email = " ".join((request.form.get("email") or "").split()).lower()
+    allowed, wait = ratelimit.reset_request(_login_ip(), email)
+    if not allowed:
+        log_sec.warning("Reset requests throttled for %s", _login_ip())
+        return render_template("admin/forgot.html", sent=None,
+                               error=f"Too many requests. Try again in {max(wait, 1)} "
+                                     f"seconds."), 429
+    user = get_user_by_email(email) if email else None
+    if user and not user["email"].endswith("@demo.invalid"):
+        settings = support.smtp_settings()
+        if not settings:
+            log_sec.warning("A password reset was asked for, but email isn't set up "
+                            "(SMTP_HOST): nothing sent")
+        else:
+            token = create_password_reset(user["id"])
+            msg = _reset_email(user, url_for("admin.reset_password_page", token=token,
+                                             _external=True))
+            msg["From"] = settings["from"]
+            try:
+                support.send_mail(msg, settings)
+                log.info("Password reset link emailed to %s", user["email"])
+            except Exception as e:
+                log_sec.warning("Password reset email failed: %s", type(e).__name__)
+    return render_template("admin/forgot.html", sent=SAME_REPLY.format(minutes=RESET_MINUTES))
+
+
+@admin_bp.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password_page(token):
+    """Set a new password with a link from forgot_password. Saving it spends
+    the link and signs out every session; then the owner signs in fresh."""
+    from db import user_for_reset, reset_password, MIN_PASSWORD_LENGTH
+    user = user_for_reset(token)
+    if not user:
+        return render_template("admin/reset.html", expired=True), 410
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password") or ""
+        if password != (request.form.get("confirm") or ""):
+            error = "The two passwords don't match."
+        else:
+            try:
+                reset_password(token, password)
+                session.pop("user_email", None)
+                log_sec.info("Password changed by reset link for %s", user["email"])
+                from flask import flash
+                flash("Password changed. Sign in with your new one.", "success")
+                return redirect(url_for("admin.login"))
+            except ValueError as e:
+                error = str(e)
+        return render_template("admin/reset.html", expired=False, error=error,
+                               email=user["email"], min_length=MIN_PASSWORD_LENGTH), 400
+    return render_template("admin/reset.html", expired=False, email=user["email"],
+                           min_length=MIN_PASSWORD_LENGTH)
 
 
 @admin_bp.route("/logout")

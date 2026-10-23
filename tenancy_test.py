@@ -182,8 +182,15 @@ def main():
     heading("visitor A, with B's ids, on every admin route")
     original = snapshot(B)
     swept = 0
+    # Public on purpose, and tied to no business: the password-reset page is
+    # opened signed out, from an emailed link (2026-10-23). Swept apart: a
+    # made-up link shows "expired" and none of B's text.
+    public = {"admin.reset_password_page"}
+    r = a_client.get("/admin/reset/not-a-real-token")
+    check("the public reset page: a made-up link is refused, and shows nothing of B's",
+          r.status_code == 410 and not secret.search(r.get_data(as_text=True)), r.status_code)
     for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
-        if not rule.endpoint.startswith("admin."):
+        if not rule.endpoint.startswith("admin.") or rule.endpoint in public:
             continue
         unknown = set(rule.arguments) - set(ids)
         if unknown:
