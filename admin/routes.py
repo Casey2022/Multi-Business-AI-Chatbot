@@ -275,12 +275,33 @@ def settings(business_id):
         from config import get_nested, parse_extra_questions, coerce_choice
         from db import clear_config_override
         base = load_config(business["config_path"])
+        # As the page was drawn, before anything below is saved: a service
+        # renamed in this same form is still its old name in the questions'
+        # ticks (browser check, 2026-10-23: "'Colour history' is set for
+        # 'colour', which this business doesn't offer any more").
+        shown = load_config(business["config_path"], business_id)
 
         had_error = False
 
         for field, spec in EDITABLE_FIELDS.items():
             # Extra questions post one input per row rather than a single
             # named field, so they're read from the whole form.
+            if spec["type"] == "services":
+                import services
+                value, errors = services.parse(request.form, shown, field)
+                if value is None:
+                    continue        # this form doesn't carry the services
+                if errors:
+                    for message in errors:
+                        flash(f"Services offered: {message}.", "error")
+                    had_error = True
+                    continue
+                if services.same_as_file(value, base.get("services")):
+                    clear_config_override(business_id, field)
+                else:
+                    set_config_override(business_id, field, value,
+                                        updated_by=user["email"])
+                continue
             if spec["type"] == "hours":
                 from config import parse_weekly_hours
                 import scheduling
@@ -302,7 +323,9 @@ def settings(business_id):
             if spec["type"] == "questions":
                 value, errors = parse_extra_questions(
                     request.form,
-                    offered_services=base.get("services") or [])
+                    # The names the page showed (a renamed service's
+                    # current name, not the YAML's).
+                    offered_services=shown.get("services") or [])
                 if value is None:
                     continue        # this form doesn't carry the questions
                 if errors:
@@ -412,6 +435,7 @@ def settings(business_id):
     from geocode import key_configured
     from policy import policy_text
     import notice_form
+    import services
     return render_template(
         "admin/settings.html",
         address_check_ready = key_configured(),
@@ -425,6 +449,7 @@ def settings(business_id):
         policy_lines = policy_text(config).splitlines(),
         notice_lines = notice_form.describe(config),
         hours_rows = weekly_hours_rows(config),
+        service_rows = services.rows(config),
         fields   = EDITABLE_FIELDS,
         personas = load_personas(),
         max_extra_questions = MAX_EXTRA_QUESTIONS,

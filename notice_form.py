@@ -47,8 +47,9 @@ def with_draft(config, business_id):
     if pending is None:
         return config
     out = copy.deepcopy(config)
-    out.setdefault("booking", {})["notice"] = pending
-    return out
+    out.setdefault("booking", {})["notice"] = copy.deepcopy(pending)
+    import services
+    return services.apply(out)          # a draft saved under an older name
 
 
 def apply_live(config, value):

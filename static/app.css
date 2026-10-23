@@ -365,6 +365,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .field-title { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: .01em; }
 .hours-table { display: flex; flex-direction: column; gap: var(--s2); margin: var(--s2) 0; }
 .hours-row .hours-day { min-width: 8.5rem; }
+.service-rows { display: flex; flex-direction: column; gap: var(--s2); }
 .field.is-inert > select,
 .field.is-inert > input { opacity: .5; cursor: not-allowed; background: var(--surface-sunk); }
 

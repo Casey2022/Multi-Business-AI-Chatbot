@@ -32,7 +32,9 @@ EDITABLE_FIELDS = {
     "calendar.scheduling.business_hours": {"label": "Opening hours",
                                            "type": "hours"},
     "business.service_area":{"label": "Service area",    "type": "text"},
-    "services":             {"label": "Services offered","type": "list"},
+    # Rows with a fixed key each (services.py): a rename keeps every link
+    # (notice, length, questions, cancellation rules) pointing at it.
+    "services":             {"label": "Services offered","type": "services"},
     "booking.noun":         {"label": "What you call a booking",
                              "type": "text"},
     "bot.persona_preset":   {"label": "Bot personality", "type": "choice"},
@@ -449,6 +451,12 @@ def load_config(config_path, business_id=None):
             # is: it has to be unreachable from anything anyone can type.
             if row.get("is_demo"):
                 config.setdefault("calendar", {})["provider"] = "simulated"
+
+    # Every link to a service by name, pointed at its current name: a
+    # service renamed on Settings keeps its notice, length, questions and
+    # cancellation rules (services.py).
+    import services
+    services.apply(config)
 
     # The hours customers are told, made from the weekly table bookings
     # follow (after the owner's overrides): one copy, so the two can't

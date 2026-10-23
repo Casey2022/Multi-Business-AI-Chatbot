@@ -84,8 +84,9 @@ def with_draft(config, business_id):
     if pending.get("removed"):
         policies.pop("cancellation", None)
     else:
-        policies["cancellation"] = pending
-    return out
+        policies["cancellation"] = copy.deepcopy(pending)
+    import services
+    return services.apply(out)          # a draft saved under an older name
 
 
 def apply_live(config, value):

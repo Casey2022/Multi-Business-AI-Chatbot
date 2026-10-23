@@ -166,10 +166,18 @@
   <div class="card">
     <div class="card-title">Services offered</div>
     <div class="field">
-      <label for="services">One per line</label>
-      <textarea id="services" name="services" rows="6">{{ config.services | join('\n') }}</textarea>
+      <input type="hidden" name="services.posted" value="1">
+      <div class="service-rows">
+        {% for r in service_rows %}
+        <input type="hidden" name="services[{{ r.index }}].key" value="{{ r.key }}">
+        <input type="text" name="services[{{ r.index }}].name" value="{{ r.name }}"
+               aria-label="{{ 'Service ' ~ (r.index + 1) if r.name else 'A new service' }}"
+               placeholder="{{ '' if r.name else 'Add a service' }}">
+        {% endfor %}
+      </div>
       <span class="hint">These are the only services the assistant will book. Anything
-        else, it says you don't offer it.</span>
+        else, it says you don't offer it. Renaming one keeps its notice, length,
+        questions and cancellation rules; clear a box to remove it.</span>
     </div>
   </div>
 

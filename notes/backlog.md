@@ -56,12 +56,8 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 ## Config structure (YAML review, 2026-10-23)
 
 Keep YAML; fix how facts spread across it. Done: opening hours have one
-copy (the weekly table; owners edit it on Settings). Next, in order:
-- **Stable service IDs.** Notice, durations, cancellation rules, booking
-  questions and menu sections link by service name, and owners can rename
-  services on Settings: renaming "custom birthday cakes" silently drops its
-  72-hour notice (only a startup log line says so). A fixed key per service,
-  the name as a label; until then, warn on Settings before a rename.
+copy (the weekly table; owners edit it on Settings), and each service has
+a fixed key, so a rename keeps its links (services.py). Next, in order:
 - **Shared defaults.** The SMS/voice/webchat channel rules are identical in
   all five YAMLs; the universal guardrails are 24-54% alike. One defaults
   file, each business keeping only what differs (prompts measured the same).

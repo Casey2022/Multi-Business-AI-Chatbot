@@ -835,6 +835,25 @@ JOURNEYS = [
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
         ],
     },
+    # A service renamed on Settings kept nothing that pointed at it by name
+    # (YAML review, 2026-10-23): its notice, length, booking questions and
+    # its own cancellation rules.
+    {
+        "name": "rename: custom cakes keep their notice (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        # As the Settings rows save it: the same key, the old name remembered.
+        "overrides": {"services": [
+            {"key": "custom_birthday_cakes", "name": "custom cakes",
+             "aka": ["custom birthday cakes"]},
+            "wedding cakes", "cupcake orders (dozen minimum)", "pastry trays for events",
+            "muffins by the dozen"]},
+        "why": "Renamed from 'custom birthday cakes': its 72 hours no longer applied.",
+        "turns": [
+            {"say": "I'd like to order a custom cake for pickup tomorrow at 2pm",
+             "must": [r"72 hours|3 days"], "must_not": [NAME_ASK]},
+        ],
+    },
     # Hours lived twice: the text customers are told (business.hours) and the
     # weekly table bookings follow (calendar.scheduling.business_hours).
     # Owners could edit the text, not the table, and nothing kept them in
@@ -1069,13 +1088,16 @@ def _short(value, limit=260):
 
 def run(journey, verbose=False):
     shutil.copy(_PRISTINE, db.DB_PATH)
+    # Settings an owner saved, for this journey only: overrides in this
+    # run's copy of the database, read by load_config like any owner's.
+    saved = dict(journey.get("overrides") or {})
     if journey.get("business_hours"):
-        # The weekly hours an owner saved on Settings, for this journey only:
-        # an override in this run's copy of the database, read by
-        # load_config like any owner's, so the hours text is made from it.
+        saved["calendar.scheduling.business_hours"] = {
+            str(d): span for d, span in journey["business_hours"].items()}
+    if saved:
         owner = db.get_business_by_slug(journey["slug"])
-        db.set_config_override(owner["id"], "calendar.scheduling.business_hours",
-                               {str(d): span for d, span in journey["business_hours"].items()})
+        for field, value in saved.items():
+            db.set_config_override(owner["id"], field, value)
     config = prepare(config_for(journey["slug"]))
     if journey.get("business"):
         # Owner settings for this journey only (a main phone that isn't the
