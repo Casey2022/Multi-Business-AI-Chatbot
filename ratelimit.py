@@ -177,6 +177,15 @@ def knowledge_preview(business_id):
     ])
 
 
+def knowledge_check(business_id):
+    """Limits for the contradiction check: one model call over the whole
+    knowledge base, the same ceiling as a preview, its own count."""
+    return check_all([
+        (f"check:{business_id}", PREVIEW_PER_MINUTE, 60),
+        (f"check:{business_id}", PREVIEW_PER_HOUR, 3600),
+    ])
+
+
 UPLOAD_PER_MINUTE = _limit("UPLOAD_PER_MINUTE", 2)
 UPLOAD_PER_HOUR   = _limit("UPLOAD_PER_HOUR", 10)
 

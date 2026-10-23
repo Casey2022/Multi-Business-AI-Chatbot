@@ -112,6 +112,9 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
   `notice_form.py`: the owner's booking-notice form (`booking.notice`).
 - `services.py`: each service's fixed key and old names; `load_config` points
   notice, durations, questions and cancellation rules at the current name.
+- `contradictions.py`: the Knowledge page's "Check for contradictions" (sections
+  and settings, by Sonnet 5.5; both quotes verified in code), measured by
+  `contradiction_eval.py`.
 - `section_links.py`: menu prices, topping lists and notice lines follow a
   knowledge-base section's new title after a rename (from its History).
 - `menu.py`, `menu_form.py`: menus as data. `photo_import.py`,

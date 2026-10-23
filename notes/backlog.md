@@ -63,7 +63,6 @@ lists and resets local drift. Next, in order:
 
 ## Owner portal
 
-- A contradiction check across knowledge-base sections.
 - A guide page owners can read.
 
 ## Uploads

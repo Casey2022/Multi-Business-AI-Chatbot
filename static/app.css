@@ -746,6 +746,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   background: var(--pending-wash); color: inherit;
   border-bottom: 2px dashed var(--pending); padding: 0 2px; border-radius: 2px;
 }
+.contradictions li + li { margin-top: var(--s2); }
 .fact-changes {
   margin: var(--s2) 0 0 18px; font-size: var(--text-sm); color: var(--ink-soft);
   display: flex; flex-direction: column; gap: 3px;

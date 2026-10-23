@@ -10,6 +10,7 @@ from db import (get_all_businesses, get_business_by_id, get_conversation_list, g
 
 import copy
 import logging
+import os
 log = logging.getLogger("admin")
 log_rec = logging.getLogger("reconcile")
 log_kb = logging.getLogger("knowledge")
@@ -477,7 +478,7 @@ def knowledge(business_id):
     return _knowledge_page(business)
 
 
-def _knowledge_page(business, conflict=None, status=200):
+def _knowledge_page(business, conflict=None, status=200, **extra):
     """The Knowledge base page. `conflict` is an edit that wasn't saved
     because the section changed under it (knowledge_update): {"id",
     "title", "body"}, shown beside the saved version."""
@@ -494,6 +495,7 @@ def _knowledge_page(business, conflict=None, status=200):
         notice_lines = section_notice_lines(business, get_documents(business_id)),
         menu_changes = menu_changes_waiting(business),
         example_title = example_section_title(business),
+        **extra,
     ), status
 
 
@@ -682,6 +684,47 @@ def example_section_title(business):
         if words:
             return words[0].upper() + words[1:]
     return "Opening hours"
+
+
+# The model behind the contradiction check. Sonnet 5.5 caught 10/10 planted
+# clashes with no false flags on five clean seed knowledge bases, 3 runs in
+# 3; Haiku 5.5 9/10 with 4 (contradiction_eval.py, 2026-10-23).
+CONTRADICTION_MODEL = os.environ.get("CONTRADICTION_MODEL", "claude-sonnet-5-5")
+
+
+@admin_bp.route("/business/<int:business_id>/knowledge/contradictions", methods=["POST"])
+@login_required
+def knowledge_contradictions(business_id):
+    """Two things the knowledge base, or it and the settings, say that
+    can't both be true (contradictions.py). Reads the sections as they are
+    now and every draft, so an owner can check before publishing. Renders
+    the page with the results; nothing is saved."""
+    require_business_access(business_id)
+    business = get_business_by_id(business_id)
+    if not business:
+        abort(404)
+    import ratelimit
+    import contradictions
+    import menu
+    import notice_form
+    import policy_form
+    from db import get_documents
+    allowed, wait = ratelimit.knowledge_check(business_id)
+    if not allowed:
+        flash(f"Checks are limited to a few a minute. Try again in {max(wait, 1)} seconds.",
+              "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+    note = budget.refusal()
+    if note:
+        flash(note, "error")
+        return redirect(url_for("admin.knowledge", business_id=business_id))
+    config = notice_form.with_draft(policy_form.with_draft(
+        menu.with_draft(load_config(business["config_path"], business_id), business_id),
+        business_id), business_id)
+    sections = get_documents(business_id)
+    found = contradictions.check(config, sections, CONTRADICTION_MODEL)
+    log.info("Contradiction check for business %s: %d found", business_id, len(found))
+    return _knowledge_page(business, contradictions=found, checked=len(sections))[0]
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/preview", methods=["POST"])

@@ -99,6 +99,41 @@
     {% endif %}
   </div>
 </div>
+
+<div class="card" id="contradictions">
+  <div class="card-title">Check for contradictions</div>
+  <div class="card-pad">
+    <div class="guidance">
+      Two places saying different things (a price, a time, a yes or no) leave the
+      assistant to pick one. This reads every section, as it is now, and the facts
+      in your settings (hours, menu prices, booking notice, cancellation rules),
+      and lists anything that disagrees.
+    </div>
+    <form method="POST" action="{{ url_for('admin.knowledge_contradictions', business_id=business.id) }}"
+          class="mt-4">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit" data-busy-label="Checking…">Check for contradictions</button>
+    </form>
+    {% if checked is defined %}
+    <div class="mt-4" role="status">
+      {% if contradictions %}
+      <ul class="fact-changes contradictions">
+        {% for c in contradictions %}
+        <li><span class="cell-strong">{{ c.a.where }}:</span> “{{ c.a.quote }}”
+          <br><span class="cell-strong">{{ c.b.where }}:</span> “{{ c.b.quote }}”
+          {% if c.why %}<div class="cell-sub">{{ c.why }}</div>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <div class="guidance mt-4">Change whichever is wrong, then check again. Facts from your
+        settings are changed on Settings, Menu, Booking notice or Cancellation rules.</div>
+      {% else %}
+      <p><span class="chip chip-quiet">No contradictions found</span> across {{ checked }}
+        section{{ '' if checked == 1 else 's' }} and your settings.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endif %}
 
 <div class="card" id="photo">
