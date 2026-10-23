@@ -819,8 +819,9 @@ def with_draft(config, business_id):
     if draft is None:
         return config
     out = copy.deepcopy(config)
-    out["menu"] = draft
-    return out
+    out["menu"] = copy.deepcopy(draft)
+    import section_links
+    return section_links.follow(out, business_id)   # a draft under an older title
 
 
 def save_draft(business_id, menu_list, updated_by=None):

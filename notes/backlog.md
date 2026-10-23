@@ -63,8 +63,6 @@ lists and resets local drift. Next, in order:
 
 - A contradiction check across knowledge-base sections.
 - A guide page owners can read.
-- The Knowledge page's rename doesn't warn that menu prices attach by section
-  title (the owner assistant refuses that rename; the page doesn't).
 
 ## Uploads
 

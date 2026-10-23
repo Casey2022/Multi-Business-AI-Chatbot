@@ -601,14 +601,19 @@ def knowledge_checks(assistant, cross, cfg, bob, bob_cfg, Block, llm):
     check("…and a menu item's price in any other section", error and "“pizza”" in text, text)
     text, _, error = crun("add_to_section", section="Delivery", text="The delivery fee is $3.")
     check("…but a price that isn't on the menu (the delivery fee) is fine", not error, text)
-    text, _, error = crun("rename_section", section="Pizza Sizes and Prices", title="Our Pies")
-    check("a section the menu's prices are attached to keeps its name",
-          error and "attached to this section" in text, text)
     text, _, error = crun("rename_section", section="Pizza Sizes and Prices",
                           title="Pizza Sizes and Prices (Topics: pizza, size, slice)")
-    check("…though its (Topics: …) can change", not error, text)
+    check("its (Topics: …) can change", not error, text)
     text, _, error = crun("delete_section", section="Pizza Sizes and Prices")
-    check("…and it can't be deleted out from under them", error and "attached to nothing" in text, text)
+    check("a section the menu's prices are shown with can't be deleted out from under them",
+          error and "attached to nothing" in text, text)
+    # Renaming it is fine since 2026-10-23: the prices follow the section's
+    # new title (section_links.py). Before, the assistant refused it.
+    text, _, error = crun("rename_section", section="Pizza Sizes and Prices", title="Our Pies")
+    import menu as _menu
+    after = config.load_config("config/crosstown_pizza.yaml", 7)
+    check("renaming it is allowed, and the prices follow the new title",
+          not error and "Pizza prices:" in _menu.price_lines_for("Our Pies", after), text)
 
     belmont, sunrise = db.get_business_by_id(9), db.get_business_by_id(10)
     bcfg = config.load_config("config/belmont_hair_studio.yaml", 9)

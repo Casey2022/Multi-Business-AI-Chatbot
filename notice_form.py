@@ -49,7 +49,9 @@ def with_draft(config, business_id):
     out = copy.deepcopy(config)
     out.setdefault("booking", {})["notice"] = copy.deepcopy(pending)
     import services
-    return services.apply(out)          # a draft saved under an older name
+    import section_links
+    # A draft saved under an older service name or section title.
+    return section_links.follow(services.apply(out), business_id)
 
 
 def apply_live(config, value):

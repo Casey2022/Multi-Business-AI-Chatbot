@@ -26,9 +26,10 @@ What code refuses, whatever the model was told:
   rules live in the YAML, which only the operator changes. A section that
   restated either could disagree with it, and the FAQ showed which copy a
   model believes (one_source_test.py).
-- Cutting the menu loose. Menu prices attach to a section by its title
-  (menu.price_lines_for), so renaming that part of the title or deleting
-  the section would leave the prices attached to nothing.
+- Cutting the menu loose. Menu prices are shown with a section, chosen
+  by its title (menu.price_lines_for), so deleting the section would leave
+  them attached to nothing. Renaming is fine: the links follow a section's
+  new title (section_links.py, 2026-10-23).
 
 Section text is the owner's, or a photo's, so a read comes back fenced as
 data, and nothing in it is an instruction.
@@ -303,11 +304,8 @@ def _change(name, args, business_id, config, owner_words, user_email):
         if new_title == title:
             raise Refused("Nothing to change: the section is already called that.")
         if _key(core(new_title)) != _key(label):
-            attached = _attached_items(config, title)
-            if attached:
-                raise Refused(f"Not renamed: the menu's prices for {', '.join(attached)} are "
-                              f"attached to this section by the name “{label}”. Keep that "
-                              "part; the “(Topics: …)” part can change.")
+            # Menu prices, topping lists and notice lines follow the new
+            # title (section_links.py), so only a clash is refused.
             if any(s["id"] != section["id"] and _key(core(s["title"])) == _key(core(new_title))
                    for s in sections):
                 raise Refused(f"There's already a section called “{core(new_title)}”.")

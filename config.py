@@ -501,6 +501,11 @@ def load_config(config_path, business_id=None):
     # cancellation rules (services.py).
     import services
     services.apply(config)
+    # And every link to a knowledge-base section by title (menu prices,
+    # topping lists, notice lines) at the title it has now (section_links).
+    if business_id is not None:
+        import section_links
+        section_links.follow(config, business_id)
 
     # The hours customers are told, made from the weekly table bookings
     # follow (after the owner's overrides): one copy, so the two can't
