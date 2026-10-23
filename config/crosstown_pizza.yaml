@@ -60,6 +60,14 @@ menu:
     add_ons:
       topping:
         each: true
+        # Which toppings there are: the only list (the Toppings section shows
+        # it as a generated line), so menu_price prices "pepperoni" itself.
+        kinds:
+          Meats: [pepperoni, sausage, bacon, ham, meatball, grilled chicken, anchovy]
+          Vegetables: [mushroom, onion, green pepper, banana pepper, black olive, tomato,
+                       spinach, roasted garlic, pineapple, jalapeño]
+          Cheeses: [extra mozzarella, ricotta, feta, blue cheese]
+        kinds_section: "Toppings"
         prices:
           10-inch personal: 1.75
           14-inch medium: 2.25

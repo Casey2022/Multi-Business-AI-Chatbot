@@ -384,6 +384,53 @@ def main():
               "menu_enabled" in c and (c["menu_enabled"] or not menu.has_items(c)),
               c.get("menu_enabled"))
 
+    heading("toppings by name (2026-10-23)")
+    # menu_price said "no price is listed for 'pepperoni'" (the menu knew
+    # one add-on, "topping", not which ones), and the model added $22 +
+    # $2.75 itself: journey_eval "toppings: a large pepperoni", the tool
+    # answering not_listed 3 runs in 3.
+    import yaml as _yaml
+    import menu_form
+    cross = _yaml.safe_load((ROOT / "config" / "crosstown_pizza.yaml").read_text())
+    def price(*order):
+        return menu.menu_price(cross, list(order))
+    r = price({"item": "pizza", "asked_for": "large", "add_ons": [{"name": "pepperoni"}]})
+    check("a topping by its own name is priced: a large pepperoni is $24.75",
+          r.get("total") == "$24.75" and "pepperoni (topping) on the 18-inch large: $2.75"
+          in r["lines"], r)
+    r = price({"item": "pizza", "asked_for": "large pepperoni"})
+    check("…also when it's only in what they asked for (read in code)",
+          r.get("total") == "$24.75", r)
+    r = price({"item": "pizza", "asked_for": "medium with pepperoni and mushroom",
+               "add_ons": [{"name": "pepperoni"}]})
+    check("two toppings, one passed and one only said: $21.50, pepperoni counted once",
+          r.get("total") == "$21.50" and sum("pepperoni" in l for l in r["lines"]) == 1, r)
+    r = price({"item": "pizza", "asked_for": "personal",
+               "add_ons": [{"name": "extra mozzarella"}]})
+    check("a two-word topping ('extra mozzarella', not 'mozzarella' too): $12.75",
+          r.get("total") == "$12.75" and len(r["lines"]) == 2, r)
+    r = price({"item": "pizza", "asked_for": "large", "add_ons": [{"name": "truffle"}]})
+    check("one that isn't a topping here is still not listed, with the ones that are",
+          "not_listed" in r and "pepperoni" in r["listed"].get("pizza topping kinds", []), r)
+    r = price({"item": "pizza", "asked_for": "large", "add_ons": [{"name": "extra cheese"}]})
+    check("'extra cheese' isn't guessed to be extra mozzarella or vegan cheese",
+          "not_listed" in r, r)
+    line = menu.section_lines_for("Toppings (Topics: toppings)", cross)
+    check("the Toppings section gets the list as a generated line",
+          line.startswith("Toppings: meats: pepperoni") and "jalapeño" in line, line)
+    body = (ROOT / "documents" / "crosstown_pizza" / "services.md").read_text()
+    toppings = body.split("## Toppings")[1].split("##")[0].split("\n", 1)[1]
+    check("…and the prose doesn't repeat it (one list)",
+          not any(k in toppings for k in ("pepperoni", "mushroom", "ricotta")), toppings)
+    entry = next(e for e in cross["menu"] if e["item"] == "pizza")
+    form = menu_form.rows_to_form(menu_form.item_rows(entry))
+    saved, errors = menu_form.parse_item_form(form, [])
+    new_list, stale = menu_form.replace_item(cross["menu"], cross["menu"].index(entry), saved, "pizza")
+    kept = next(e for e in new_list if e["item"] == "pizza")["add_ons"]["topping"]
+    check("saving the pizza on the Menu page keeps the toppings (the page doesn't show them)",
+          not errors and not stale and kept.get("kinds") == entry["add_ons"]["topping"]["kinds"]
+          and kept.get("kinds_section") == "Toppings", (errors, kept))
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     return 0 if not FAILED else 1
 

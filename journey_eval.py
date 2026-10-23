@@ -431,8 +431,10 @@ JOURNEYS = [
              "must": [NAME_ASK], "must_not": [_RAW_WHEN]},
             {"say": "Jordan", "state": "collecting", "must": [r"address"]},
             {"say": "12 Elm Street, Rochester NY", "state": "collecting"},
-            {"say": "kitchen sink draining slowly", "state": "collecting"},
-            {"say": "yes", "state": "confirming",
+            # Bob's seed asks no "can the issue be seen?" question; a local
+            # owner override did, and this journey answered it (reset to the
+            # seed, 2026-10-23).
+            {"say": "kitchen sink draining slowly", "state": "confirming",
              "must": [r"drain cleaning", r"September 23", r"10:00"]},
             {"say": "yes", "state": "idle", "must": [r"scheduled|booked"]},
             {"say": "yes", "must_not": [_RETRACTS, r"don'?t count on"]},
@@ -835,6 +837,45 @@ JOURNEYS = [
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
         ],
     },
+    # Toppings by name (2026-10-23). The menu knew one add-on, "topping",
+    # not which toppings exist (they were in the Toppings prose), so
+    # menu_price said "no price is listed for 'pepperoni'" and the model
+    # added the numbers itself; Preview's grounding check flagged the $24.75.
+    {
+        "name": "toppings: a large pepperoni (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "$22 large + $2.75 topping, worked out by the model, not the tool.",
+        "turns": [
+            {"say": "how much is a large pepperoni", "state": "idle",
+             "tool": "menu_price", "must": [r"\$24\.75"],
+             "trace_must_not": [r"not_listed"]},
+        ],
+    },
+    {
+        "name": "toppings: a medium with pepperoni and mushroom (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "$17 medium + 2 x $2.25 = $21.50.",
+        "turns": [
+            {"say": "what would a medium with pepperoni and mushroom cost?", "state": "idle",
+             "tool": "menu_price", "must": [r"\$21\.50"],
+             "trace_must_not": [r"not_listed"]},
+        ],
+    },
+    {
+        "name": "toppings: one that isn't on the menu (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "Truffle isn't a topping here: say so, don't price it as one.",
+        "turns": [
+            {"say": "how much is a large with truffle on it?", "state": "idle",
+             "tool": "menu_price",
+             # "a large with one listed topping would be $24.75" is true; a
+             # price for truffle isn't (2026-10-23).
+             "must": [r"truffle"], "must_not": [r"truffle[^.]{0,30}\$\d", r"\$\d[^.]{0,30}truffle"]},
+        ],
+    },
     # A service renamed on Settings kept nothing that pointed at it by name
     # (YAML review, 2026-10-23): its notice, length, booking questions and
     # its own cancellation rules.
@@ -1167,6 +1208,11 @@ def run(journey, verbose=False):
         if turn.get("tool") and not any(line.startswith(f"tool {turn['tool']}(")
                                         for line in TRACE):
             problems.append((where, f"didn't call {turn['tool']}"))
+        # What a tool answered, not only the reply: a right total the model
+        # worked out after the tool said "not listed" is luck (2026-10-23).
+        for pattern in turn.get("trace_must_not", []):
+            if any(re.search(pattern, line, re.I) for line in TRACE):
+                problems.append((where, f"a tool answered /{pattern}/"))
         for key, pattern in turn.get("not_filed", {}).items():
             value = str((current.get("pending") or {}).get(key, ""))
             if value and re.search(pattern, value, re.I):

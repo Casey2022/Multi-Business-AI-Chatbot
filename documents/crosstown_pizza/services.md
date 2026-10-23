@@ -7,12 +7,8 @@ in the oven. Gluten-free crust comes in the 10-inch size only; we can't
 make a medium or large gluten-free.
 
 ## Toppings (Topics: toppings, pepperoni, veggie, meat, cheese)
-Meats: pepperoni, sausage, bacon, ham, meatball, grilled chicken,
-anchovy. Vegetables: mushroom, onion, green pepper, banana pepper,
-black olive, tomato, spinach, roasted garlic, pineapple, jalapeño.
-Cheeses: extra mozzarella, ricotta, feta, blue cheese. Vegan cheese is
-available. We do not have a vegan crust — the standard dough contains no
-dairy or egg, but it is made on shared equipment.
+Vegan cheese is available. We do not have a vegan crust — the standard
+dough contains no dairy or egg, but it is made on shared equipment.
 
 ## Wings (Topics: wings, bone in, boneless, sauce, heat)
 Bone-in or boneless, same price. Sauces: mild, medium, hot, suicidal,

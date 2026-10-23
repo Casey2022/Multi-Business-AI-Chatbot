@@ -307,8 +307,24 @@ def replace_item(menu_list, index, entry, expected_name, expected_fingerprint=No
     if entry is None:
         del items[index]
     else:
-        items[index] = entry
+        items[index] = _keep_kinds(items[index], entry)
     return items, None
+
+
+def _keep_kinds(old, new):
+    """The new entry with each extra's kinds (which toppings there are) and
+    their section carried over from the stored one: the page doesn't show
+    them, and rebuilding an extra from its rows dropped them, so saving the
+    pizza's prices would have lost every topping name (2026-10-23)."""
+    for name, spec in (old.get("add_ons") or {}).items():
+        if not isinstance(spec, dict) or not spec.get("kinds"):
+            continue
+        target = (new.get("add_ons") or {}).get(name)
+        if isinstance(target, dict):
+            target.setdefault("kinds", spec["kinds"])
+            if spec.get("kinds_section"):
+                target.setdefault("kinds_section", spec["kinds_section"])
+    return new
 
 
 def rows_to_form(rows):

@@ -61,6 +61,22 @@ def enabled(config):
     return bool(flag)
 
 
+def _kinds(raw):
+    """An add-on's kinds ("pepperoni", "mushroom": each a topping) as
+    {group or "": [names]}, in order. Written in the YAML as a list, or as
+    groups ({"Meats": [...], "Vegetables": [...]})."""
+    if isinstance(raw, dict):
+        return {str(g): [str(k) for k in (v or [])] for g, v in raw.items()}
+    if isinstance(raw, list):
+        return {"": [str(k) for k in raw]}
+    return {}
+
+
+def kind_names(rule):
+    """Every kind an add-on has, in order."""
+    return [k for names in (rule.get("kinds") or {}).values() for k in names]
+
+
 def items(config):
     """The menu as a list of dicts (empty when the business has none, or has
     the menu switched off — then nothing anywhere quotes from it).
@@ -82,7 +98,9 @@ def items(config):
                 spec = {"prices": {"any": spec}}
             add_ons[str(name)] = {"each": bool(spec.get("each")),
                                   "prices": {str(k): parse_price(v) for k, v in
-                                             (spec.get("prices") or {}).items()}}
+                                             (spec.get("prices") or {}).items()},
+                                  "kinds": _kinds(spec.get("kinds")),
+                                  "kinds_section": str(spec.get("kinds_section") or "")}
         out.append({
             "item": str(entry["item"]),
             "aliases": [str(a) for a in (entry.get("aliases") or [])],
@@ -257,8 +275,21 @@ def price_lines_for(title, config):
     Matched on the whole title before "(Topics…)": a prefix match put the
     colour prices on "Colour Deposits and Lateness" too."""
     core = section_core(title)
-    return " ".join(render_item(it) for it in items(config)
-                    if it["section"] and section_core(it["section"]) == core)
+    lines = [render_item(it) for it in items(config)
+             if it["section"] and section_core(it["section"]) == core]
+    lines += [kinds_line(add_name, rule) for it in items(config)
+              for add_name, rule in it["add_ons"].items()
+              if rule["kinds"] and section_core(rule["kinds_section"]) == core]
+    return " ".join(lines)
+
+
+def kinds_line(add_name, rule):
+    """ "Toppings: meats: pepperoni, sausage; vegetables: mushroom, …." The
+    menu's kinds are the only list (the Toppings prose doesn't repeat it)."""
+    groups = [(f"{g.lower()}: " if g else "") + ", ".join(names)
+              for g, names in rule["kinds"].items() if names]
+    title = add_name if add_name.endswith("s") else add_name + "s"
+    return f"{title.capitalize()}: " + "; ".join(groups) + "."
 
 
 def section_lines_for(title, config):
@@ -509,7 +540,13 @@ def menu_price(config, order):
         asked = str(entry.get("asked_for") or "")
         quantity = max(1, int(entry.get("quantity") or 1))
 
-        option, why = match_option(it, asked) if it["options"] else (None, "not listed")
+        # The size is matched without the toppings named in it: "large
+        # pepperoni" is the large, with pepperoni.
+        sized = asked
+        for _, kind in kinds_in(asked, it):
+            sized = re.sub(r"\b" + r"\s+".join(map(re.escape, _words(kind))) + r"\b", " ",
+                           sized, flags=re.I)
+        option, why = match_option(it, sized) if it["options"] else (None, "not listed")
         if option is None and it["each"] is not None:
             # By the piece: a number they said is how many, "dozen" is 12.
             said = _counts([w for w in _words(asked) if w not in _item_words(it)])
@@ -569,7 +606,16 @@ def menu_price(config, order):
                      if quantity > 1 else f"{label}: {price_text(price)}")
         if option in it["notes"]:
             notes.append(f"{label}: {it['notes'][option]}")
-        for add in entry.get("add_ons") or []:
+        extras = list(entry.get("add_ons") or [])
+        # A kind the customer named ("a large pepperoni") is counted even
+        # when the model passed it only in asked_for: what they said is
+        # read in code (2026-10-23).
+        passed = {(f[0], f[2]) for f in (_find_add_on(it, str(a.get("name") or ""))
+                                         for a in extras) if f}
+        for add_name, kind in kinds_in(asked, it):
+            if (add_name, kind) not in passed:
+                extras.append({"name": kind, "count": 1})
+        for add in extras:
             name = str(add.get("name") or "")
             count = max(1, int(add.get("count") or 1))
             spec = _find_add_on(it, name)
@@ -578,8 +624,12 @@ def menu_price(config, order):
                 for add_name, rule in it["add_ons"].items():
                     listed[f"{it['item']} extra: {add_name}"] = {
                         o: price_text(p) for o, p in rule["prices"].items()}
+                    if rule["kinds"]:
+                        listed[f"{it['item']} {add_name} kinds"] = kind_names(rule)
                 continue
-            add_name, rule = spec
+            add_name, rule, kind = spec
+            if kind:
+                add_name = f"{kind} ({add_name})"
             each = rule["prices"].get(option, rule["prices"].get("any"))
             if each is None:
                 not_listed.append(f"{add_name} isn't available on the {option} "
@@ -632,16 +682,40 @@ def _label(it, option):
 
 
 def _find_add_on(it, name):
-    """The add-on the words name: all of one inside the other ("toppings" /
-    "topping"). Not a shared word: "extra cheese" shares "cheese" with "vegan
-    cheese" and isn't it (extra mozzarella is a topping). The tool lists the
-    add-on names, so the model can pass the menu's own."""
+    """(add-on, rule, kind or None) for the words: the add-on's own name, all
+    of one inside the other ("toppings" / "topping"), or one of its kinds
+    ("pepperoni" is a topping). Not a shared word: "extra cheese" shares
+    "cheese" with "vegan cheese" and isn't it, and isn't "extra mozzarella"
+    either. Before 2026-10-23 the menu had no kinds, so "pepperoni" was "no
+    price is listed" and the model added the numbers itself."""
     wanted = set(_words(name)) - _FILLER
     for add_name, rule in it["add_ons"].items():
         own = set(_words(add_name)) - _FILLER
         if wanted and own and (wanted <= own or own <= wanted):
-            return add_name, rule
+            return add_name, rule, None
+    for add_name, rule in it["add_ons"].items():
+        for kind in kind_names(rule):
+            if wanted and wanted == set(_words(kind)) - _FILLER:
+                return add_name, rule, kind
     return None
+
+
+def kinds_in(text, it):
+    """The add-on kinds the customer's words name, longest first so "extra
+    mozzarella" isn't also "mozzarella": [(add-on, kind)]."""
+    words = _words(text)
+    found, taken = [], set()
+    pairs = [(add_name, kind) for add_name, rule in it["add_ons"].items()
+             for kind in kind_names(rule)]
+    for add_name, kind in sorted(pairs, key=lambda p: -len(_words(p[1]))):
+        k = _words(kind)
+        for i in range(len(words) - len(k) + 1):
+            span = set(range(i, i + len(k)))
+            if words[i:i + len(k)] == k and not span & taken:
+                found.append((add_name, kind))
+                taken |= span
+                break
+    return found
 
 
 def tool(config):
