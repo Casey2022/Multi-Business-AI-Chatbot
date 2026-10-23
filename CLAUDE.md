@@ -94,6 +94,10 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
   seed files. When you edit a seed document, update the local DB to match
   (`db.update_document_section`, then `db.set_documents_clean`) and check
   every section is identical.
+- `python3 seed_check.py` lists where the local database differs from the
+  seed (sections, overrides, drafts); `seed_check.py <slug> --reset` puts one
+  business back, after copying the database to `backups/`. Run it when an
+  eval fails on data the live site doesn't have.
 - SQLite writes delete a journal file; if a write fails with "disk I/O
   error", that's a delete permission problem, not a bad disk.
 

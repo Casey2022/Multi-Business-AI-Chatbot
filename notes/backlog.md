@@ -44,8 +44,11 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 - Preview's Now/After comparison (`preview.compare_facts`) got unreadable
   JSON once (2026-10-23) and fell back to "wording differs"; the grounding
   check now reads the object after any preamble, and this could too.
-- Local DB: Bob's has a "Drywall Repair" section the seed doesn't (left in
-  place on 2026-10-23, when the rest of Bob's was reset to the seed).
+- Local DB drift, as `seed_check.py` found it on 2026-10-23 (reset any with
+  `--reset` when wanted): Bob's local-only Drywall Repair section and a
+  booking-questions override (the water-heater-age question replaced);
+  Crosstown's radius 6 -> 5 miles and a menu override ("6 wings": $8);
+  Ridgeline's Payment and Change Orders under its older, shorter Topics line.
 - Belmont rag_eval row 32 ("do I pay anything up front for balayage"), once
   on 2026-10-23: the $30 deposit right, then "the info I have doesn't confirm
   whether balayage counts as a colour service". It's a lightening service;
@@ -58,9 +61,8 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 Keep YAML; fix how facts spread across it. Done: opening hours have one
 copy (the weekly table; owners edit it on Settings), and each service has
 a fixed key, so a rename keeps its links (services.py), and what every
-business is told lives once in config/defaults.yaml. Next, in order:
-- **Local vs seed check / reset command** (`rag_eval` warns; a command that
-  lists and resets the differences would have saved this week's detours).
+business is told lives once in config/defaults.yaml, and seed_check.py
+lists and resets local drift. Next, in order:
 - **Schema check at load**, surfaced in the portal, not only the log.
 - **Persistence on Render** before a real business: the disk is wiped on
   each deploy, so owner overrides vanish.

@@ -6,3 +6,6 @@ chatbot.db
 .DS_Store
 chroma_db/
 logs/
+
+# seed_check.py --reset copies the database here first: local data, never committed.
+backups/
