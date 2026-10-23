@@ -37,13 +37,8 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
   "we open at 11, so a noon tray can't be promised; call". Noon is open;
   the chat takes orders before opening.
-- Mid-booking, "ok got it, thanks" at the address question gets the address
-  question again, without a word for the thanks.
 - Crosstown rag_eval row 32 ("a medium with two toppings, delivered"):
   "$25-26" for $24.50, once on 2026-10-22; no tool on that path.
-- A slot answered out of turn gets the same question again word for word
-  (Ridgeline: scope given while asked for timing, "Any timeframe in mind?"
-  twice). Correct, but reads as a bot that didn't listen.
 
 ## Owner portal
 

@@ -466,11 +466,26 @@ NUDGES = {
 }
 NON_ANSWERS = BOOKING_WORDS | NUDGES
 
+# A message made only of these words acknowledges; it answers nothing.
+# journey_eval, 2026-10-22: "ok got it, thanks" at "Where are we delivering
+# to?" was filed as the address and read back: "did you mean ok got it,
+# thanks?". Not "sure" or "yes": those answer a yes/no question.
+ACKNOWLEDGING = {
+    "ok", "okay", "k", "kk", "thanks", "thank", "you", "thx", "ty", "got", "it",
+    "sounds", "good", "great", "cool", "perfect", "alright", "awesome", "nice",
+    "noted", "understood",
+}
+
+
+def _acknowledges(message):
+    words = _normalise(message).split()
+    return bool(words) and all(w in ACKNOWLEDGING for w in words)
+
 
 def _is_not_an_answer(message):
     """True if this message can't sensibly be the answer to any question."""
     text = _normalise(message)
-    return bool(text) and text in NON_ANSWERS
+    return bool(text) and (text in NON_ANSWERS or _acknowledges(message))
 
 
 def _reask_after_non_answer(message, missing, pending, config):
@@ -505,7 +520,29 @@ def _reask_after_non_answer(message, missing, pending, config):
         lead = (f"We're already setting up your {service}"
                 if service else "We're already in the middle of booking")
         return f"{lead}, no need to start over. {prompt}", pending
+    if _acknowledges(message):
+        return f"No problem! {prompt}", pending
     return f"Still here! {prompt}", pending
+
+
+def _ask_again_after_other_answer(missing, pending, config):
+    """The question we just asked, again, after the answer landed somewhere
+    else (another question's slot): acknowledged, never word for word.
+
+    journey_eval, 2026-10-22, 3 in 3 each: asked "Any timeframe in mind?",
+    "oh and we also want to move the sink to the island" went to the scope,
+    and the same question came back verbatim; at Sunrise "gluten free
+    please" went to the notes and "Any customization details?" came back.
+    Same alternation as _reask_after_non_answer, on the same count.
+    Returns (reply, pending)."""
+    prompt = substitute(missing["prompt"], config)
+    counts = dict(pending.get("_reasked") or {})
+    n = counts.get(missing["key"], 0)
+    counts[missing["key"]] = n + 1
+    pending = {**pending, "_reasked": counts}
+    if n % 2 == 1:
+        return (f"Noted. I still need this one to finish the booking: {prompt}"), pending
+    return f"Got it, I've noted that. {prompt}", pending
 
 
 def _looks_like_a_question(message):
@@ -1556,6 +1593,7 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
                 log.info(f"No slots extracted — "
                       f"treating message as '{missing['key']}'")
 
+        asked = missing
         pending.update(extracted)
         _tidy_name(pending)
         if pending.get("service"):
@@ -1563,6 +1601,17 @@ def _handle_booking_inner(phone, message, config, business_id, prefilled=None,
         early = _check_datetime_now(phone, business_id, pending, extracted, config)
         if early:
             return early
+        # The answer went to another question, and the one we asked is
+        # still the next one: say so, rather than ask it word for word.
+        still = _first_missing_slot(pending, slots)
+        if asked and still and still["key"] == asked["key"] and extracted:
+            # An address given out of turn is still checked at once.
+            refusal = _check_addresses(phone, business_id, pending, config, slots)
+            if refusal:
+                return refusal
+            reply, pending = _ask_again_after_other_answer(still, pending, config)
+            _save_state(phone, business_id, "collecting", pending=pending)
+            return reply
         _save_state(phone, business_id, "collecting", pending=pending)
         return _ask_next_or_finalize(phone, business_id, pending, config, slots)
     # --- Confirming: read-back accepted, rejected, or corrected ---

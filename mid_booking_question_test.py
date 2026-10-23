@@ -226,6 +226,44 @@ def main():
                 check(f"{message!r}: no question, no extra answer",
                       not answered and "About your question" not in reply, reply)
 
+        heading("an answer that lands elsewhere: the question isn't repeated word for word")
+        # journey_eval, 2026-10-22, 3 in 3: "gluten free please" at the
+        # customization question went to the notes, and "Any customization
+        # details?" came back verbatim.
+        asking = {k: v for k, v in base.items() if k != "customization"}
+        prompt = "Any customization details? (e.g. 'Happy Birthday Carl', colors, theme — or reply 'none')"
+        set_state(phone, biz, "collecting", pending=dict(asking))
+        extract_returns.clear(); extract_returns["notes"] = "gluten free"
+        answered.clear()
+        first = sched._handle_booking_inner(phone, "gluten free please", cfg, biz)
+        pending = get_state(phone, biz)["pending"]
+        check("the note is kept", pending.get("notes") == "gluten free", str(pending))
+        check("…and the question comes again, acknowledged",
+              first == f"Got it, I've noted that. {prompt}", first)
+        extract_returns.clear(); extract_returns["notes"] = "gluten free, no nuts"
+        second = sched._handle_booking_inner(phone, "and no nuts", cfg, biz)
+        check("…and differently the next time (never the same reply twice running)",
+              second != first and second.endswith(prompt), second)
+        set_state(phone, biz, "collecting", pending=dict(asking))
+        extract_returns.clear(); extract_returns["customization"] = "blue icing"
+        got = sched._handle_booking_inner(phone, "blue icing", cfg, biz)
+        check("an answer to the question asked moves on, as before",
+              got.startswith("Anything else we should know?"), got)
+
+        heading("an acknowledgement answers nothing (journey_eval 2026-10-22)")
+        # "ok got it, thanks" at "Where are we delivering to?" was filed as
+        # the address and read back: "did you mean ok got it, thanks?".
+        for message in ("ok got it, thanks", "thanks!", "Okay", "sounds good", "got it"):
+            set_state(phone, biz, "collecting", pending=dict(asking))
+            extract_returns.clear()
+            got = sched._handle_booking_inner(phone, message, cfg, biz)
+            pending = get_state(phone, biz)["pending"]
+            check(f"{message!r}: not stored, and the question again after 'No problem!'",
+                  "customization" not in pending and got == f"No problem! {prompt}", got)
+        for message in ("sure", "yes", "ok, blue icing please", "no thanks", "none"):
+            check(f"{message!r} can still be an answer",
+                  not sched._acknowledges(message), message)
+
         heading("a correction at the read-back is still a correction")
         set_state(phone, biz, "confirming", pending=dict(full))
         extract_returns.clear(); extract_returns["datetime"] = "Wednesday at 10"
