@@ -37,18 +37,15 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
   "we open at 11, so a noon tray can't be promised; call". Noon is open;
   the chat takes orders before opening.
-- Bob's, after-hours emergency at 11pm (Preview's grounding check,
-  2026-10-22): "call (585) 555-0124 if you need help right away", the main
-  line; the Emergency Service section says after hours it's 555-0123.
 - Crosstown "how much is a large pepperoni": the menu tool says pepperoni
   isn't a listed topping (the menu has "topping", not each one), and the
   model adds $22 + $2.75 itself. Probably right, never looked up; Preview
   now flags "$24.75". Same gap as row 32 below.
-- Local DB: Bob's Emergency Service says a $90 after-hours fee, the seed
-  says $75 (a local edit? the live site has $75). Demos copied locally get $90.
 - Preview's Now/After comparison (`preview.compare_facts`) got unreadable
   JSON once (2026-10-23) and fell back to "wording differs"; the grounding
   check now reads the object after any preamble, and this could too.
+- Local DB: Bob's has a "Drywall Repair" section the seed doesn't (left in
+  place on 2026-10-23, when the rest of Bob's was reset to the seed).
 - Crosstown rag_eval row 32 ("a medium with two toppings, delivered"):
   "$25-26" for $24.50, once on 2026-10-22; no tool on that path.
 

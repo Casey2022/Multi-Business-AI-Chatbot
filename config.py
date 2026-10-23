@@ -20,6 +20,10 @@ log = logging.getLogger("config")
 EDITABLE_FIELDS = {
     "business.name":        {"label": "Business name",   "type": "text"},
     "business.phone":       {"label": "Phone",           "type": "text"},
+    # A separate after-hours line (Bob's on-call dispatcher). Emergencies
+    # outside hours go here; everything else to the phone above.
+    "business.emergency_phone": {"label": "After-hours emergency line (if you have one)",
+                                 "type": "text"},
     "business.address":     {"label": "Address",         "type": "text"},
     "business.hours":       {"label": "Hours (as shown to customers)",
                              "type": "text"},
@@ -440,6 +444,7 @@ def substitute(text, config):
     Supported placeholders:
         {business_name}     business.name
         {phone}             business.phone
+        {emergency_phone}   business.emergency_phone, else business.phone
         {hours}             business.hours
         {address}           business.address
         {service_area}      business.service_area
@@ -455,6 +460,7 @@ def substitute(text, config):
     replacements = {
         "business_name":     business.get("name", ""),
         "phone":             business.get("phone", ""),
+        "emergency_phone":   business.get("emergency_phone") or business.get("phone", ""),
         "hours":             business.get("hours", ""),
         "address":           business.get("address", ""),
         "service_area":      business.get("service_area", ""),

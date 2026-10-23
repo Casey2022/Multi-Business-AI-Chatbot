@@ -7,6 +7,10 @@ business:
   # like an identifier. Must match the registered slug.
   slug: "bobs_plumbing"
   phone: "(585) 555-0123"
+  # The on-call dispatcher, after hours: the only copy (the knowledge base
+  # says "our after-hours emergency line"). The same number as the main
+  # phone here, but an owner can change either one.
+  emergency_phone: "(585) 555-0123"
   address: "123 Main St, Rochester NY"
   hours: "Mon-Fri, 9am-5pm"
   service_area: "Greater Rochester, within 20 miles"
@@ -104,7 +108,7 @@ rules:
   - name: "emergency"
     keywords: ["emergency", "urgent", "flooding", "burst", "leak now"]
     match: "any"
-    reply: "For emergencies, call {phone} immediately — we have 24/7 service and can typically be on-site within 90 minutes."
+    reply: "For emergencies, call {emergency_phone} immediately — we have 24/7 service and can typically be on-site within 90 minutes."
 
   - name: "thanks"
     keywords: ["thanks", "thank you", "thx"]

@@ -158,6 +158,38 @@ def main():
     check("a changed notice changes the boot digest (the collection is rebuilt)",
           rag._source_digest(docs, sun) != rag._source_digest(docs, changed))
 
+    heading("an after-hours line lives only in business.emergency_phone")
+    # 2026-10-22: the number lived in one knowledge-base paragraph, and the
+    # emergency shortcut and the prompt used the main phone; with an owner's
+    # main phone set to another number, an 11pm emergency went there.
+    from config import substitute
+    bob = load_config(str(ROOT / "config" / "bobs_plumbing.yaml"))
+    line = bob["business"].get("emergency_phone")
+    docs = " ".join((ROOT / "documents" / "bobs_plumbing").joinpath(f).read_text()
+                    for f in ("services.md",))
+    check("Bob's has one", line == "(585) 555-0123", line)
+    check("…and the knowledge base doesn't state it", line not in docs)
+    moved = copy.deepcopy(bob)
+    moved["business"]["phone"] = "(585) 555-0124"
+    rule = next(r for r in bob["rules"] if r["name"] == "emergency")
+    check("the emergency shortcut gives the after-hours line, not the main phone",
+          "555-0123" in substitute(rule["reply"], moved)
+          and "555-0124" not in substitute(rule["reply"], moved))
+    plain = copy.deepcopy(moved); plain["business"].pop("emergency_phone")
+    check("…and a business without one gets its main phone, as before",
+          substitute("{emergency_phone}", plain) == "(585) 555-0124")
+    prompt = llm.build_system_prompt(moved, channel="webchat")
+    check("the business facts state it beside the main phone",
+          "- After-hours emergency line: (585) 555-0123" in prompt
+          and "- Phone: (585) 555-0124" in prompt)
+    check("…and only for a business that has one (every other prompt as it was)",
+          "After-hours emergency line" not in llm.build_system_prompt(plain, channel="webchat"))
+    import config as cfg_module
+    check("owners set it on Settings",
+          "business.emergency_phone" in cfg_module.EDITABLE_FIELDS
+          and "'business.emergency_phone'" in (ROOT / "admin" / "templates" / "admin"
+                                               / "settings.html").read_text())
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

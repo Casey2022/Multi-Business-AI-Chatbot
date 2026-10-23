@@ -835,6 +835,50 @@ JOURNEYS = [
                           r"I have:[^?]*(?:Wednesday, September 23|Thursday, September 24)"]},
         ],
     },
+    # After hours, an emergency goes to the on-call line, not the main one.
+    # Preview's grounding check, 2026-10-22: at 11pm Bob's said "call (585)
+    # 555-0124 if you need help right away", the main line (an owner
+    # override locally); the Emergency Service section says after hours it's
+    # 555-0123. Live, the main phone IS 555-0123, so it was hidden there.
+    {
+        "name": "after hours: flooding, who do I call (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 23, 0),                                   # Tuesday 11pm
+        "business": {"phone": "(585) 555-0124"},
+        "why": "The emergency shortcut said 'call {phone}': the main line.",
+        "turns": [
+            {"say": "my basement is flooding, who do I call?",
+             "must": [r"555-0123"], "must_not": [r"555-0124"]},
+        ],
+    },
+    {
+        "name": "after hours: the emergency fee (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 23, 0),
+        "business": {"phone": "(585) 555-0124"},
+        "why": "At 11pm: 'call (585) 555-0124 if you need help right away'.",
+        "turns": [
+            {"say": "do you charge for after hours emergencies",
+             # Naming the line isn't required in a fee answer; sending an
+             # emergency to the main one is wrong (2026-10-23, 1 in 3 named none).
+             "must": [r"\$75"],
+             "must_not": [r"555-0124[^.]{0,60}(?:right away|now|immediately|urgent|emergenc)",
+                          r"(?:right away|now|immediately|urgent|emergenc)[^.]{0,60}555-0124"]},
+        ],
+    },
+    {
+        "name": "after hours: a water heater leaking at 11pm (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 23, 0),
+        "business": {"phone": "(585) 555-0124"},
+        "why": "An emergency described, no keyword: the on-call line.",
+        "turns": [
+            {"say": "it's 11pm and water is pouring out from under my water heater, what should I do?",
+             "must": [r"555-0123"],
+             "must_not": [r"555-0124[^.]{0,60}(?:right away|now|immediately|urgent|emergenc)",
+                          r"(?:right away|now|immediately|urgent|emergenc)[^.]{0,60}555-0124"]},
+        ],
+    },
     # An answer that lands somewhere else, then the same question again word
     # for word: correct, but reads as a bot that didn't listen (backlog,
     # 2026-10-22). Each checks only that the question isn't repeated
@@ -997,6 +1041,10 @@ def _short(value, limit=260):
 def run(journey, verbose=False):
     shutil.copy(_PRISTINE, db.DB_PATH)
     config = prepare(config_for(journey["slug"]))
+    if journey.get("business"):
+        # Owner settings for this journey only (a main phone that isn't the
+        # after-hours line), as an override from the Settings page would be.
+        config["business"].update(journey["business"])
     if journey.get("policy"):
         # Rules an owner set on the Cancellation rules page, for this journey only.
         config.setdefault("policies", {})["cancellation"] = journey["policy"]

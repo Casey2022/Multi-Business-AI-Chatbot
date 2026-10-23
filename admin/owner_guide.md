@@ -176,6 +176,7 @@ Changes here take effect as soon as you press **Save settings**.
 
 - **Taking new bookings?**: set it to No to pause new bookings, say while you're away or fully booked. The assistant keeps answering questions, but anyone asking to book (or part-way through booking) gets your message instead. **What the assistant says instead** starts with a standard wording; change it if you like ({phone} becomes your phone number; clear it to go back to the standard). **Turn bookings back on automatically on** is optional: choose a day and bookings switch back on by themselves that morning. While bookings are paused, every page shows a reminder with a **Change** button.
 - Business details: **Business name**, **Phone**, **Address**, **Hours (as shown to customers)** and **Service area**, as the assistant tells customers.
+- **After-hours emergency line (if you have one)**: a separate number for emergencies outside your hours, like an on-call dispatcher. The assistant gives it for an emergency out of hours and your main phone for everything else. Leave it blank to use one number.
 - **Limit service area?** and **How far will you travel?**: with the limit on, the assistant asks for the customer's address early in the booking and turns away addresses further than your distance. This needs address checking, which your operator sets up; without it the switch is greyed out.
 - **Personality**: how the assistant sounds.
 - **Services offered**: one per line. These are the only services the assistant will book; anything else, it says you don't offer.

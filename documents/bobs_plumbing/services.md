@@ -2,8 +2,8 @@
 
 ## Emergency Service
 We offer 24/7 emergency plumbing service throughout greater Rochester. After
-business hours, calls to (585) 555-0123 connect directly to our on-call
-dispatcher, who can typically have a technician on-site within 90 minutes
+business hours, calls to our after-hours emergency line connect directly to
+our on-call dispatcher, who can typically have a technician on-site within 90 minutes
 for emergencies in the Greater Rochester area. There is a $75 after-hours
 service call fee in addition to standard labor rates.
 

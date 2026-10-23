@@ -503,6 +503,15 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
         for key, (label, _) in holidays.HOLIDAYS.items()
         if key in holidays.ticked(config))
 
+    # Only for a business with a separate after-hours line, so every other
+    # prompt stays as it was. Before (2026-10-22), the number lived in one
+    # knowledge-base paragraph, and an 11pm emergency was sent to the main
+    # phone once an owner set that to a different number.
+    emergency = (business.get("emergency_phone") or "").strip()
+    emergency_text = (f"\n- After-hours emergency line: {emergency} (for an emergency "
+                      f"outside the hours below; the phone above is for everything else)"
+                      if emergency else "")
+
     return f"""You are an SMS assistant for {business['name']}.
                Today is {today_str}.
 
@@ -510,7 +519,7 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
 
 Business facts:
 - Name: {business['name']}
-- Phone: {business['phone']}
+- Phone: {business['phone']}{emergency_text}
 - Address: {business['address']}
 - Hours: {business['hours']}{holiday_text}
 - Service area: {business.get('service_area', 'N/A')}
