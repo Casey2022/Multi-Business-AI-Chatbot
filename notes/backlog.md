@@ -7,9 +7,24 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 
 - **Demo feedback round.** Testers use "Send feedback" (demo chat page) or
   "Help & feedback" (portal); messages land in the operator's Support inbox.
-  Email alerts are optional: set `SUPPORT_ALERT_EMAIL`, `SMTP_HOST`
-  (`smtp.gmail.com`), `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD` (a Gmail
-  app password) on Render. Not set up yet; feedback is saved either way.
+  Feedback is saved whether or not email works.
+
+## Costs money (decided 2026-10-24: later)
+
+- **Email on Render.** The SMTP settings are on Render (`SMTP_HOST`
+  smtp.gmail.com, `SMTP_PORT` 587, `SMTP_USER`, `SMTP_PASSWORD` a Gmail app
+  password, `SUPPORT_ALERT_EMAIL`), but nothing is sent: a reset request
+  logged `Password reset email failed: OSError` (2026-10-24 19:32). Render's
+  free web services block outbound ports 25, 465 and 587 (Render changelog,
+  2026-09). So reset emails and support alerts don't go out. Two ways:
+  - a paid Render instance (the lowest is $25/month as of 2026-10-24): SMTP
+    works with no code change, and it's what persistence needs anyway
+    (Render's disks are paid only);
+  - an email API over https (Brevo, Mailjet, Resend...): free tiers, a code
+    change in `support.send_mail`; check each one's sender rules (some need
+    a domain of our own).
+- **Persistence on Render** (below, under Config structure) needs the same
+  paid instance for a disk, or a hosted database.
 
 ## Model upgrade (done 2026-10-22)
 
