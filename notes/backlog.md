@@ -108,17 +108,14 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 Data doesn't cross between demos (`tenancy_test.py`, `demo_test.py`). What
 visitors do share:
 
-- **One request at a time → four threads.** Render's Start Command was
-  `gunicorn app:app --workers 1 --timeout 60 --bind 0.0.0.0:$PORT`: one
-  sync worker. Measured locally with Render's settings, four visitors
-  sending at once waited 2.2, 3.9, 5.9, 7.6 s (one alone: 2.4 s). With
-  `--threads 4`: about 2 s each, twice. The code is ready for threads
-  (`threads_test.py`); **to do: add `--threads 4` to Render's Start
-  Command** (the Procfile has it, but Render doesn't read the Procfile).
-  Checked and fine with threads: rate limits (SQLite, atomic increment),
-  SQLite (800 writes from 8 threads, no lock errors), one message in
-  flight per chat page. Locally on macOS, `--preload` workers segfault on
-  the first outbound call unless run with
+- **Four threads: done.** Render's Start Command has `--threads 4`
+  (confirmed 2026-10-24; it matches the Procfile, which Render doesn't
+  read). Measured live that day: one message alone 1.8-3.3 s; four sent at
+  once 3.1-4.3 s each, not the one-at-a-time staircase measured locally
+  with one sync worker (2.2, 3.9, 5.9, 7.6 s). The code is ready for
+  threads (`threads_test.py`): rate limits, SQLite writes and one message
+  in flight per chat page checked. Locally on macOS, `--preload` workers
+  segfault on the first outbound call unless run with
   `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES no_proxy='*'`; Render (Linux)
   doesn't need this.
 
