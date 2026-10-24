@@ -89,6 +89,23 @@ def main():
         got = contradictions.check(sun, sections)
         check("the real one is kept, with both sides and the reason",
               got == [{"a": good["a"], "b": good["b"], "why": "differ"}], got)
+        # Sonnet 5.5, contradiction_eval x3 (2026-10-24): 3 false flags,
+        # each with its own reason saying there's no clash.
+        llm._create = answering(json.dumps({"contradictions": [
+            dict(good, why="5pm against 3pm"),
+            dict(good, why="These two statements are consistent, so this is not a real "
+                           "contradiction."),
+            dict(good, why="They don't actually contradict each other."),
+            dict(good, why="No real conflict: one is a rule, the other an exception.")]}))
+        got = contradictions.check(sun, sections)
+        check("a pair whose own reason says it isn't a clash is dropped; a real one stays",
+              [g["why"] for g in got] == ["5pm against 3pm"], got)
+        for why in ("The two statements are inconsistent: 24 hours vs 48 hours.",
+                    "These are not consistent: one says free, the other $15.",
+                    "The hours aren't consistent with the settings.",
+                    "A direct conflict between $20 and $22."):
+            llm._create = answering(json.dumps({"contradictions": [dict(good, why=why)]}))
+            check(f"kept: {why[:45]!r}", len(contradictions.check(sun, sections)) == 1)
         llm._create = answering('Here you go:\n' + json.dumps({"contradictions": [good]})
                                 + '\n{"another": 1}')
         check("an object after a sentence, with another after it, is still read",

@@ -15,6 +15,7 @@ contradiction_eval.py: clean seed knowledge bases and planted clashes.
 
 import logging
 import os
+import re
 
 log = logging.getLogger("contradictions")
 
@@ -88,6 +89,20 @@ are none. At most %d.
 """ % MAX_PAIRS
 
 
+# A pair whose own reason says there's no clash. Sonnet 5.5, 2026-10-24,
+# contradiction_eval x3: 3 false flags, all one Sunrise pair (gluten-free
+# muffins made to order / not in the case), each with a "why" like "These
+# two statements are consistent, so this is not a real contradiction".
+# Narrow on purpose: "inconsistent", "not consistent" and "isn't
+# consistent" are reasons FOR a clash and don't match.
+_NO_CLASH = re.compile(
+    r"\b(?:are|is|seem|appear) (?:fully |entirely |actually )?consistent\b"
+    r"|\bnot (?:a |an )?(?:real |actual |true |genuine )?(?:contradiction|conflict)"
+    r"|\bno (?:real |actual |true |genuine )?(?:contradiction|conflict)"
+    r"|\b(?:do not|don'?t|does not|doesn'?t) (?:actually )?(?:contradict|conflict)",
+    re.I)
+
+
 def _norm(text):
     return " ".join(str(text or "").lower().replace("’", "'").split())
 
@@ -124,7 +139,11 @@ def check(config, sections, model=None):
                       "quote": str(pair[k]["quote"]).strip().strip('"')} for k in ("a", "b")]
         except (KeyError, TypeError):
             continue
+        why = str(pair.get("why") or "")
+        if _NO_CLASH.search(why):
+            log.info("Dropped a pair whose own reason says it isn't a contradiction")
+            continue
         if all(s["where"] in text and _norm(s["quote"]) and _norm(s["quote"]) in text[s["where"]]
                for s in sides) and _norm(sides[0]["quote"]) != _norm(sides[1]["quote"]):
-            out.append({"a": sides[0], "b": sides[1], "why": str(pair.get("why") or "")[:200]})
+            out.append({"a": sides[0], "b": sides[1], "why": why[:200]})
     return out
