@@ -333,6 +333,23 @@ The nav's **Password** page (`/admin/password`, `db.change_password`):
 check, no rate limit, other sessions kept, this session lost, demo guard
 off, the same password allowed.
 
+## Links in emails were http (fixed 2026-10-24)
+
+Render ends the visitor's https at its proxy and hands the app plain http,
+and `url_for(_external=True)` takes its scheme from that. A request shaped
+like Render's (measured in a test client) gave the reset email
+`http://simonai-q92o.onrender.com/admin/reset/<token>` and the support
+alert `http://.../admin/support`. Live, Render answers an http link with a
+301 to https, but only after the browser has sent the token unencrypted.
+
+`links.public_url` builds every emailed link: https, except on this
+machine (localhost, 127.0.0.1, [::1], *.localhost; not lookalikes such as
+localhost.evil.example). `links_test.py` (15), mutation-tested 4 ways.
+
+Not changed: the host in those links is still the request's Host header.
+Render routes by host, so a request naming another host doesn't reach the
+app there; a server reached directly would want a fixed public host.
+
 ## A demo's "Back to your account" outlived the session (fixed 2026-10-24)
 
 Starting a demo while signed in sets that account aside (`displaced_user`)

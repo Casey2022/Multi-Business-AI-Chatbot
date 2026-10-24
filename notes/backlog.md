@@ -101,7 +101,11 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
 - **Dependencies:** `pip-audit` before each deploy that changes requirements
   (round 2 done 2026-10-23: 101 advisories, all fixed but chromadb's five
   server-only ones).
-- **Twilio, when it goes live:** test webhook signature validation.
+- **Twilio, when it goes live:** test webhook signature validation. It
+  checks the signature against `request.url`, which on Render is http
+  (the https ends at Render's proxy; see "Links in emails were http" in
+  `notes/security.md`), while Twilio signs the https address: expect every
+  real text to be rejected until the check uses the public https URL.
 
 ## Many visitors at once (2026-10-20)
 

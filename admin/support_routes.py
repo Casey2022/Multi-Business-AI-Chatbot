@@ -12,6 +12,7 @@ from flask import abort, flash, jsonify, redirect, render_template, request, url
 
 import ratelimit
 import support
+from links import public_url
 from admin import admin_bp
 from admin.auth import (_login_ip, current_user, login_required,
                         operator_required)
@@ -117,7 +118,7 @@ def help_page():
             return _render_help(user, business, page, error_id, message,
                                 contact or "", status=400)
         support.file_request(user, business, message, contact, page, error_id,
-                             inbox_url=url_for("admin.support_inbox", _external=True))
+                             inbox_url=public_url("admin.support_inbox"))
         flash("Sent. We'll take a look and get back to you"
               + ("." if needs_contact and not contact else " by email.")
               + " You can see its status below.", "success")

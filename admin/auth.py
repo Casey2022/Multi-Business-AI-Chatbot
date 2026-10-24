@@ -242,8 +242,9 @@ def forgot_password():
                             "(SMTP_HOST): nothing sent")
         else:
             token = create_password_reset(user["id"])
-            msg = _reset_email(user, url_for("admin.reset_password_page", token=token,
-                                             _external=True))
+            # https whatever the request came in as (links.py).
+            from links import public_url
+            msg = _reset_email(user, public_url("admin.reset_password_page", token=token))
             msg["From"] = settings["from"]
             try:
                 support.send_mail(msg, settings)
