@@ -56,10 +56,14 @@ Keep YAML; fix how facts spread across it. Done: opening hours have one
 copy (the weekly table; owners edit it on Settings), and each service has
 a fixed key, so a rename keeps its links (services.py), and what every
 business is told lives once in config/defaults.yaml, and seed_check.py
-lists and resets local drift. Next, in order:
-- **Schema check at load**, surfaced in the portal, not only the log.
+lists and resets local drift, and config_check.py says what's wrong with a
+config in words (startup log, the operator's Businesses page, and
+config_check_test.py holds every shipped YAML to none; 2026-10-23). Next:
 - **Persistence on Render** before a real business: the disk is wiped on
   each deploy, so owner overrides vanish.
+- A config that fails to load still answers the customer with a server
+  error (chat and the owner's pages); the Businesses page now says why, but
+  the customer could get "we can't answer right now, call ..." instead.
 
 ## Owner portal
 

@@ -338,6 +338,12 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .chip-warn { color: var(--pending); background: transparent; border-color: var(--pending); border-style: dashed; }
 .chip-refused { color: var(--refused); background: var(--refused-wash); border-color: var(--refused); }
 .chip-quiet   { color: var(--ink-soft); background: var(--surface-sunk); border-color: var(--rule-strong); }
+/* The Businesses page's Config cell: a chip that opens the list of problems
+   (config_check.py). A plain <details>, so it works without JavaScript. */
+.config-problems > summary { cursor: pointer; list-style: none; }
+.config-problems > summary::-webkit-details-marker { display: none; }
+.config-problems ul { margin: var(--s2) 0 0; padding-left: 1.1em; font-size: var(--text-sm); }
+.config-problems li + li { margin-top: 4px; }
 
 /* ---------------------------------------------------------------------- *
  * Forms

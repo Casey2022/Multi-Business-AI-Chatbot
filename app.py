@@ -134,8 +134,6 @@ def bootstrap():
                   "ADMIN_PASSWORD are not set — the admin portal is "
                   "unreachable.")
 
-    from scheduling import (unknown_duration_services, unknown_notice_services,
-                            unknown_condition_services)
     from import_documents import import_for_business
     for b in businesses:
         if not b["active"]:
@@ -161,40 +159,14 @@ def bootstrap():
             if imported:
                 log_boot.info("Imported %d knowledge section(s) for %s",
                               imported, b["name"])
-            # A per-service duration whose key names no service does nothing
-            # at all — the booking silently takes the default length. Said
-            # once at startup, it's a typo; left unsaid, it's a stylist
-            # wondering why her afternoon keeps getting double-booked.
-            # The FAQ was folded into the knowledge base (2026-09-29) and is
-            # no longer read. A faq: block left in a YAML would be answers
-            # an operator believes are live and aren't — say so at startup.
-            if config.get("faq"):
-                log_boot.warning(
-                    "%s still has a faq: block in its config. It is ignored "
-                    "— move those answers into the knowledge base",
-                    b["name"])
-            unknown_notice = unknown_notice_services(config)
-            if unknown_notice:
-                log_boot.warning(
-                    "%s has notice set for services it doesn't offer: %s "
-                    "— those services are booked with no notice",
-                    b["name"], ", ".join(repr(s) for s in unknown_notice))
-            stale = unknown_duration_services(config)
-            if stale:
-                log_boot.warning(
-                    "%s has service_durations for services it doesn't "
-                    "offer: %s — those bookings will use the default length",
-                    b["name"], ", ".join(repr(s) for s in stale))
-            # Same failure one layer over: a question conditioned on a
-            # service that was renamed is never asked again, for anyone,
-            # and the owner's only clue is an answer that stopped arriving.
-            orphaned = unknown_condition_services(config)
-            if orphaned:
-                log_boot.warning(
-                    "%s has booking questions set for services it doesn't "
-                    "offer: %s — those questions will never be asked",
-                    b["name"],
-                    ", ".join(f"{key} -> {name!r}" for key, name in orphaned))
+            # Everything wrong with the config, in words (config_check.py):
+            # links to services that don't exist, hours that close before
+            # they open, a faq: block nobody reads... The operator's
+            # Businesses page shows the same list.
+            import config_check
+            for found in config_check.problems(b["config_path"], b["id"]):
+                log_boot.warning("%s config, %s (%s): %s", b["name"], found["where"],
+                                 found["level"], found["says"])
         except Exception as e:
             # A broken config shouldn't stop the server from starting —
             # that business just won't be fully set up until it's fixed.

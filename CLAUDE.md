@@ -125,6 +125,9 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
 - `preview.py`: Preview answers (Now vs After you publish). `grounding.py`:
   marks a fact in an answer that nothing it read says (numbers in code,
   claims by Sonnet 5.5); measured by `grounding_eval.py`.
+- `config_check.py`: what's wrong with a business's config, in words
+  (broken / warning, and where); logged at startup, shown on the operator's
+  Businesses page. A new YAML field the code reads gets a check here.
 - `config/defaults.yaml`: the channel rules and shared guardrails every business
   gets; a business names the rules it uses and fills their blanks (`bot.words`).
   `defaults_test.py` holds each business's guardrails to `evals/guardrails.json`.

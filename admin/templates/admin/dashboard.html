@@ -39,7 +39,22 @@
               <span class="chip chip-quiet">Inactive</span>
             {% endif %}
           </td>
-          <td data-label="Config" class="cell-sub">{{ b.config_path }}</td>
+          <td data-label="Config">
+            {% set found = problems.get(b.id, []) %}
+            {% if not found %}
+              <span class="chip chip-booked">Config OK</span>
+            {% else %}
+              <details class="config-problems">
+                <summary><span class="chip {{ 'chip-refused' if found|selectattr('level', 'equalto', 'broken')|list else 'chip-warn' }}">{{ summary(found) }}</span></summary>
+                <ul>
+                  {% for p in found %}
+                    <li><strong>{{ p.where }}</strong> ({{ p.level }}): {{ p.says }}</li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+            <div class="cell-sub">{{ b.config_path }}</div>
+          </td>
           <td data-label="Where to go">
             {{ ui.destination_links(b) }}
           </td>

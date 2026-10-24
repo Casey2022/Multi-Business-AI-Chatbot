@@ -25,7 +25,14 @@ def dashboard():
         return redirect(url_for("admin.appointments",
                                 business_id=user["business_id"]))
     businesses = get_all_businesses()
-    return render_template("admin/dashboard.html", businesses=businesses)
+    # What's wrong with each config, in words (config_check.py): before,
+    # a mistake in a YAML showed up as a crash on a customer's screen or
+    # a line in the startup log.
+    import config_check
+    problems = {b["id"]: config_check.problems(b["config_path"], b["id"])
+                for b in businesses if not b["is_demo"]}
+    return render_template("admin/dashboard.html", businesses=businesses,
+                           problems=problems, summary=config_check.summary)
 
 
 @admin_bp.route("/business/<int:business_id>/conversations")

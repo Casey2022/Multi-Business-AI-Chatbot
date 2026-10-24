@@ -96,9 +96,18 @@ def main():
     check("settings POST has no faq parser", '"faq"' not in routes)
 
     heading("startup says so if a faq: block turns up")
-    app_src = (ROOT / "app.py").read_text()
+    # Said by config_check since 2026-10-23: logged at startup and shown on
+    # the operator's Businesses page (config_check_test.py).
+    import tempfile
+    import config_check
+    leftover = yaml.safe_load((ROOT / "config" / "bobs_plumbing.yaml").read_text())
+    leftover["faq"] = [{"q": "hours?", "a": "9-5"}]
+    path = Path(tempfile.mkdtemp(prefix="one_source_")) / "faq.yaml"
+    path.write_text(yaml.safe_dump(leftover, sort_keys=False, allow_unicode=True))
+    found = config_check.problems(path)
     check("bootstrap warns on a leftover faq: block",
-          'config.get("faq")' in app_src and "still has a faq: block" in app_src)
+          any(p["where"] == "faq" and "knowledge base" in p["says"] for p in found)
+          and "config_check.problems(" in (ROOT / "app.py").read_text(), found)
 
     heading("rules kept as data aren't also kept as prose")
     import policy
