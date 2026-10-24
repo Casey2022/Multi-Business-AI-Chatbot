@@ -26,7 +26,6 @@ Two checks, for two kinds of fact:
 Measured on evals/grounding_cases.json (grounding_eval.py).
 """
 
-import json
 import logging
 import re
 
@@ -211,7 +210,7 @@ def claim_flags(reply, sources, model=None):
     """[{"phrase", "why"}] for statements the sources don't support, by the
     model. A quote that isn't in the reply word for word is dropped; on any
     failure, [] (the numbers check still runs)."""
-    from llm import _create, as_data, text_of, _note_usage
+    from llm import _create, as_data, text_of, _note_usage, json_object
     if not (reply or "").strip():
         return []
     information = "\n\n".join(sources or [])[-MAX_SOURCE_CHARS:]
@@ -223,11 +222,9 @@ def claim_flags(reply, sources, model=None):
     try:
         response = _create(**call)
         _note_usage(response, "grounding check")
-        raw = text_of(response)
         # The object, wherever it is: a reply that put a sentence before it
-        # failed to parse, once in 60 (2026-10-23).
-        found = re.search(r"\{.*\}", raw, re.S)
-        data = json.loads(found.group() if found else raw)
+        # failed to parse, once in 60 (2026-10-23). llm.json_object.
+        data = json_object(text_of(response))
         items = data.get("unsupported") if isinstance(data, dict) else None
         if not isinstance(items, list):
             raise ValueError("unexpected shape")

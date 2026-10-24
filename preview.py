@@ -187,8 +187,7 @@ def compare_facts(question, now, after):
     method: "identical" (no call), "model", or "exact" (the fallback)."""
     if _flat(now) == _flat(after):
         return {"changed": False, "differences": [], "method": "identical"}
-    import json
-    from llm import _create, as_data, text_of, _note_usage
+    from llm import _create, as_data, text_of, _note_usage, json_object
     prompt = (
         "Two replies from a business's assistant answer the same customer "
         "question, before and after the owner edited the business's "
@@ -217,8 +216,9 @@ def compare_facts(question, now, after):
         response = _create(max_tokens=400, temperature=0,
                            messages=[{"role": "user", "content": prompt}])
         _note_usage(response, "preview fact check")
-        raw = text_of(response).replace("```json", "").replace("```", "").strip()
-        data = json.loads(raw)
+        # The object, wherever it is in the reply (llm.json_object): a
+        # sentence before it once made this give up (2026-10-23).
+        data = json_object(text_of(response))
         if not isinstance(data, dict) or not isinstance(data.get("facts_changed"), bool):
             raise ValueError("unexpected shape")
         differences = []

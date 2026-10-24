@@ -13,9 +13,7 @@ in the sources they name (the same safeguard as grounding.py). Measured on
 contradiction_eval.py: clean seed knowledge bases and planted clashes.
 """
 
-import json
 import logging
-import re
 
 log = logging.getLogger("contradictions")
 
@@ -90,7 +88,7 @@ def _norm(text):
 def check(config, sections, model=None):
     """[{"a": {"where", "quote"}, "b": {...}, "why"}] for each clash the
     model finds whose quotes are really where it says. [] on any failure."""
-    from llm import _create, as_data, text_of, _note_usage
+    from llm import _create, as_data, text_of, _note_usage, json_object
     found = sources(config, sections)
     if len(found) < 2:
         return []
@@ -103,11 +101,9 @@ def check(config, sections, model=None):
     try:
         response = _create(**call)
         _note_usage(response, "contradiction check")
-        raw = text_of(response)
         # The first whole object, whatever comes before or after it (once in
-        # 15, Sonnet 5.5 wrote a second one: "Extra data").
-        start = raw.find("{")
-        data = json.JSONDecoder().raw_decode(raw[start:])[0] if start != -1 else json.loads(raw)
+        # 15, Sonnet 5.5 wrote a second one: "Extra data"). llm.json_object.
+        data = json_object(text_of(response))
         pairs = data.get("contradictions") if isinstance(data, dict) else None
         if not isinstance(pairs, list):
             raise ValueError("unexpected shape")

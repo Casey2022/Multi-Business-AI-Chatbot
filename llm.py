@@ -183,6 +183,27 @@ def text_of(response):
                      if getattr(b, "type", None) == "text").strip()
 
 
+def json_object(text):
+    """The first complete JSON object anywhere in a model's reply, as a dict.
+    Raises ValueError when there isn't one.
+
+    Asked for "ONLY a JSON object", models still add a sentence before it,
+    a note after it, a ```json fence, or a second object; each of these
+    once made a check give up (grounding, 1 in 60; contradictions, "Extra
+    data", 1 in 15; Preview's comparison, once, 2026-10-23). The three read
+    it three ways and each still failed on one of the others' shapes; this
+    is the one way: try each "{" in turn until a whole object decodes."""
+    decoder = json.JSONDecoder()
+    text = text or ""
+    start = text.find("{")
+    while start != -1:
+        try:
+            return decoder.raw_decode(text, start)[0]   # from a "{": an object
+        except ValueError:
+            start = text.find("{", start + 1)
+    raise ValueError("no JSON object in the reply")
+
+
 def _thought(response):
     return any(getattr(b, "type", None) == "thinking" for b in response.content)
 
