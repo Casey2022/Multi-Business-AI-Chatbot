@@ -831,7 +831,18 @@ def version():
     and a live test couldn't tell whether it had deployed). The short hash
     only; nothing else about the server."""
     commit = os.environ.get("RENDER_GIT_COMMIT", "")
-    return {"commit": commit[:7] if re.fullmatch(r"[0-9a-f]{7,40}", commit) else "unknown"}
+    out = {"commit": commit[:7] if re.fullmatch(r"[0-9a-f]{7,40}", commit) else "unknown"}
+    # TEMPORARY (2026-10-23), remove with the fix: how Render's proxy
+    # writes X-Forwarded-For, to count hops from the right instead of
+    # trusting the first entry (notes/security.md, "The client address
+    # behind Render's proxy"). Only when asked, and only the asker's own
+    # request: nothing about anyone else.
+    if request.args.get("proxy") == "1":
+        forwarded = [e.strip() for e in request.headers.get("X-Forwarded-For", "").split(",")
+                     if e.strip()]
+        out["proxy"] = {"x_forwarded_for": forwarded, "remote_addr": request.remote_addr}
+        log.info("Proxy shape: %d X-Forwarded-For entries", len(forwarded))
+    return out
 
 
 @app.route("/", methods=["GET"])

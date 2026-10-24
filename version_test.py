@@ -35,7 +35,9 @@ def main():
           decorators == ["app.route('/version', methods=['GET'])"], decorators)
     fn.decorator_list = []
     env = {}
-    namespace = {"re": re, "os": types.SimpleNamespace(environ=env)}
+    asked = types.SimpleNamespace(args={}, headers={}, remote_addr="10.0.0.1")
+    namespace = {"re": re, "os": types.SimpleNamespace(environ=env), "request": asked,
+                 "log": types.SimpleNamespace(info=lambda *a, **k: None)}
     exec(compile(ast.Module(body=[fn], type_ignores=[]), "app.py", "exec"), namespace)
     version = namespace["version"]
 
@@ -45,6 +47,14 @@ def main():
     check("running locally (no variable): 'unknown'", version() == {"commit": "unknown"})
     env["RENDER_GIT_COMMIT"] = "<script>alert(1)</script>"
     check("anything that isn't a hash is never echoed back", version() == {"commit": "unknown"})
+    # TEMPORARY with ?proxy=1 (2026-10-23): the asker's own X-Forwarded-For.
+    env.clear()
+    asked.headers = {"X-Forwarded-For": "203.0.113.9, 198.51.100.7"}
+    check("without ?proxy=1, still only the commit", version() == {"commit": "unknown"})
+    asked.args = {"proxy": "1"}
+    check("with ?proxy=1, the asker's own header, split, and the connecting address",
+          version()["proxy"] == {"x_forwarded_for": ["203.0.113.9", "198.51.100.7"],
+                                 "remote_addr": "10.0.0.1"}, version())
     body = ast.unparse(fn)
     check("it reads that one variable and nothing else about the server",
           body.count("os.environ") == 1 and "RENDER_GIT_COMMIT" in body)
