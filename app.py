@@ -378,23 +378,10 @@ def _customer_config(business):
 
 def _offline_reply(business):
     """llm.offline_reply with the business's phone, read without the config
-    that won't load: the owner's saved number, else the YAML's."""
-    from pathlib import Path
-    import yaml
+    that won't load (config.phone_without_loading)."""
+    from config import phone_without_loading
     from llm import offline_reply
-    phone = None
-    try:
-        from db import get_config_overrides
-        phone = get_config_overrides(business["id"]).get("business.phone")
-    except Exception:
-        pass
-    if not phone:
-        try:
-            raw = yaml.safe_load(Path(business["config_path"]).read_text())
-            phone = ((raw or {}).get("business") or {}).get("phone")
-        except Exception:
-            pass
-    return offline_reply(phone if isinstance(phone, str) and phone.strip() else None)
+    return offline_reply(phone_without_loading(business))
 
 
 # ---------------------------------------------------------------------------

@@ -404,6 +404,36 @@ def load_personas():
         return yaml.safe_load(f) or {}
 
 
+class ConfigUnreadable(Exception):
+    """A business's config couldn't be loaded, whatever the reason (a YAML
+    error, a section in the wrong shape). One exception to catch: the
+    owner's portal shows a page saying so (admin/routes.py) instead of a
+    general 500, and config_check.py says what's wrong in words."""
+
+    def __init__(self, path, cause):
+        super().__init__(f"{path}: {type(cause).__name__}: {cause}")
+        self.path, self.cause = str(path), cause
+
+
+def phone_without_loading(business):
+    """The business's phone when its config can't be loaded: the owner's
+    saved number, else the one in the YAML, else None. For saying "call us"
+    while the rest is broken (the customer fallback, the portal's page)."""
+    phone = None
+    try:
+        from db import get_config_overrides
+        phone = get_config_overrides(business["id"]).get("business.phone")
+    except Exception:
+        pass
+    if not phone:
+        try:
+            raw = yaml.safe_load(Path(business["config_path"]).read_text())
+            phone = ((raw or {}).get("business") or {}).get("phone")
+        except Exception:
+            pass
+    return phone.strip() if isinstance(phone, str) and phone.strip() else None
+
+
 def load_config(config_path, business_id=None):
     """Load a business config: YAML as the base, database overrides on top.
 
@@ -412,7 +442,16 @@ def load_config(config_path, business_id=None):
 
     business_id is optional so scripts that only need the file (ingestion,
     seeding) can skip the database entirely.
+
+    Any failure is a ConfigUnreadable, with the original as its cause.
     """
+    try:
+        return _load_config(config_path, business_id)
+    except Exception as e:
+        raise ConfigUnreadable(config_path, e) from e
+
+
+def _load_config(config_path, business_id=None):
     path = Path(config_path)
     with open(path, "r") as f:
         config = yaml.safe_load(f)

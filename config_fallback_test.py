@@ -159,6 +159,63 @@ def main():
     page = html.unescape(client.get("/chat/bobs_plumbing").get_data(as_text=True))
     check("the usual greeting", "Hi! I'm the Bob's Plumbing assistant. How can I help?" in page)
 
+    # The owner's portal (2026-10-24). Measured before: six of the owner's
+    # eight pages were the general "Something went wrong on our side" 500,
+    # Appointments (where they land) among them; Conversations and Knowledge
+    # worked.
+    heading("the owner's portal, with a config that won't load")
+    import config
+    try:
+        config.load_config(str(use(biz["id"], wont_load, name="wont_load")), biz["id"])
+        raised = None
+    except Exception as e:
+        raised = e
+    check("load_config says ConfigUnreadable, with the cause kept",
+          isinstance(raised, config.ConfigUnreadable)
+          and isinstance(raised.cause, AttributeError), repr(raised))
+    db.create_user("owner@example.test", "owner long passphrase", business_id=biz["id"])
+    db.create_user("operator@example.test", "operator long passphrase", is_operator=True)
+
+    def signed_in(email, password):
+        c = app.test_client()
+        t = re.search(r'name="_csrf_token" value="([^"]+)"',
+                      c.get("/admin/login").get_data(as_text=True)).group(1)
+        c.post("/admin/login", data={"_csrf_token": t, "email": email, "password": password})
+        return c
+    owner = signed_in("owner@example.test", "owner long passphrase")
+    operator = signed_in("operator@example.test", "operator long passphrase")
+    needs_config = ["appointments", "calendar", "settings", "cancellation", "notice", "menu"]
+    for name in needs_config:
+        r = owner.get(f"/admin/business/{biz['id']}/{name}")
+        body = html.unescape(r.get_data(as_text=True))
+        check(f"{name}: says the settings can't be read, not 'something went wrong'",
+              r.status_code == 503 and "Bob's Plumbing's settings can't be read" in body
+              and "Something went wrong on our side" not in body, r.status_code)
+    r = owner.get("/admin/", follow_redirects=True)
+    body = html.unescape(r.get_data(as_text=True))
+    check("signing in lands there too (the dashboard sends owners to Appointments)",
+          "settings can't be read" in body)
+    check("…says what customers are told, with the number",
+          "call you at (585) 555-0123" in " ".join(re.sub(r"<[^>]+>", "", body).split()))
+    check("…links to the pages that still work",
+          f"/admin/business/{biz['id']}/conversations" in body
+          and f"/admin/business/{biz['id']}/knowledge" in body)
+    check("…and to telling us, with the page filled in",
+          "/admin/help?from=/admin/business/" in body)
+    check("an owner isn't shown the file or the error", "wont_load.yaml" not in body
+          and "AttributeError" not in body)
+    for name in ("conversations", "knowledge"):
+        check(f"{name} still opens", owner.get(f"/admin/business/{biz['id']}/{name}").status_code
+              == 200)
+    body = html.unescape(operator.get(f"/admin/business/{biz['id']}/settings").get_data(as_text=True))
+    check("the operator sees what's wrong (config_check) and which file",
+          "What's wrong (" in body and "wont_load.yaml" in body and "Loading it failed" in body)
+    check("…with a link back to Businesses, not 'tell us'", 'href="/admin/"' in body
+          and "Tell us about it" not in body)
+    said = [line for line in kept.lines if "can't be loaded" in line]
+    check("the log says which business and which page, once a request",
+          said and "Bob's Plumbing" in said[-1] and "/admin/business/" in said[-1], said[-1:])
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

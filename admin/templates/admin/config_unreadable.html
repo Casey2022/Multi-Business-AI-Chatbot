@@ -1,0 +1,50 @@
+<!doctype html>
+{# Standalone, like error.html: base.html reads things (paused bookings)
+   that can need the very config that can't be loaded. #}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ business.name if business else "This business" }}: settings can't be read — Simon Says</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<div class="page">
+  <div class="card error-card">
+    <div class="card-title">{{ business.name if business else "This business" }}'s settings can't be read</div>
+    <div class="card-pad">
+      <p>There's a mistake in this business's settings file, so the pages that need it
+        (appointments, calendar, settings, menu, notice and cancellation rules) can't open
+        until it's fixed. Nothing you saved is lost.</p>
+      <p>Your customers aren't shown an error: the chat and texts ask them to
+        {% if phone %}call you at <strong>{{ phone }}</strong>{% else %}try again later{% endif %}.</p>
+      {% if problems %}
+        <p class="hint">What's wrong ({{ config_path }}):</p>
+        <ul class="config-problems">
+          {% for p in problems %}
+            <li><strong>{{ p.where }}</strong> ({{ p.level }}): {{ p.says }}</li>
+          {% endfor %}
+        </ul>
+      {% elif is_operator %}
+        <p class="hint">Loading {{ config_path }} failed: {{ reason }}</p>
+      {% endif %}
+      <div class="toolbar">
+        {% if business %}
+          <a class="btn btn-nav" href="{{ url_for('admin.conversations', business_id=business.id) }}">Conversations</a>
+          <a class="btn btn-nav" href="{{ url_for('admin.knowledge', business_id=business.id) }}">Knowledge base</a>
+        {% endif %}
+        {% if is_operator %}
+          <a class="btn btn-primary" href="{{ url_for('admin.dashboard') }}">Businesses</a>
+        {% else %}
+          <a class="btn btn-primary" href="{{ help_url }}">Tell us about it</a>
+        {% endif %}
+        <a class="btn btn-nav" href="{{ url_for('admin.logout') }}">Log out</a>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

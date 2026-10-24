@@ -3,8 +3,9 @@
 from flask import render_template, request, abort, redirect, url_for, flash
 from admin import admin_bp
 from admin.auth import login_required, operator_required, require_business_access, current_user
-from config import load_config
+from config import load_config, ConfigUnreadable
 import budget
+import support
 import calendar_sync
 from db import (get_all_businesses, get_business_by_id, get_conversation_list, get_conversation, get_business_by_number, get_appointments, get_appointment, cancel_appointment, reschedule_appointment, notifications_for_appointment)
 
@@ -1204,6 +1205,36 @@ def upload_too_large(e):
     if business_id:
         return redirect(url_for("admin.knowledge", business_id=business_id))
     return redirect(url_for("admin.dashboard"))
+
+
+@admin_bp.errorhandler(ConfigUnreadable)
+def config_unreadable(e):
+    """A page that needs the business's config, when it can't be loaded.
+    Before (measured 2026-10-24), six of the owner's eight pages were the
+    general "something went wrong" 500, Appointments among them, where an
+    owner lands after signing in: no word of what, that it would stay that
+    way, or that two pages still worked. Now it says so, what customers are
+    told meanwhile, and (to the operator) what's wrong, from config_check."""
+    import config_check
+    from config import phone_without_loading
+    business_id = (request.view_args or {}).get("business_id")
+    user = current_user()
+    if not business_id and user:
+        business_id = user.get("business_id")
+    business = get_business_by_id(business_id) if business_id else None
+    is_operator = bool(user and user.get("is_operator"))
+    log.warning("Config for %s can't be loaded (%s); showed the settings page on %s",
+                business["name"] if business else e.path, type(e.cause).__name__,
+                request.path)
+    problems = (config_check.problems(business["config_path"], business["id"])
+                if business and is_operator else [])
+    page = support.clean_page(request.path)
+    return render_template(
+        "admin/config_unreadable.html", business=business, is_operator=is_operator,
+        phone=phone_without_loading(business) if business else None,
+        problems=problems, config_path=e.path,
+        reason=f"{type(e.cause).__name__}: {e.cause}",
+        help_url=url_for("admin.help_page", **({"from": page} if page else {}))), 503
 
 
 @admin_bp.route("/business/<int:business_id>/cancellation", methods=["GET", "POST"])
