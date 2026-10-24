@@ -131,6 +131,8 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
 - `config/defaults.yaml`: the channel rules and shared guardrails every business
   gets; a business names the rules it uses and fills their blanks (`bot.words`).
   `defaults_test.py` holds each business's guardrails to `evals/guardrails.json`.
+- `analytics.py`: Cloudflare Web Analytics on the demo sandbox only, when
+  `CF_WEB_ANALYTICS_TOKEN` is set (`analytics_test.py` holds where).
 - `rag.py`, `import_documents.py`, `db.py`, `config.py`, `demo.py`.
 - Deeper reading: `notes/codebase_walkthrough.md`,
   `notes/debugging_lessons.md`, `notes/conversation_defects.md`.

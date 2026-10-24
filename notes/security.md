@@ -333,6 +333,20 @@ The nav's **Password** page (`/admin/password`, `db.change_password`):
 check, no rate limit, other sessions kept, this session lost, demo guard
 off, the same password allowed.
 
+## Visitor counting (2026-10-24)
+
+Cloudflare Web Analytics (`analytics.py`): cookieless, a beacon script that
+reports a page view (address, referrer, browser), never anything typed.
+On only when `CF_WEB_ANALYTICS_TOKEN` is set on Render (32 hex characters,
+or it's ignored), and only on the demo sandbox: the demo picker, a demo's
+chat and text pages, a demo visitor's portal. Never a real business's
+customer chat, a real owner's or the operator's portal, or a signed-out
+portal page (the reset page's address is its one-time token). The security
+policy names `static.cloudflareinsights.com` (script) and
+`cloudflareinsights.com` (reports) only while it's on; the beacon carries
+the page's nonce. Browser-checked locally: no policy errors.
+`analytics_test.py` (30), mutation-tested 5 ways.
+
 ## Links in emails were http (fixed 2026-10-24)
 
 Render ends the visitor's https at its proxy and hands the app plain http,

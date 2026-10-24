@@ -45,17 +45,31 @@ def nonce():
 admin_bp.add_app_template_global(nonce, "csp_nonce")
 
 
+def analytics_token():
+    import analytics
+    return analytics.token()
+
+
+admin_bp.add_app_template_global(analytics_token, "analytics_token")
+
+
 def policy(script_nonce):
+    # Cloudflare Web Analytics' script and the address it reports to, only
+    # when it's switched on (analytics.py): otherwise nothing outside.
+    import analytics
+    script_from = report_to = ""
+    if analytics.token():
+        script_from, report_to = f" {analytics.SCRIPT_HOST}", f" {analytics.REPORT_HOST}"
     return "; ".join([
         "default-src 'self'",
-        f"script-src 'self' 'nonce-{script_nonce}'",
+        f"script-src 'self' 'nonce-{script_nonce}'{script_from}",
         # Google Fonts: the stylesheet from one host, the font files from
         # another. No inline styles anywhere (style="" was removed earlier).
         "style-src 'self' https://fonts.googleapis.com",
         "font-src https://fonts.gstatic.com",
         # blob: is photo-upload.js shrinking a photo before it's sent.
         "img-src 'self' data: blob:",
-        "connect-src 'self'",
+        f"connect-src 'self'{report_to}",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",

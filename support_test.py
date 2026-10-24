@@ -229,7 +229,11 @@ def main():
     chat = (ROOT / "templates" / "demo.html").read_text()
     check("the demo chat page links to it, inside the demo-only part of the nav",
           "Send feedback</a>" in chat
-          and chat.index("{% if is_demo %}") < chat.index("Send feedback</a>") < chat.index("{% endif %}", chat.index("{% if is_demo %}"))
+          # The demo-only block the link sits in: the nearest {% if is_demo %}
+          # before it, closed only after it.
+          and chat.rindex("{% if is_demo %}", 0, chat.index("Send feedback</a>"))
+          < chat.index("Send feedback</a>")
+          < chat.index("{% endif %}", chat.rindex("{% if is_demo %}", 0, chat.index("Send feedback</a>")))
           and "'/chat/' ~ business.slug" in chat and "#support" in chat)
     check("…and its 'from' page is one the Help page accepts", support.clean_page("/chat/demo-belmont-0fe37a") == "/chat/demo-belmont-0fe37a")
     picker = (ROOT / "templates" / "demo_picker.html").read_text()

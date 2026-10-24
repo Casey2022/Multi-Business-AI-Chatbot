@@ -14,6 +14,9 @@
      <style> block copied into this template plus 167 inline style
      attributes across the other nine. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {# Demo visitors only (analytics.py): never a real owner's portal, the
+     operator's, or a signed-out page like the reset link's. #}
+  {% if viewer and viewer.email.endswith('@demo.invalid') %}{% include "_analytics.html" %}{% endif %}
 </head>
 <body>
 

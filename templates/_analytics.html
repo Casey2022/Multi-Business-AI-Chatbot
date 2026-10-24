@@ -1,0 +1,6 @@
+{# Cloudflare Web Analytics (analytics.py): a page view, nothing typed.
+   Included only where counting is meant to happen; off without a token. #}
+{% if analytics_token() %}
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" nonce="{{ csp_nonce() }}"
+        data-cf-beacon='{{ {"token": analytics_token()} | tojson }}'></script>
+{% endif %}
