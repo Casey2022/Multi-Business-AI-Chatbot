@@ -167,6 +167,12 @@ def login():
 
         user = verify_password(email, password)
         if user:
+            # Signing in is choosing an account: a demo's "Back to your
+            # account" from before is forgotten. Left in place, it showed in
+            # the operator's own nav after a redeploy swept the demo
+            # (2026-10-24).
+            session.pop("displaced_user", None)
+            session.pop("displaced_version", None)
             session["user_email"] = user["email"]
             session["session_version"] = user.get("session_version") or 0
             # permanent=True is what arms PERMANENT_SESSION_LIFETIME. It
@@ -263,7 +269,7 @@ def reset_password_page(token):
         else:
             try:
                 reset_password(token, password)
-                session.pop("user_email", None)
+                session.clear()     # signed out entirely, as logout does
                 log_sec.info("Password changed by reset link for %s", user["email"])
                 from flask import flash
                 flash("Password changed. Sign in with your new one.", "success")
@@ -320,5 +326,9 @@ def change_password():
 
 @admin_bp.route("/logout")
 def logout():
-    session.pop("user_email", None)
+    """Everything the session held goes, not only who's signed in. Popping
+    just user_email left a demo's "displaced_user" behind, and /demo/leave
+    then signed the next person at that browser in as the account the demo
+    had set aside, with no password (measured 2026-10-24)."""
+    session.clear()
     return redirect(url_for("admin.login"))

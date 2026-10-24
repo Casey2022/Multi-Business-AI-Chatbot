@@ -781,11 +781,25 @@ def demo_start():
     # who clicked a demo out of curiosity found their own dashboard
     # redirecting them into a sandbox business, with nothing on screen
     # saying why. The nav offers them a way back now.
-    displaced = session.get("user_email")
+    #
+    # Only a session that is really signed in is set aside (current_user,
+    # which checks the password hasn't changed since), with the version it
+    # signed in under, so the way back checks it again. And the demo's own
+    # account gets its own version: carrying the operator's over ended the
+    # demo at once for anyone who had ever changed their password
+    # (measured 2026-10-24).
+    from admin.auth import current_user
+    from db import get_user_by_email
+    signed_in = current_user()
+    session.pop("displaced_user", None)
+    session.pop("displaced_version", None)
+    if signed_in and signed_in["email"] != minted["email"]:
+        session["displaced_user"] = signed_in["email"]
+        session["displaced_version"] = signed_in.get("session_version") or 0
+        log_web.info("Demo replaced the session of %s", signed_in["email"])
     session["user_email"] = minted["email"]
-    if displaced and displaced != minted["email"]:
-        session["displaced_user"] = displaced
-        log_web.info("Demo replaced the session of %s", displaced)
+    session["session_version"] = (get_user_by_email(minted["email"]) or {}).get(
+        "session_version") or 0
     # permanent=True is what arms PERMANENT_SESSION_LIFETIME. It reads
     # backwards: permanent=False means a browser-session cookie, which
     # sounds safer but has no timeout at all — it lives as long as the
@@ -831,8 +845,12 @@ def demo_leave():
     if they'd closed the tab. This only swaps the session back.
     """
     displaced = session.pop("displaced_user", None)
+    version = session.pop("displaced_version", 0)
     if displaced:
+        # With the version it signed in under: if the password changed
+        # meanwhile, current_user ends this and they sign in again.
         session["user_email"] = displaced
+        session["session_version"] = version
         log_web.info("Returned %s to their own account", displaced)
         return redirect(url_for("admin.dashboard"))
     return redirect(url_for("demo_picker"))

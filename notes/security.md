@@ -333,6 +333,31 @@ The nav's **Password** page (`/admin/password`, `db.change_password`):
 check, no rate limit, other sessions kept, this session lost, demo guard
 off, the same password allowed.
 
+## A demo's "Back to your account" outlived the session (fixed 2026-10-24)
+
+Starting a demo while signed in sets that account aside (`displaced_user`)
+so the nav can offer the way back (`/demo/leave`). Only `/demo/leave`
+cleared it. Found as a stray "Back to your account" in the operator's nav
+on the live site; measured in a test client:
+
+- **Logging out kept it.** Operator starts a demo, logs out; whoever used
+  that browser next could open `/demo/leave` and land on the operator's
+  dashboard **with no password**. Logout now clears the whole session
+  (as does setting a password by reset link).
+- Signing in kept it: a demo swept by a redeploy, then signing in again,
+  left "Back to your account" in the operator's own nav. Signing in now
+  forgets it.
+- An operator who had ever changed their password couldn't use a demo:
+  the operator's `session_version` carried over to the demo's account,
+  which ended it at once. The demo gets its own version; the set-aside
+  account's is kept (`displaced_version`) and checked again on the way
+  back, so a password changed meanwhile means signing in again.
+- Only a session that is really signed in is set aside (`current_user`),
+  not a stale email left in the cookie.
+
+`demo_leave_test.py` (13 checks; nothing tested the way back before),
+mutation-tested 5 ways.
+
 ## The client address behind Render's proxy (fixed 2026-10-23)
 
 The per-IP limits (login, reset, chat, demo starts) took the **first**
