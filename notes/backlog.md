@@ -38,24 +38,16 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 
 ## Answer quality
 
-- Regular hours misstated after a blocked day: "open again Tuesday through
-  Friday 7am-3pm" at Sunrise (open Tue–Sun), journey "a day the owner
-  blocked off", 1 run in ~16 on 2026-10-20. A reply check against the
-  config's hours would settle it, if it recurs.
-- "A day the owner blocked off", ~1 run in 10: the model says "closed on
-  Sundays and Mondays", and `policy.one_off_said_as_one` turns it into "not
-  available this Sunday and Mondays", which the judge rightly fails.
+Measured 2026-10-24, 10 runs each, every reply read: the blocked-Sunday
+hours slips (Sunrise) and the noon tray (Crosstown) didn't recur, 0/10
+each; if one comes back, the journeys are "opening hours: a day the owner
+blocked off" and "a tray's order-by time isn't taken back". Belmont's
+balayage deposit was hedged 9/10 because the knowledge base didn't say
+balayage counts as colour; the seed now does, 10/10 plain.
+
 - Booking notice: adding a new variant from the owner page (version 2 edits
   existing ones only); a negated variant ("not gluten free") still counts
   (`notes/booking_notice.md`).
-- Crosstown, Friday 5pm, "noon tray tomorrow, when do I order by?": 1 run
-  in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
-  "we open at 11, so a noon tray can't be promised; call". Noon is open;
-  the chat takes orders before opening.
-- Belmont rag_eval row 32 ("do I pay anything up front for balayage"), once
-  on 2026-10-23: the $30 deposit right, then "the info I have doesn't confirm
-  whether balayage counts as a colour service". It's a lightening service;
-  the Colour Deposits section says "colour services over $100".
 
 ## Config structure (YAML review, 2026-10-23)
 
