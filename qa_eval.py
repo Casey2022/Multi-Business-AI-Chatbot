@@ -16,7 +16,9 @@ the bot has every reason to reach for the phone. Checks:
   us;
 - no_back_to_back_referral: no two replies in a row both send them to call;
 - every_reply_says_something: no empty or phone-only replies;
-- reply_must / reply_must_not: per-scenario patterns for one reply.
+- reply_must / reply_must_not: per-scenario patterns for one reply;
+- no_retraction: no reply takes back an earlier one ("Correction to my
+  last message: ...").
 
 Costs a few cents per run (about 5 model calls per scenario). Uses the
 real document search, so run it on the Mac with the app's collections
@@ -162,8 +164,26 @@ def run(scenario):
     return config, turns
 
 
+# A reply taking back an earlier one (2026-10-23, the bakery: after
+# "Gluten-free vanilla and chocolate sponge are available to order ahead",
+# the delivery answer added "Correction to my last message: I can't confirm
+# our gluten-free cake flavors"). Broader than llm._RETRACTION on purpose:
+# this finds them, it doesn't remove them.
+RETRACTION = re.compile(
+    r"\bcorrect(?:ion|ing)\b.{0,40}\b(?:last|previous|earlier|above)\b"
+    r"|\b(?:last|previous|earlier) (?:message|reply|answer)\b"
+    r"|\bI (?:misspoke|was wrong|spoke too soon)\b"
+    r"|\bshouldn'?t have (?:said|given|told|mentioned)\b"
+    r"|\b(?:please )?disregard\b|\b(?:don'?t|not) (?:rely|count) on (?:that|it|this|what)\b",
+    re.I)
+
+
 def check(scenario, config, turns):
     problems = []
+    for i, (_, r) in enumerate(turns):
+        if i and RETRACTION.search(r):
+            problems.append(("no_retraction", f"reply {i + 1} takes back an earlier "
+                             f"one: {RETRACTION.search(r).group(0)!r}"))
     pattern = _phone_pattern(config["business"].get("phone"))
     asked = set(scenario.get("asks_for_number_at", []))
     with_number = [i for i, (_, r) in enumerate(turns) if pattern and pattern.search(r)]

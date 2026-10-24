@@ -59,11 +59,6 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   on 2026-10-23: the $30 deposit right, then "the info I have doesn't confirm
   whether balayage counts as a colour service". It's a lightening service;
   the Colour Deposits section says "colour services over $100".
-- The bot took back its own correct answer, once (qa_eval, 2026-10-23):
-  after "Gluten-free vanilla and chocolate sponge are available to order
-  ahead", the next reply said "Correction to my last message: I can't confirm
-  our gluten-free cake flavors". llm.without_retraction only covers replies
-  others wrote (the booking flow, rules, tools).
 
 ## Config structure (YAML review, 2026-10-23)
 
