@@ -143,10 +143,11 @@ def main():
         check("the clash is shown: both sides, where, and why",
               r.status_code == 200 and "Muffins and Daily Pastries:" in html
               and "We&#39;re open until 5pm." in html and "5pm against 3pm" in html, r.status_code)
-        check("on the model the route names (Sonnet 5.5 unless set)",
-              calls[0]["model"] == routes.CONTRADICTION_MODEL
+        check("on contradictions.MODEL (Sonnet 5.5 unless set), the eval's default too",
+              calls[0]["model"] == routes.CONTRADICTION_MODEL == contradictions.MODEL
               and 'os.environ.get("CONTRADICTION_MODEL", "claude-sonnet-5-5")'
-              in (ROOT / "admin" / "routes.py").read_text())
+              in (ROOT / "contradictions.py").read_text()
+              and "contradictions.MODEL" in (ROOT / "contradiction_eval.py").read_text())
         llm._create = answering('{"contradictions": []}')
         html = client.post(f"/admin/business/{biz}/knowledge/contradictions",
                            data={"_csrf_token": token}).get_data(as_text=True)

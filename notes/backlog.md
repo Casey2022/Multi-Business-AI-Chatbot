@@ -52,11 +52,12 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
   in 6 (2026-10-22, after the deadline fix) said the right 9:00 AM, then
   "we open at 11, so a noon tray can't be promised; call". Noon is open;
   the chat takes orders before opening.
-- `contradiction_eval.py` defaults to the app's default model (Claude Haiku
-  5.5), but the Knowledge page runs the check with `CONTRADICTION_MODEL`
-  (Sonnet 5.5). On Haiku it misses a different planted pair from run to run
-  (10/10, 8/10, 9/10, 2026-10-24). Default the eval to the model the app
-  uses, then re-measure.
+- Contradiction check, on Sonnet 5.5 (the eval now defaults to it,
+  2026-10-24): 10/10 planted clashes caught x3, but false flags 0, 1, 2,
+  all one Sunrise pair, and each one's own "why" says it isn't one:
+  "These two statements are consistent, so this is not a real
+  contradiction." (gluten-free muffins made to order vs not in the case).
+  A pair whose reason says so could be dropped in code.
 - Belmont rag_eval row 32 ("do I pay anything up front for balayage"), once
   on 2026-10-23: the $30 deposit right, then "the info I have doesn't confirm
   whether balayage counts as a colour service". It's a lightening service;

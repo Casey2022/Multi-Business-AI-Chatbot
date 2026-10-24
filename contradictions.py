@@ -14,9 +14,16 @@ contradiction_eval.py: clean seed knowledge bases and planted clashes.
 """
 
 import logging
+import os
 
 log = logging.getLogger("contradictions")
 
+# The model the Knowledge page's check runs with, and contradiction_eval.py's
+# default. Sonnet 5.5 caught 10/10 planted clashes with no false flags on
+# five clean seed knowledge bases, 3 runs in 3; Haiku 5.5 9/10 with 4
+# (contradiction_eval.py, 2026-10-23). The eval used to default to the app's
+# default model (Haiku) instead, so its headline numbers weren't this one's.
+MODEL = os.environ.get("CONTRADICTION_MODEL", "claude-sonnet-5-5")
 MAX_PAIRS = 6
 SETTINGS = ("Business details", "Menu prices", "Booking notice", "Cancellation rules")
 

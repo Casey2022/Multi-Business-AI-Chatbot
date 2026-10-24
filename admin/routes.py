@@ -694,10 +694,9 @@ def example_section_title(business):
     return "Opening hours"
 
 
-# The model behind the contradiction check. Sonnet 5.5 caught 10/10 planted
-# clashes with no false flags on five clean seed knowledge bases, 3 runs in
-# 3; Haiku 5.5 9/10 with 4 (contradiction_eval.py, 2026-10-23).
-CONTRADICTION_MODEL = os.environ.get("CONTRADICTION_MODEL", "claude-sonnet-5-5")
+# The model behind the contradiction check: contradictions.MODEL (the eval
+# defaults to the same one).
+from contradictions import MODEL as CONTRADICTION_MODEL
 
 
 @admin_bp.route("/business/<int:business_id>/knowledge/contradictions", methods=["POST"])

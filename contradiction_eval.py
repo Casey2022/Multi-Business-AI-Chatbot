@@ -2,7 +2,7 @@
 """contradiction_eval.py — does contradictions.py find clashes, and only those?
 
 Run it:
-    python3 contradiction_eval.py                       the default model
+    python3 contradiction_eval.py                       the model the app uses
     python3 contradiction_eval.py --model=claude-sonnet-5-5 [--repeat=3]
 
 Cases are built from the seed (documents/<slug>/*.md and config/<slug>.yaml):
@@ -81,7 +81,9 @@ def cases():
 
 
 def main():
-    model = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--model=")), None)
+    # Default: the model the Knowledge page uses (contradictions.MODEL).
+    model = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--model=")),
+                 contradictions.MODEL)
     repeat = next((int(a.split("=", 1)[1]) for a in sys.argv if a.startswith("--repeat=")), 1)
     llm.start_turn_accounting()
     failed = 0
