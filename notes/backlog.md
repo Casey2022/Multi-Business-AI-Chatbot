@@ -85,10 +85,9 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
   attacks measured, the one that got through fixed). Worth a round 3 when
   real SMS goes live (texts arrive with no page around them) and if the
   owner assistant gains tools beyond drafts.
-- **Accounts:** password reset is done (2026-10-23, `notes/security.md`).
-  Left: an in-portal "change password", and the client address behind
-  Render's proxy (the per-IP limits trust the first X-Forwarded-For entry,
-  which a client can set; verify Render's hop, then count from the right).
+- **Accounts:** password reset is done, and the per-IP limits read the real
+  visitor's address (2026-10-23, `notes/security.md`). Left: an in-portal
+  "change password".
 - **Abuse and cost:** push on the existing rate limits (chat, demo creation,
   uploads, support). Demo spend is capped (`budget.py`: $0.50 a demo, $5
   all demos, a day), each call at its own model's prices

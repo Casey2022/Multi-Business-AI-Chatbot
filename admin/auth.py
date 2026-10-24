@@ -132,10 +132,11 @@ def _login_ip():
     name existed. Nothing noticed for a week, because a logged-in session
     never visits the login page and the demo signs people in directly.
     """
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
+    import ratelimit
+    # Counted from the right, past the proxies (ratelimit.client_address):
+    # the first entry is whatever the visitor sends (2026-10-23).
+    return ratelimit.client_address(request.headers.get("X-Forwarded-For", ""),
+                                    request.remote_addr)
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])

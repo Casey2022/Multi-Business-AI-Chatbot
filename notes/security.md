@@ -314,21 +314,30 @@ signed-in browser: it kept working).
 etc. on Render to send anything (`SUPPORT_ALERT_EMAIL` is no longer
 required for mail in general, only for support alerts).
 
-## The client address behind Render's proxy (found 2026-10-23, open)
+## The client address behind Render's proxy (fixed 2026-10-23)
 
-The per-IP limits (login, reset, chat, demo starts) take the **first**
-`X-Forwarded-For` entry. Render appends to a header the client sends
-rather than replacing it (community reports; no official doc found), so
-that first entry is whatever the client wrote: changing it each time
-slips the per-IP limit. The per-account limits still hold (5 a minute,
-30 an hour per login address), so guessing one account's password stays
-capped.
+The per-IP limits (login, reset, chat, demo starts) took the **first**
+`X-Forwarded-For` entry, and that entry is whatever the visitor sends.
+Measured on Render with a temporary `/version?proxy=1` (the asker's own
+header), from 50.48.130.141:
 
-The fix is to count hops from the right, but which entry Render adds (the
-client's address, or its own) decides how many, and guessing wrong puts
-every visitor in one bucket. To verify before changing it: log
-`len(X-Forwarded-For entries)` and `request.remote_addr` for one request
-on Render, from a known address, then take the entry just before Render's.
+| sent | X-Forwarded-For as the app saw it |
+|---|---|
+| nothing | 50.48.130.141, 162.159.114.27, 10.24.90.146 |
+| `203.0.113.9` | 203.0.113.9, 50.48.130.141, 172.70.115.164, 10.24.90.146 |
+| two made up | 203.0.113.9, 198.51.100.7, 50.48.130.141, 172.70.231.73, 10.24.90.146 |
+
+Render keeps what the client sent and appends the real address, then a
+Cloudflare edge (162.159..., 172.70...), then its own balancer (10.24...).
+So the first entry could be anything, and changing it each request
+slipped every per-IP limit (the per-account limits still held).
+
+`ratelimit.client_address` now takes the entry just before the proxies,
+counted from the right (`PROXY_HOPS`, 2 on Render); both readers
+(`app._client_ip`, `admin/auth._login_ip`) use it. Locally, with no header,
+the connecting address. If Render's chain ever changes, re-run the
+measurement (a request with a made-up header) and set `PROXY_HOPS`.
+`security_test.py` holds the three measured shapes.
 
 ## Still to do
 

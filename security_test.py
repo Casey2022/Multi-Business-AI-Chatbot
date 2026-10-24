@@ -297,6 +297,32 @@ def main():
     check("ALLOW_UNSIGNED_REQUESTS defaults to false",
           'os.environ.get("ALLOW_UNSIGNED_REQUESTS", "false")' in app_src)
 
+    heading("The per-IP limits use the visitor's address, not one they wrote")
+    # Measured on Render, 2026-10-23 (a temporary /version?proxy=1): what
+    # the visitor sends stays in front, then the real address, then a
+    # Cloudflare edge, then Render's balancer. The first entry was trusted.
+    import ratelimit
+    for name, header in (
+            ("plain", "50.48.130.141, 162.159.114.27, 10.24.90.146"),
+            ("one forged entry in front", "203.0.113.9, 50.48.130.141, 172.70.115.164, 10.24.90.146"),
+            ("two forged", "203.0.113.9, 198.51.100.7, 50.48.130.141, 172.70.231.73, 10.24.90.146")):
+        got = ratelimit.client_address(header, "127.0.0.1")
+        check(f"Render, {name}: the real visitor (third from the right)",
+              got == "50.48.130.141", got)
+    check("no header (running locally): the connecting address",
+          ratelimit.client_address("", "127.0.0.1") == "127.0.0.1")
+    check("fewer entries than the proxies add: the first (nothing better known)",
+          ratelimit.client_address("50.48.130.141", "127.0.0.1") == "50.48.130.141")
+    check("another hop count when PROXY_HOPS says so",
+          ratelimit.client_address("9.9.9.9, 50.48.130.141, 10.0.0.1", "x", hops=1) == "50.48.130.141")
+    app_src = (ROOT / "app.py").read_text()
+    auth_src = (ROOT / "admin" / "auth.py").read_text()
+    check("chat and demo limits, and login and reset limits, all read it there",
+          "ratelimit.client_address(" in app_src and "ratelimit.client_address(" in auth_src
+          and 'split(",")[0]' not in app_src + auth_src)
+    check("the temporary probe is gone from /version", "proxy" not in
+          app_src.split("def version():")[1].split("@app.route")[0])
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

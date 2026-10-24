@@ -23,6 +23,36 @@ import time
 log = logging.getLogger("ratelimit")
 
 
+# Proxies between a visitor and the app that each add an entry to
+# X-Forwarded-For: on Render, a Cloudflare edge, then Render's balancer.
+PROXY_HOPS = int(os.environ.get("PROXY_HOPS", "2"))
+
+
+def client_address(forwarded, remote_addr, hops=None):
+    """The visitor's address, for the per-IP limits (login, reset, chat,
+    demo starts): the X-Forwarded-For entry just before the proxies we
+    run behind, counted from the right.
+
+    The first entry was trusted until 2026-10-23, and it's whatever the
+    visitor sends. Measured on Render (/version?proxy=1, a temporary probe):
+      plain:        50.48.130.141, 162.159.114.27, 10.24.90.146
+      one forged:   203.0.113.9, 50.48.130.141, 172.70.115.164, 10.24.90.146
+      two forged:   203.0.113.9, 198.51.100.7, 50.48.130.141, 172.70.231.73,
+                    10.24.90.146
+    The visitor (50.48.130.141) is always third from the right: Render keeps
+    what the client sent and appends the real address, then Cloudflare's
+    edge, then its own balancer. With no header (running locally), the
+    connecting address. With fewer entries than the proxies should add,
+    the first: nothing better is known."""
+    hops = PROXY_HOPS if hops is None else hops
+    entries = [e.strip() for e in (forwarded or "").split(",") if e.strip()]
+    if len(entries) > hops:
+        return entries[-(hops + 1)]
+    if entries:
+        return entries[0]
+    return remote_addr or "unknown"
+
+
 def _limit(name, default):
     """Read a limit from the environment, falling back to a sane default."""
     try:
