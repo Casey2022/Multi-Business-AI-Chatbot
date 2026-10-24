@@ -1257,14 +1257,20 @@ def reset_password(token, new_password):
     ValueError (the reason, for the page) when the link is no good or the
     password isn't allowed. Spends the link, cancels the user's other
     links, and ends every session they have (session_version)."""
-    import bcrypt
-    from datetime import datetime as _dt
     user = user_for_reset(token)
     if not user:
         raise ValueError("This link has expired or was already used.")
     problem = password_problem(new_password, user["email"])
     if problem:
         raise ValueError(problem)
+    return _store_password(user, new_password)
+
+
+def _store_password(user, new_password):
+    """Save a new password (already checked), spend any reset links still
+    open, and end every session from before (session_version)."""
+    import bcrypt
+    from datetime import datetime as _dt
     pw_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     conn = get_connection()
     conn.execute("UPDATE users SET password_hash = ?, session_version = session_version + 1 "
@@ -1274,6 +1280,23 @@ def reset_password(token, new_password):
     conn.commit()
     conn.close()
     return get_user_by_email(user["email"])
+
+
+def change_password(email, current_password, new_password):
+    """Change a signed-in user's password (the portal's Password page).
+    The current password is asked for again, so a session left open on a
+    shared computer can't be used to lock the owner out. Returns the user,
+    or raises ValueError with the reason, for the page. Like a reset, it
+    ends every session from before; the page keeps the one that asked."""
+    user = verify_password(email, current_password or "")
+    if not user:
+        raise ValueError("The current password isn't right.")
+    problem = password_problem(new_password, user["email"])
+    if problem:
+        raise ValueError(problem)
+    if verify_password(email, new_password):
+        raise ValueError("That's the password you have now. Choose a new one.")
+    return _store_password(user, new_password)
 
 
 def verify_password(email, password):

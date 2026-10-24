@@ -276,6 +276,48 @@ def reset_password_page(token):
                            min_length=MIN_PASSWORD_LENGTH)
 
 
+def is_demo_account(user):
+    """A demo visitor's account: its password was made up for them and never
+    shown, so there's nothing to change and no inbox to reset it from."""
+    return bool(user) and user["email"].endswith("@demo.invalid")
+
+
+@admin_bp.route("/password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """Change your password while signed in (2026-10-23). Asks for the
+    current one; tries count against the sign-in limits, so this page isn't
+    a way round them to guess it. Every other session ends; this one stays."""
+    from flask import flash
+    from db import change_password as save, MIN_PASSWORD_LENGTH
+    user = current_user()
+    page = dict(min_length=MIN_PASSWORD_LENGTH, demo=is_demo_account(user), error=None)
+    if page["demo"] and request.method == "POST":
+        return render_template("admin/password.html", **page), 403
+    if request.method == "GET":
+        return render_template("admin/password.html", **page)
+    import ratelimit
+    allowed, wait = ratelimit.login_attempt(_login_ip(), user["email"])
+    if not allowed:
+        log_sec.warning("Password change attempts throttled for %s", user["email"])
+        page["error"] = f"Too many attempts. Try again in {max(wait, 1)} seconds."
+        return render_template("admin/password.html", **page), 429
+    new = request.form.get("password") or ""
+    if new != (request.form.get("confirm") or ""):
+        page["error"] = "The two new passwords don't match."
+        return render_template("admin/password.html", **page), 400
+    try:
+        changed = save(user["email"], request.form.get("current") or "", new)
+    except ValueError as e:
+        page["error"] = str(e)
+        return render_template("admin/password.html", **page), 400
+    session["session_version"] = changed["session_version"]
+    log_sec.info("Password changed in the portal by %s", user["email"])
+    flash("Password changed. Anywhere else you were signed in, you'll need the new one.",
+          "success")
+    return redirect(url_for("admin.change_password"))
+
+
 @admin_bp.route("/logout")
 def logout():
     session.pop("user_email", None)

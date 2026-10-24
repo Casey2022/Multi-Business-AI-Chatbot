@@ -10,15 +10,16 @@
     <div class="card-title login-title">Set a new password</div>
     {% if expired %}
       <div class="field"><div class="flash flash-error">This link has expired or was already used.</div></div>
-      <p><a href="{{ url_for('admin.forgot_password') }}">Ask for a new link</a></p>
+      <div class="field"><p><a href="{{ url_for('admin.forgot_password') }}">Ask for a new
+        link</a></p></div>
     {% else %}
     <form method="POST">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       {% if error %}
         <div class="field"><div class="flash flash-error">{{ error }}</div></div>
       {% endif %}
-      <p class="hint">For {{ email }}. Saving it signs you out everywhere; then sign in with
-        the new one.</p>
+      <div class="field"><p class="hint">For {{ email }}. Saving it signs you out everywhere;
+        then sign in with the new one.</p></div>
       <div class="field">
         <label for="password">New password (at least {{ min_length }} characters)</label>
         <input type="password" id="password" name="password" autocomplete="new-password"

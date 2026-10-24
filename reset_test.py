@@ -170,6 +170,67 @@ def main():
     r = app.test_client().post("/admin/forgot", data={"email": "owner@example.test"})
     check("no CSRF token: refused", r.status_code in (400, 403), r.status_code)
 
+    heading("changing it while signed in (the Password page)")
+    ratelimit.LOGIN_PER_MINUTE, ratelimit.LOGIN_PER_HOUR = 1000, 1000   # until the limit check
+    current = "a long new passphrase"
+    check("signed out, the page sends you to sign in",
+          app.test_client().get("/admin/password").status_code == 302)
+    me, elsewhere = app.test_client(), app.test_client()
+    for c in (me, elsewhere):
+        t = token_of(c, "/admin/login")
+        c.post("/admin/login", data={"_csrf_token": t, "email": "owner@example.test",
+                                     "password": current})
+    settings = f"/admin/business/{biz}/settings"
+    check("signed in twice", me.get(settings).status_code == elsewhere.get(settings).status_code == 200)
+    check("the nav links to it", "/admin/password" in me.get(settings).get_data(as_text=True))
+    t = token_of(me, "/admin/password")
+
+    def change(cur, new, again=None, client=None):
+        return (client or me).post("/admin/password", data={
+            "_csrf_token": t, "current": cur, "password": new,
+            "confirm": new if again is None else again})
+    for name, args in (("the current password wrong", ("not the password at all", "another long passphrase")),
+                       ("the two new ones differ", (current, "another long passphrase", "a third long passphrase")),
+                       ("too short", (current, "short")),
+                       ("the same as now", (current, current))):
+        r = change(*args)
+        check(f"refused, in words: {name}", r.status_code == 400
+              and 'class="flash flash-error"' in r.get_data(as_text=True), r.status_code)
+    check("…and the password is still the old one", db.verify_password("owner@example.test", current))
+    r = me.post("/admin/password", data={"current": current, "password": "another long passphrase",
+                                         "confirm": "another long passphrase"})
+    check("no CSRF token: refused", r.status_code in (400, 403)
+          and db.verify_password("owner@example.test", current), r.status_code)
+    pending = db.create_password_reset(db.get_user_by_email("owner@example.test")["id"])
+    r = change(current, "another long passphrase")
+    check("a good one is saved", r.status_code == 302
+          and db.verify_password("owner@example.test", "another long passphrase")
+          and not db.verify_password("owner@example.test", current), r.status_code)
+    check("…it says so", "Password changed" in me.get("/admin/password").get_data(as_text=True))
+    check("…this browser stays signed in", me.get(settings).status_code == 200)
+    check("…the other one is signed out", elsewhere.get(settings).status_code == 302)
+    check("…and a reset link sent before stops working", db.user_for_reset(pending) is None)
+
+    ratelimit.LOGIN_PER_MINUTE = 3
+    hits = [change("guessing at it", "yet another passphrase").status_code for _ in range(5)]
+    check("guessing the current password is slowed down like signing in (429)", 429 in hits, hits)
+    ratelimit.LOGIN_PER_MINUTE, ratelimit.LOGIN_PER_HOUR = 1000, 1000
+
+    demo_client = app.test_client()
+    t = token_of(demo_client, "/admin/login")
+    demo_client.post("/admin/login", data={"_csrf_token": t, "email": "demo-x@demo.invalid",
+                                           "password": "a long demo passphrase"})
+    page = demo_client.get(settings).get_data(as_text=True)
+    check("a demo account: no Password link", demo_client.get(settings).status_code == 200
+          and "/admin/password" not in page)
+    page = demo_client.get("/admin/password").get_data(as_text=True)
+    check("…the page says why, with no form", "demo account" in page and 'name="current"' not in page)
+    t = token_of(demo_client, settings)       # the Password page has no form for a demo
+    r = demo_client.post("/admin/password", data={"_csrf_token": t, "current": "a long demo passphrase",
+                                                  "password": "a demo visitor's own", "confirm": "a demo visitor's own"})
+    check("…and posting to it anyway changes nothing (403)", r.status_code == 403
+          and db.verify_password("demo-x@demo.invalid", "a long demo passphrase"), r.status_code)
+
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
         print(f"  FAILED: {name}")

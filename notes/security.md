@@ -314,6 +314,25 @@ signed-in browser: it kept working).
 etc. on Render to send anything (`SUPPORT_ALERT_EMAIL` is no longer
 required for mail in general, only for support alerts).
 
+### Changing it while signed in (2026-10-23)
+
+The nav's **Password** page (`/admin/password`, `db.change_password`):
+
+- Asks for the current password again, so a session left open on a shared
+  computer can't be used to lock the owner out. Wrong guesses count against
+  the sign-in limits (`ratelimit.login_attempt`, per address and account),
+  so the page isn't a way round them.
+- The new one goes through `password_problem`, can't be the current one,
+  and is typed twice.
+- Saving it bumps `session_version` (every other session ends) and spends
+  any reset link still open; the browser that changed it keeps its session.
+- Demo accounts get no link and no form (their password was made up and
+  never shown); a POST anyway is refused.
+
+`reset_test.py` (+18 checks), mutation-tested 6 ways: no current-password
+check, no rate limit, other sessions kept, this session lost, demo guard
+off, the same password allowed.
+
 ## The client address behind Render's proxy (fixed 2026-10-23)
 
 The per-IP limits (login, reset, chat, demo starts) took the **first**
