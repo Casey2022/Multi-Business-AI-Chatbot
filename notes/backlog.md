@@ -88,9 +88,10 @@ config_check_test.py holds every shipped YAML to none; 2026-10-23). Next:
 
 ## Testing
 
-- Journeys exist for a booking to confirmation and a question mid-booking at
-  each business, Ridgeline business days, and holidays (2026-10-20). Next:
-  a correction at the read-back ("actually make it Thursday") at each.
+- Journeys exist for a booking to confirmation, a question mid-booking and a
+  correction at the read-back at each business (the day, the time, both,
+  the size, the quantity: 15/15 on 2026-10-24, nothing to fix), Ridgeline
+  business days, and holidays.
 
 ## Security review (before wider use)
 

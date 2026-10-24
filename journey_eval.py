@@ -510,6 +510,98 @@ JOURNEYS = [
              "must_not": [r"cupcake"]},
         ],
     },
+    # A correction at the read-back (2026-10-24): "actually make it Thursday"
+    # in answer to "Is that right?". The flow runs anything that isn't a
+    # plain yes or no through extraction as a possible change; nothing
+    # checked it end to end. Each business changes something different (the
+    # day, the time, both, the size, the quantity), and the read-back after
+    # must show the new value, keep the rest, and book that one.
+    {
+        "name": "read-back correction: actually make it Thursday (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A day changed at the read-back keeps the time and the job.",
+        "turns": [
+            {"say": "I'd like to book a drain cleaning tomorrow at 10am", "state": "collecting"},
+            {"say": "Jordan", "state": "collecting"},
+            {"say": "12 Elm Street, Rochester NY", "state": "collecting"},
+            {"say": "kitchen sink draining slowly", "state": "confirming",
+             "must": [r"September 23"]},
+            {"say": "actually make it Thursday", "state": "confirming",
+             "must": [r"drain cleaning", r"September 24", r"10:00", r"Elm"],
+             "must_not": [r"September 23"]},
+            {"say": "yes", "state": "idle", "must": [r"scheduled|booked", r"September 24"],
+             "must_not": [r"September 23"]},
+        ],
+    },
+    {
+        "name": "read-back correction: 3pm instead (Belmont)",
+        "slug": "belmont_hair_studio",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A time changed at the read-back keeps the day and the service.",
+        "turns": [
+            {"say": "I'd like to book a haircut on Thursday at 2pm", "state": "collecting"},
+            {"say": "Sam", "state": "collecting"},
+            {"say": "no preference", "state": "collecting"},
+            {"say": "yes", "state": "confirming", "must": [r"2:00"]},
+            {"say": "can we do 3pm instead?", "state": "confirming",
+             "must": [r"haircut", r"September 24", r"3:00"], "must_not": [r"2:00"]},
+            {"say": "yes", "state": "idle", "must": [r"booked", r"3:00"],
+             "must_not": [r"2:00"]},
+        ],
+    },
+    {
+        "name": "read-back correction: a medium, not a large (Crosstown)",
+        "slug": "crosstown_pizza",
+        "clock": (2026, 9, 22, 17, 0),
+        "why": "The item changed at the read-back keeps the time and the address.",
+        "turns": [
+            {"say": "I want to order a large pepperoni pizza for delivery at 7pm",
+             "state": "collecting"},
+            {"say": "Alex", "state": "collecting"},
+            {"say": "34 Oak Avenue, Rochester NY", "state": "collecting"},
+            {"say": "none", "state": "confirming", "must": [r"large"]},
+            {"say": "actually make it a medium", "state": "confirming",
+             "must": [r"medium", r"pepperoni", r"7:00", r"Oak"],
+             "must_not": [r"\blarge\b"]},
+            {"say": "yes", "state": "idle", "must": [r"order in|placed"],
+             "must_not": [r"\blarge\b"]},
+        ],
+    },
+    {
+        "name": "read-back correction: Monday at 1 instead (Ridgeline)",
+        "slug": "ridgeline_contracting",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "A day and time changed at once, over a weekend, keeps the job.",
+        "turns": [
+            {"say": "I'd like to book an estimate visit for a deck repair on Friday at 9am",
+             "state": "collecting"},
+            {"say": "Morgan", "state": "collecting"},
+            {"say": "56 Pine Road, Rochester NY", "state": "collecting"},
+            {"say": "the deck boards are rotting, and no rush on timing",
+             "state": "confirming", "must": [r"September 25"]},
+            {"say": "sorry, can we do Monday at 1pm instead", "state": "confirming",
+             "must": [r"deck", r"September 28", r"1:00", r"Pine"],
+             "must_not": [r"September 25", r"9:00"]},
+            {"say": "yes", "state": "idle", "must": [r"booked", r"September 28"],
+             "must_not": [r"September 25"]},
+        ],
+    },
+    {
+        "name": "read-back correction: two dozen, not one (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),
+        "why": "The quantity changed at the read-back keeps the day and the muffins.",
+        "turns": [
+            {"say": "I'd like to order a dozen blueberry muffins for pickup Friday at 9am",
+             "state": "collecting"},
+            {"say": "Riley", "state": "collecting"},
+            {"say": "none", "state": "confirming", "must": [r"dozen"]},
+            {"say": "oh wait, make it two dozen", "state": "confirming",
+             "must": [r"two dozen|2 dozen|24", r"muffin", r"September 25", r"9:00"]},
+            {"say": "yes", "state": "idle", "must": [r"placed|booked"]},
+        ],
+    },
     # After a booking, the booking flow's confirmation is in the chat as an
     # earlier reply. Claude Haiku 5.5 (2026-10-22) read it as its own and took
     # it back: "I need to correct my last message: I can't actually place or
