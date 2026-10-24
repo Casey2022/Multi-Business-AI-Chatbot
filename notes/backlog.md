@@ -61,9 +61,10 @@ config in words (startup log, the operator's Businesses page, and
 config_check_test.py holds every shipped YAML to none; 2026-10-23). Next:
 - **Persistence on Render** before a real business: the disk is wiped on
   each deploy, so owner overrides vanish.
-- A config that fails to load still answers the customer with a server
-  error (chat and the owner's pages); the Businesses page now says why, but
-  the customer could get "we can't answer right now, call ..." instead.
+- A config that fails to load: customers are now asked to call
+  (`app._customer_config`, 2026-10-23). The owner's own portal pages still
+  give a server error for that business; the operator's Businesses page
+  says why.
 
 ## Owner portal
 

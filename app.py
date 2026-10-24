@@ -360,6 +360,43 @@ def safe_process_message(message, sender_id, business_id, config, channel):
         return unavailable_reply(config)
 
 
+def _customer_config(business):
+    """load_config for a route a customer reaches, or None when the config
+    can't be loaded at all. Before (measured 2026-10-23), a config that
+    wouldn't load gave the chat page a bare "Internal Server Error", every
+    message a 500 the chat called "couldn't reach the assistant, try
+    again", and a real text no reply at all. The reason is on the
+    operator's Businesses page (config_check.py); here it's one log line."""
+    try:
+        return load_config(business["config_path"], business["id"])
+    except Exception as e:
+        log.warning("%s config won't load (%s: %s); customers are asked to call. "
+                    "The Businesses page says what's wrong.", business["name"],
+                    type(e).__name__, e)
+        return None
+
+
+def _offline_reply(business):
+    """llm.offline_reply with the business's phone, read without the config
+    that won't load: the owner's saved number, else the YAML's."""
+    from pathlib import Path
+    import yaml
+    from llm import offline_reply
+    phone = None
+    try:
+        from db import get_config_overrides
+        phone = get_config_overrides(business["id"]).get("business.phone")
+    except Exception:
+        pass
+    if not phone:
+        try:
+            raw = yaml.safe_load(Path(business["config_path"]).read_text())
+            phone = ((raw or {}).get("business") or {}).get("phone")
+        except Exception:
+            pass
+    return offline_reply(phone if isinstance(phone, str) and phone.strip() else None)
+
+
 # ---------------------------------------------------------------------------
 # Channel adapters
 # ---------------------------------------------------------------------------
@@ -415,7 +452,9 @@ def sms_turn(business, from_number, incoming_msg):
     log.info("Incoming SMS for %s from %s (%s)", business["name"],
              from_number, scrub(incoming_msg))
     log.debug("SMS content from %s: %r", from_number, incoming_msg)
-    config = load_config(business["config_path"], business["id"])
+    config = _customer_config(business)
+    if config is None:
+        return sms.for_sms(_offline_reply(business))
     log.info(f"Serving: {business['name']} (id={business['id']})")
     # The channel-agnostic brain, with the SMS channel's instructions.
     reply_text = safe_process_message(
@@ -468,7 +507,9 @@ def webchat_reply(slug):
     if note:
         return {"reply": note}
 
-    config      = load_config(business["config_path"], business["id"])
+    config      = _customer_config(business)
+    if config is None:
+        return {"reply": _offline_reply(business)}
     business_id = business["id"]
 
     # A demo is swept once nobody has used it for a while, and this is what
@@ -488,6 +529,24 @@ def webchat_reply(slug):
     )
 
     return {"reply": reply_text}
+
+def _delivery_time(business):
+    """Now, in the business's time zone, for stamping a notice delivered; or
+    None when the config can't say (it won't load, or its time zone isn't
+    one). The chat pages poll every few seconds: before, each poll was a
+    500 (measured 2026-10-23). None means no news this time; nothing is
+    marked delivered, so nothing is lost."""
+    import clock
+    config = _customer_config(business)
+    if config is None:
+        return None
+    try:
+        return clock.business_now(config).isoformat(timespec="seconds")
+    except Exception as e:
+        log.warning("%s: can't tell the time there (%s: %s)", business["name"],
+                    type(e).__name__, e)
+        return None
+
 
 @app.route("/webchat/<slug>/updates", methods=["GET"])
 def webchat_updates(slug):
@@ -516,10 +575,10 @@ def webchat_updates(slug):
     from reconcile import maybe_reconcile
     maybe_reconcile(business, min_interval=60)
 
-    import clock
     from db import collect_notifications
-    config = load_config(business["config_path"], business["id"])
-    delivered_at = clock.business_now(config).isoformat(timespec="seconds")
+    delivered_at = _delivery_time(business)
+    if delivered_at is None:
+        return {"messages": []}
     notes = collect_notifications(business["id"], session_id, delivered_at)
     if notes:
         log_web.info("Delivered %d notice(s) to %s", len(notes), session_id)
@@ -611,14 +670,14 @@ def text_page(slug):
     if not business:
         return "Unknown business", 404
     import sms
-    config = load_config(business["config_path"], business["id"])
+    config = _customer_config(business)
     phone = _new_sim_number(business["id"])
     return render_template(
         "text.html", business=business, is_demo=bool(business.get("is_demo")),
         sim_phone=phone, sim_token=_sim_signer().dumps(phone),
         cost_out=sms.COST_OUT_CENTS, cost_in=sms.COST_IN_CENTS,
-        greeting=f"Hi! This is {config['business']['name']}. Text us a question "
-                 f"or to book.")
+        greeting=(f"Hi! This is {config['business']['name']}. Text us a question "
+                  f"or to book." if config else _offline_reply(business)))
 
 
 @app.route("/textsim/<slug>", methods=["POST"])
@@ -656,7 +715,6 @@ def textsim_updates(slug):
     """Texts the business sent this simulated phone unasked (a moved or
     cancelled appointment): the web chat's pickup, keyed by the number, which
     comes from the signed token (?token=), so only that page can read them."""
-    import clock
     import sms
     from db import collect_notifications
     business = get_business_by_slug(slug)
@@ -667,8 +725,9 @@ def textsim_updates(slug):
         return {"error": "phone is required"}, 400
     from reconcile import maybe_reconcile
     maybe_reconcile(business, min_interval=60)
-    config = load_config(business["config_path"], business["id"])
-    delivered_at = clock.business_now(config).isoformat(timespec="seconds")
+    delivered_at = _delivery_time(business)
+    if delivered_at is None:
+        return {"messages": []}
     notes = collect_notifications(business["id"], phone, delivered_at)
     return {"messages": [{"text": sms.for_sms(n["body"]),
                           "out": sms.segments(sms.for_sms(n["body"]))} for n in notes]}
@@ -756,12 +815,13 @@ def chat_page(slug):
     business = get_business_by_slug(slug)
     if not business:
         return "Unknown business", 404
-    config = load_config(business["config_path"], business["id"])
+    config = _customer_config(business)
     return render_template(
         "demo.html",
         business=business,
         is_demo=bool(business.get("is_demo")),
-        greeting=f"Hi! I'm the {config['business']['name']} assistant. How can I help?",
+        greeting=(f"Hi! I'm the {config['business']['name']} assistant. How can I help?"
+                  if config else _offline_reply(business)),
     )
 @app.route("/demo/leave", methods=["GET"])
 def demo_leave():

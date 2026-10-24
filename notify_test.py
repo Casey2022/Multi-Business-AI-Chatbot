@@ -254,15 +254,17 @@ def test_wiring():
 
     heading("the updates endpoint")
     app_tree = ast.parse(Path("app.py").read_text())
-    fn = next(n for n in app_tree.body if isinstance(n, ast.FunctionDef)
-              and n.name == "webchat_updates")
-    fn.decorator_list = []
+    # The route, and the helpers it reads the time with (2026-10-23).
+    fns = [n for n in app_tree.body if isinstance(n, ast.FunctionDef)
+           and n.name in ("webchat_updates", "_delivery_time", "_customer_config")]
+    for fn in fns:
+        fn.decorator_list = []
     import re
     ns = {"re": re, "load_config": lambda *a: CONFIG,
-          "get_business_by_slug": lambda slug: {"id": 1, "config_path": "x"}
+          "get_business_by_slug": lambda slug: {"id": 1, "config_path": "x", "name": "t"}
           if slug == "sunrise" else None,
-          "log_web": logging.getLogger("t")}
-    exec(compile(ast.Module([fn], []), "app.py", "exec"), ns)
+          "log_web": logging.getLogger("t"), "log": logging.getLogger("t")}
+    exec(compile(ast.Module(fns, []), "app.py", "exec"), ns)
     def call(slug, session):
         ns["request"] = types.SimpleNamespace(args={"session_id": session})
         return ns["webchat_updates"](slug)

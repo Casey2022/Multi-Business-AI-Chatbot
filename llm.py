@@ -1059,6 +1059,15 @@ def unavailable_reply(config):
             f"minute, {reach}.")
 
 
+def offline_reply(phone=None):
+    """What the customer sees when the business's settings can't be read at
+    all (a broken config; app._customer_config). Not "try again in a
+    minute": it won't fix itself, so the way through is the phone."""
+    if phone:
+        return f"Sorry, I can't answer messages right now. Please call us at {phone}."
+    return "Sorry, I can't answer messages right now. Please try again later."
+
+
 # A question needs one tool call, occasionally two (a notice check and a
 # cancellation in one message). A model still asking after this many rounds
 # is looping, and the last round forbids tools so it has to answer.
