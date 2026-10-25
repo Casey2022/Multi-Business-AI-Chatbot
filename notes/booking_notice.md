@@ -105,9 +105,16 @@ longer states 96 or 72.
 Before: three journeys, 0/3 each (gluten-free muffins Thursday, a themed
 display Thursday, gluten-free said at the notes question). After: 3/3.
 
-Not matched: a negation ("not gluten free") still names the variant, so
-it can refuse a time it didn't need to; the refusal names the rule, so the
-customer can say so. Say if it happens.
+A negation isn't the variant (2026-10-24, `policy._asked_for`): "a dozen
+muffins, not gluten free" was refused with "We need 4 days (96 hours) of
+notice for gluten-free muffins" (journey "notice: muffins, NOT gluten-free",
+0/3; after, 3/3). A mention is negated when a negator ("not", "no",
+"nothing", "don't", "doesn't", "without"...) comes before it in the same
+part of the sentence with only small words between ("don't need to be",
+"no need for"), or "isn't needed" follows it. Parts split at punctuation
+and "but", so "not themed, but gluten free" and "no, gluten free please"
+are gluten free, and "no nuts and gluten free" too ("nuts" isn't a small
+word).
 
 **Owner page** (`notice_form.py`, `/admin/business/<id>/notice`, linked
 from Settings and from each generated line on the Knowledge page). A card
@@ -116,5 +123,11 @@ hours, and the section that shows the line. A draft like the cancellation
 rules (`notice_draft` → `notice` on Publish); Publish rebuilds the index
 with it, since the lines are in the chunks. Which words name a service or
 a variant stay the operator's (copied through untouched). A variant
-shorter than its service is refused (it would never apply). Not yet:
-adding a new variant from the page.
+shorter than its service is refused (it would never apply).
+
+Adding a variant (2026-10-24): each card has an "Add a variant" box (what
+it's called, the words in an order that mean it, its notice). The owner's
+words are matched like the operator's (whole words, plurals ignored, a
+negation not counting); up to five, letters and numbers; not one another
+variant of the service already uses. A service with no notice of its own
+can have one.

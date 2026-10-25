@@ -45,9 +45,6 @@ blocked off" and "a tray's order-by time isn't taken back". Belmont's
 balayage deposit was hedged 9/10 because the knowledge base didn't say
 balayage counts as colour; the seed now does, 10/10 plain.
 
-- Booking notice: adding a new variant from the owner page (version 2 edits
-  existing ones only); a negated variant ("not gluten free") still counts
-  (`notes/booking_notice.md`).
 
 ## Config structure (YAML review, 2026-10-23)
 
