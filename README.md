@@ -1,156 +1,186 @@
-# Multi-Business AI Chatbot
+# Simon Says: an AI receptionist for small businesses
 
-An AI receptionist platform for small businesses. One server hosts many
-independent client businesses — each with its own phone number, personality,
-document knowledge base, and booking flow — reachable by SMS or embedded web
-chat, with an admin portal for managing conversations and appointments.
+One server, many independent small businesses. Each has its own phone
+number, personality, knowledge base, services and booking rules, and is
+reachable by SMS or an embedded web chat. Customers ask questions and book;
+owners change what the assistant knows and does from their own portal,
+without touching code.
 
-**Adding a new client is a config file and a document, not a code change.**
+**Adding a business is a config file and a document, not a code change.**
 
 ## Live demo
 
-**[Try it](https://simonai-q92o.onrender.com/demo)** — pick a business and you
-get your own copy of it: the chat a customer sees, and the portal its owner
-uses to change what the bot says. Your copy is yours alone and is cleared
-once you've finished with it.
+**[Try it](https://simonai-q92o.onrender.com/demo)**: pick a business and you
+get your own copy of it, both the chat a customer sees and the portal its
+owner uses. Change a price or a rule, publish it, and ask the chat again. A
+short guided tour points out what's where. Your copy is yours alone and is
+cleared when you're done.
 
-Five fictional businesses run on the same server from the same codebase, each
-set up to show something the others don't:
+Five fictional businesses run on the same server from the same code, each
+showing something the others don't:
 
-- **[Bob's Plumbing](https://simonai-q92o.onrender.com/chat/bobs_plumbing)** — one job at a time, travel buffers between them, and the customer's address checked against a 20-mile service radius
-- **[Belmont Hair Studio](https://simonai-q92o.onrender.com/chat/belmont_hair_studio)** — three chairs, and appointments that aren't the same length: a blowout takes half an hour, a balayage takes three
-- **[Crosstown Pizza Co.](https://simonai-q92o.onrender.com/chat/crosstown_pizza)** — six orders in the oven at once on a 15-minute clock, with the same address check deciding delivery rather than travel
-- **[Ridgeline Contracting](https://simonai-q92o.onrender.com/chat/ridgeline_contracting)** — books the free estimate, never the job, and refuses to quote a price
-- **[Sunrise Bakery & Café](https://simonai-q92o.onrender.com/chat/sunrise_bakery_and_cafe)** — orders rather than appointments, with three pickups able to share one slot
+- **[Bob's Plumbing](https://simonai-q92o.onrender.com/chat/bobs_plumbing)**: one job at a time, travel buffers between them, the customer's address checked against a 20-mile radius, and an after-hours emergency line
+- **[Belmont Hair Studio](https://simonai-q92o.onrender.com/chat/belmont_hair_studio)**: three chairs, appointments of different lengths, deposits, and cancellation charges that differ by service
+- **[Crosstown Pizza Co.](https://simonai-q92o.onrender.com/chat/crosstown_pizza)**: a menu with sizes and per-topping prices, six orders in the oven at once, and party trays with a 4pm order-by on Fridays and Saturdays
+- **[Ridgeline Contracting](https://simonai-q92o.onrender.com/chat/ridgeline_contracting)**: books the free estimate, never the job; counts business days across weekends and holidays
+- **[Sunrise Bakery & Café](https://simonai-q92o.onrender.com/chat/sunrise_bakery_and_cafe)**: orders rather than appointments, notice periods per product (gluten-free needs four days, "not gluten free" doesn't)
 
-- [Demo]
-- <img width="357" height="497" alt="Bob&#39;s Plumbing" src="https://github.com/user-attachments/assets/110aa1d6-801e-4d55-80dc-c1651769ff20" /> <img width="357" height="497" alt="Sunrise Bakery" src="https://github.com/user-attachments/assets/0f36852d-64b2-46f5-8633-371e44bbc2b3" />
+<img width="357" height="497" alt="Bob&#39;s Plumbing" src="https://github.com/user-attachments/assets/110aa1d6-801e-4d55-80dc-c1651769ff20" /> <img width="357" height="497" alt="Sunrise Bakery" src="https://github.com/user-attachments/assets/0f36852d-64b2-46f5-8633-371e44bbc2b3" />
 
-Try asking about prices, services they *don't* offer, or say "order" / "book"
-to start a booking. Notice that the two bots have different personalities,
-different knowledge, and even call a booking by a different name.
+Try asking about prices, something they *don't* offer, or a time that's too
+soon; or say "book" / "order" to start a booking and change your mind at the
+read-back ("actually make it Thursday").
 
-> Hosted on a free tier that sleeps after 15 minutes of inactivity — the first
-> request may take up to a minute to wake the server.
+> Hosted on Render's free tier, which sleeps after 15 minutes idle: the first
+> request can take up to a minute to wake it. The free tier also wipes the
+> disk on each deploy, so the live site rebuilds from the seed files.
 
 ## What it does
 
-- **Answers questions** grounded in each business's own documents, with an
-  explicit "I don't know" path rather than invented answers
-- **Takes bookings** through natural conversation — customers can give every
-  detail at once or one at a time, and correct themselves mid-flow
-- **Serves many businesses** from one deployment, routed by inbound phone
-  number (SMS) or URL slug (web)
-- **Works across channels** — Twilio SMS and web chat share the same core,
-  with per-channel behavioural rules
-- **Gives the operator visibility** — a password-protected admin portal with
-  conversation threads and an appointments dashboard
+**For customers**
+- Answers questions from the business's own knowledge base, and says so
+  when it doesn't know, with a way forward (the phone number) instead of a
+  guess.
+- Takes bookings in conversation: every detail at once or one at a time,
+  corrections at any point, questions mid-booking. It checks opening hours,
+  blocked days, holidays, capacity, travel buffers, booking notice and the
+  service area before it confirms anything.
+- Works the same over SMS (Twilio) and web chat.
 
-## Architecture
+**For owners** (the portal, `/admin`)
+- **Knowledge base, Menu, Cancellation rules, Booking notice**: every
+  change is a draft. **Preview answers** shows how the assistant would
+  answer before and after, flagging facts that changed and claims nothing
+  supports; **Publish** makes it live.
+- **Update from a photo, PDF or web page**: the assistant reads a menu or
+  price list and proposes the changes, for the owner to tick.
+- **Check for contradictions** across sections and settings.
+- **Calendar**: blocked time, holidays, and every booking; Google Calendar
+  sync.
+- An **owner assistant** that answers "how do I…?" from the owner guide
+  (also a page of its own) and can make knowledge-base and menu edits as
+  drafts.
 
-Three response layers, each handling what it's best suited for:
+**For the operator**: every business at a glance, with any mistake in its
+config said in words, and a support inbox. Demo visits are counted in
+Cloudflare Web Analytics.
+
+## How it works
 
 ```
-Incoming message
+Incoming message (SMS or web)
    │
-   ├─ 1. Rules engine ──────── keyword match → instant canned reply
-   │                            (free, ~1ms, handles greetings/hours/location)
+   ├─ 1. Keyword rules ──────── instant canned replies (hours, greetings)
    │
-   ├─ 2. Booking state machine  if mid-booking, every message is an answer
-   │                            (deterministic; owns all database writes)
+   ├─ 2. Booking flow ───────── a deterministic state machine; the model
+   │                            only extracts what the customer said
    │
-   └─ 3. LLM + RAG ─────────── semantic search over business documents,
-                                then Claude generates a grounded reply
+   └─ 3. Model + retrieval ──── the business's own documents, plus tools
+                                that work out facts in code (notice,
+                                cancellation charges, business days, prices)
+                                   │
+                                   └─ reply checks: deterministic fixes for
+                                      what prompting alone didn't stop
 ```
 
-Each layer exists because the one before it had a specific limitation. Rules
-are free and instant but can't handle anything unanticipated. RAG grounds
-answers in real documents but can't take an action. The LLM converses
-naturally but cannot be trusted to touch the database.
+**The model phrases; code settles facts.** Arithmetic and rule lookups
+(how much notice a gluten-free cake needs, what cancelling 30 hours ahead
+costs, the price of a medium with two toppings) are tools in code, and
+facts the customer stated are read in code before a tool runs. The model
+turns the answer into a sentence.
 
-**The design principle:** each layer gets exactly the authority it can be
-trusted with. The language model extracts structured data from conversation
-and suggests; a deterministic state machine decides and writes. A confirmation
-message is only ever produced *after* a successful database write — so the bot
-cannot tell a customer their order is placed unless an order actually exists.
+**Each layer gets the authority it can be trusted with.** The model
+extracts and suggests; the state machine decides and writes. A booking is
+only confirmed after the database write that makes it true.
 
-### Channel adapters
+**Prompt rules alone don't hold.** When the model kept producing the same
+wrong phrase ("you still have time" after a free window had passed, a
+discount someone claimed promised back), a check on the finished reply
+fixes it, rather than one more instruction.
 
-```
-SMS (Twilio)  ─┐
-Web chat      ─┼─→  process_message()  →  rules / booking / LLM+RAG
-Voice (future)─┘         (channel-agnostic core)
-```
+**One source of truth.** Prices live only in the menu, cancellation rules
+only in the rules, opening hours only in the weekly table; the knowledge
+base gets generated lines from them, so two copies can't disagree.
 
-Each channel is a thin endpoint that translates its own format into a standard
-internal call and formats the reply on the way out. Adding a channel is ~20
-lines and does not touch the core.
+## How it's tested
+
+- **`run_tests.py`**: about 2,700 offline checks across 55 files (~90s, no
+  API calls). Every new guard is mutation-tested: break it on purpose,
+  confirm a test fails, restore.
+- **Evals against the live model** (a few cents each), with a judge model
+  grading meaning against a rubric rather than matching wording:
+  `journey_eval.py` (79 whole conversations through the real message path),
+  `rag_eval.py` (retrieval and answers per business), `qa_eval.py`,
+  `conversation_eval.py`, `grounding_eval.py`, `contradiction_eval.py`,
+  `upload_eval.py`, `assistant_eval.py`.
+- **Measure first.** A reported failure becomes an eval row or journey
+  before the fix, and the fix is judged by re-running it. When an eval
+  fails, the first question is whether the bot or the check is wrong.
 
 ## Tech stack
 
-**Backend:** Python 3.13, Flask, SQLite
-**AI:** Anthropic Claude (conversation, structured extraction), Voyage AI (embeddings)
-**Retrieval:** ChromaDB with per-business collections
-**Messaging:** Twilio (SMS webhooks, signature verification)
-**Frontend:** Jinja2 templates, vanilla JavaScript
-**Deployment:** Render, gunicorn
+**Backend:** Python 3.13, Flask, SQLite, gunicorn
+**AI:** Anthropic Claude (Haiku 5.5 for replies; Sonnet 5.5 for judging, grounding and contradiction checks), Voyage AI embeddings
+**Retrieval:** ChromaDB, one collection per business
+**Integrations:** Twilio (SMS, signature-verified), Google Calendar, Cloudflare Web Analytics (cookieless, demo pages only)
+**Frontend:** Jinja2 templates, vanilla JavaScript as progressive enhancement
+**Hosting:** Render
 
-## How multi-tenancy works
+## Multi-tenancy
 
-A `businesses` table maps identifiers to configuration:
+Every request resolves to a business first: the Twilio `To` number for SMS,
+the URL slug for web chat, the signed-in owner for the portal. Its config
+(the YAML, with the owner's saved changes on top) is loaded per request and
+passed explicitly. Messages, appointments, conversation state and the
+knowledge-base collection are all scoped to the business, and
+`tenancy_test.py` checks that one demo visitor can't read or change
+another's data through any portal route.
 
-| id | name | slug | twilio_number | config_path |
-|----|------|------|---------------|-------------|
-| 1 | Bob's Plumbing | `bobs_plumbing` | +1585... | `config/bobs_plumbing.yaml` |
-| 2 | Sunrise Bakery & Café | `sunrise_bakery_and_cafe` | +1585... | `config/sunrise_bakery_and_cafe.yaml` |
+## Adding a business
 
-Every request resolves to a business before anything else happens — by the
-Twilio `To` number for SMS, by URL slug for web chat. Config is then loaded
-per-request and threaded explicitly through every function. Messages,
-appointments, and conversation state are all scoped by `business_id`, so two
-businesses can serve the same customer independently without collision.
+1. Create `config/<slug>.yaml`: business details, services, opening hours,
+   persona, booking questions, notice, menu, cancellation rules. Shared
+   wording every business gets lives once in `config/defaults.yaml`.
+2. Create `documents/<slug>/services.md`: what the assistant should know.
+3. Add the business to the list in `seed_businesses.py`.
+4. Restart. On boot the app registers it, imports its knowledge base and
+   builds its search index.
 
-## Adding a new business
-
-No code changes required:
-
-1. **Create `config/<slug>.yaml`** — business facts, services, persona,
-   behavioural guardrails, keyword rules, and booking questions
-2. **Create `documents/<slug>/services.md`** — the knowledge base the bot
-   answers from (prices, policies, what you don't offer)
-3. **Register it** in the `businesses` table
-4. **Ingest** the documents: `python3 rag.py`
-5. **Restart** the server
-
-See [`notes/adding_a_new_business.md`](notes/adding_a_new_business.md) for the
-full runbook, templates, and troubleshooting table.
+`run_tests.py` holds every shipped config to `config_check.py` (a typo'd
+time zone or hours written 17:00-09:00 fail before they're committed), and
+the operator's Businesses page shows the same check. Full runbook:
+[`notes/adding_a_new_business.md`](notes/adding_a_new_business.md).
 
 ## Configuration example
 
-Business behaviour lives entirely in YAML:
-
 ```yaml
-bot:
-  persona: |
-    Warm, friendly, a little playful. You love food and treat every
-    customer like a neighbor.
-  guardrails:
-    universal: |
-      Only state facts explicitly listed in this config or in the
-      retrieved business document excerpts. Never invent prices,
-      flavors, ingredients, allergens, or policies you don't see here.
-    sms: "Keep replies under 320 characters."
-    voice: "Reply in 1-2 short sentences. No emojis, no markdown."
+business:
+  name: "Sunrise Bakery & Café"
+  phone: "(585) 555-0188"
+
+services:
+  - "custom birthday cakes"
+  - "muffins by the dozen"
+
+calendar:
+  timezone: "America/New_York"
+  scheduling:
+    business_hours:            # 0 = Monday; the hours customers hear are written from this
+      1: ["07:00", "15:00"]
+      # ...
 
 booking:
-  noun: "order"          # Bob's Plumbing says "appointment"
-  extra_questions:
-    - key: "customization"
-      prompt: "Any customization details? (e.g. 'Happy Birthday Carl')"
-```
+  noun: "order"                # Bob's Plumbing says "appointment"
+  notice:
+    muffins by the dozen: {hours: 24, variants: [
+      {words: [gluten free], hours: 96, name: "gluten-free muffins"}]}
 
-The same `extra_questions` block defines both what the state machine asks
-*and* what the language model extracts from free-form messages.
+bot:
+  persona_preset: "warm"
+  guardrails:
+    universal:
+      - rule: facts_only       # shared wording, from config/defaults.yaml
+```
 
 ## Running locally
 
@@ -161,129 +191,119 @@ python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+A `.env` file:
 
 ```
 ANTHROPIC_API_KEY=your-key
 VOYAGE_API_KEY=your-key
 SECRET_KEY=generate-with-secrets.token_hex(32)
-ADMIN_PASSWORD=choose-one
-ALLOW_UNSIGNED_REQUESTS=true    # dev only — lets curl tests skip Twilio signature checks
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=at-least-12-characters
+ALLOW_UNSIGNED_REQUESTS=true    # local only: lets curl tests skip Twilio signatures
 
-# Optional: email the operator for each Help request (they always reach /admin/support).
-# With Gmail, use an app password, not the account password.
-SUPPORT_ALERT_EMAIL=you@example.com
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+# Optional
+SMTP_HOST=smtp.gmail.com        # password-reset emails and support alerts
+SMTP_PORT=587                   # (Render's free tier blocks these ports)
 SMTP_USER=you@gmail.com
-SMTP_PASSWORD=your-app-password
+SMTP_PASSWORD=a-gmail-app-password
+SUPPORT_ALERT_EMAIL=you@example.com
+CF_WEB_ANALYTICS_TOKEN=...      # Cloudflare Web Analytics, demo pages only
 ```
 
-Then:
-
-```bash
-python3 app.py
-```
-
-The app self-heals on boot: it creates tables, registers any business missing
-from the registry, imports its knowledge base, and ingests the documents into
-a vector collection if any of that hasn't happened yet.
-
-Then visit `http://127.0.0.1:5001/demo` to pick a business, or go straight to
-one: `http://127.0.0.1:5001/chat/bobs_plumbing`.
-
-URLs worth knowing:
+Then `python3 app.py` and open `http://127.0.0.1:5001/demo` (port 5001, not
+5000: macOS uses 5000 for AirPlay).
 
 | path | what it is |
 |---|---|
-| `/chat/<slug>` | the chat page a customer sees, for any business |
-| `/chat/<slug>/text` | the same assistant as a text conversation on a drawn phone: the real SMS path with an invented 555 number, segment counts and an estimated cost per text (`sms.py`); nothing is sent |
 | `/demo` | the sandbox: pick a business and get your own copy |
-| `/demo/start` | mints that copy and signs you in as its owner |
-| `/admin` | the owner's portal |
-| `/admin/help` | an owner asks the assistant how to do something (`assistant.py`, answering from `admin/owner_guide.md`), or asks the operator for help (page and error reference attached) |
-| `/admin/support` | the operator's inbox of help requests |
-| `/webchat/<slug>` | the JSON endpoint the chat page posts to |
+| `/chat/<slug>` | the chat page a customer sees |
+| `/chat/<slug>/text` | the same assistant as texts on a drawn phone: the real SMS path, segment counts, nothing sent |
+| `/admin` | the owner's portal (and the operator's Businesses page) |
+| `/admin/guide` | the owner guide, the same text the owner assistant answers from |
+| `/admin/help` | ask the owner assistant, or a person |
 | `/sms` | the Twilio webhook |
-
-(`/demo/<slug>` still works and redirects to `/chat/<slug>` — it was the
-original address, back when "demo" meant the chat page rather than the
-sandbox.)
-
-### Tests and evals
+| `/version` | the deployed commit |
 
 ```bash
-python3 run_tests.py            # every offline test file, one progress bar (~20s, no API calls)
-python3 run_tests.py menu       # just the files whose name matches
+python3 run_tests.py            # every offline test file (~90s, no API calls)
+python3 run_tests.py menu       # only files whose names match
+python3 journey_eval.py         # whole conversations against the live model
+python3 seed_check.py           # where the local database differs from the seed
 ```
-
-The evals call the API and have their own progress bars: `rag_eval.py`,
-`journey_eval.py`, `qa_eval.py`, `conversation_eval.py`, `upload_eval.py`,
-`assistant_eval.py` (`--repeat=3` for three runs each), and `judge_test.py`.
-The bars need `pip install tqdm`; without it everything runs the same,
-just without a bar.
 
 ## Project structure
 
 ```
-app.py              Flask server, channel adapters, message orchestration
-rules.py            Keyword matching engine
-llm.py              Claude integration, prompt assembly, structured extraction
-rag.py              Document ingestion and semantic retrieval
-scheduler.py        Booking state machine
-db.py               All SQLite access
-config.py           YAML loading and placeholder substitution
-phone_utils.py      E.164 normalization
-admin/              Admin portal (Flask Blueprint)
-config/             Per-business YAML
-documents/          Per-business knowledge bases
-notes/              Design decisions, debugging lessons, roadmap
+app.py, conversation.py   routes and channels; process_message, the path every message takes
+llm.py                    prompts, the tool loop, reply checks
+scheduler.py              the booking state machine
+policy.py, menu.py        rule tools (notice, cancellation, business days) and menu prices
+rag.py                    ingestion and retrieval
+config.py, config_check.py, services.py, section_links.py
+                          loading config, checking it, and keeping links through renames
+preview.py, grounding.py, contradictions.py
+                          Preview answers and the checks behind it
+photo_import.py, web_import.py
+                          reading photos, PDFs and web pages (with SSRF guards)
+assistant.py              the owner assistant
+budget.py, ratelimit.py   the demo's spending caps and rate limits
+admin/                    the portal (routes, templates, owner_guide.md)
+config/, documents/       per-business YAML and knowledge bases
+notes/                    design decisions, debugging lessons, security, backlog
 ```
+
+A guided read: [`notes/codebase_walkthrough.md`](notes/codebase_walkthrough.md).
 
 ## Engineering notes
 
-Some decisions worth explaining:
+A few decisions, each from something that went wrong:
 
-**Configuration over code.** Business-specific content never appears in
-Python. This is what makes onboarding a client a 20-minute task instead of a
-development cycle.
+**Grounded confirmation.** An early version, told about the booking process
+so it could answer questions about it, started *performing* bookings,
+confirming orders that were never saved. Confirmations now come only from a
+successful database write.
 
-**Grounded confirmation.** An early version of the bot, having been told about
-the booking process so it could answer questions about it, started *performing*
-bookings — collecting dates and confirming orders that were never saved. The
-fix was two-part: an explicit capability boundary in the prompt ("you have no
-access to the booking system"), and a structural rule that confirmations are
-derived from successful database writes rather than from conversation.
+**Retrieval that admits ignorance, and remembers.** A distance threshold
+lets the bot say "I don't have details on that" rather than assemble an
+answer from weak matches. And each turn now also sees the excerpts behind
+the customer's last two questions: without them, the model took back its
+own true answers a turn later ("Correction: disregard the prices I listed
+earlier"), in 5 conversations out of 20.
 
-**Retrieval that admits ignorance.** Vector search always returns *something*.
-A distance threshold discards weak matches so the bot can say "I don't have
-details on that" instead of assembling an answer from irrelevant chunks.
+**Measure, then decide who's wrong.** Belmont's balayage deposit was
+hedged 9 times in 10. The bot was right to hedge: the knowledge base never
+said balayage was a colour service. The fix was one sentence in the
+document, not the prompt.
 
-**Hosted embeddings.** Local ONNX inference worked fine in development and was
-unusable on a small container. Moving embeddings to an API removed ~200 MB of
-runtime memory and a large model download on every cold start — an example of
-the deployment target dictating the design.
+**The proxy's header, read from the right.** Rate limits keyed on the first
+`X-Forwarded-For` entry, which the visitor writes. Measured on Render, the
+real address is third from the right; read from there, a made-up header no
+longer resets a limit.
 
-**Fork-safe initialization.** The vector database client is created lazily,
-per process. Creating it at import time meant gunicorn's forked workers
-inherited locks from a thread that didn't exist in them, deadlocking every
-request that touched retrieval. Invisible locally; fatal in production.
+**One visitor can't spend everyone's day.** The demo has a daily model
+budget. A test with one address starting demo after demo spent all of it in
+8 demos; each visitor now has a budget of their own.
 
-Further detail in [`notes/debugging_lessons.md`](notes/debugging_lessons.md).
+**Fork-safe initialization.** The vector database client is created lazily
+per process: created at import time, gunicorn's forked workers inherited
+locks from a thread that didn't exist in them and deadlocked. Invisible
+locally; fatal in production.
+
+More in [`notes/debugging_lessons.md`](notes/debugging_lessons.md) and
+[`notes/security.md`](notes/security.md).
 
 ## Roadmap
 
-- Calendar integration (Google Calendar first) — bookings the owner can see
-  on their phone
+- A paid Render instance: a disk that survives deploys (owner changes are
+  wiped today) and outbound email (reset links, support alerts)
+- Real Twilio texting, with returning customers recognised by number
 - Customer self-service cancellation and rescheduling
-- Voice channel via Twilio — the architecture already anticipates it
-- Notice-period enforcement on bookings
-- Marketing site with embedded demo and paid signup
+- A voice channel: the channel adapters already anticipate it
 
-Reasoning and decision triggers for each are in
+Details and reasoning: [`notes/backlog.md`](notes/backlog.md) and
 [`notes/future_directions.md`](notes/future_directions.md).
 
 ## Status
 
-Working end-to-end and deployed. Built as a portfolio project with an eye
-toward real commercial use.
+Working end to end and deployed. A portfolio project built with an eye to
+real commercial use.
