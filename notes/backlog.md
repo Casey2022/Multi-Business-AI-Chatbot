@@ -83,12 +83,12 @@ The first pass is `notes/security.md` (8 fixes, `security_test.py`). Next:
   attacks measured, the one that got through fixed). Worth a round 3 when
   real SMS goes live (texts arrive with no page around them) and if the
   owner assistant gains tools beyond drafts.
-- **Abuse and cost:** push on the existing rate limits (chat, demo creation,
-  uploads, support). Demo spend is capped (`budget.py`: $0.50 a demo, $5
-  all demos, a day), each call at its own model's prices
-  (`llm.cost_of`, 2026-10-23). The upload routes' budget checks aren't exercised by
-  `budget_test.py`'s sweep (they need a file or a fetched page first);
-  `llm._create` still refuses their calls past the budget.
+- **Abuse and cost:** pushed 2026-10-24 (`notes/security.md`, "one visitor,
+  many demos"): chat, demo starts and the upload routes' budget checks
+  hold; one visitor rotating demos could spend everyone's $5 day, so each
+  visitor now has $1 a day (`VISITOR_DAILY_BUDGET`). Left: preview, the
+  contradiction check and uploads are still limited per demo, not per
+  visitor; the dollar caps bound them.
 - **Secrets:** a real secrets story (`notes/security.md`, "Still to do"); the
   SMTP app password lives only in Render's environment.
 - **Dependencies:** `pip-audit` before each deploy that changes requirements

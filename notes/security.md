@@ -333,6 +333,29 @@ The nav's **Password** page (`/admin/password`, `db.change_password`):
 check, no rate limit, other sessions kept, this session lost, demo guard
 off, the same password allowed.
 
+## Abuse and cost: one visitor, many demos (2026-10-24)
+
+Pushed on the limits from one address, offline (each fake model call
+$0.20, the real rate limits):
+
+| what | result |
+|---|---|
+| 40 chat messages, a new session each | 30 through, 10 limited (30/min per address holds) |
+| 6 demo starts in a row | 3 a minute holds |
+| photo, web page, re-suggest, over a demo's budget | no model call, the note shown (never exercised before: the route sweep's form has no file or fetchable page) |
+| one address starting demo after demo | **spent the whole $5 all-demos day with 8 demos**; every other visitor then got "The demos have used their share" |
+
+Preview, the contradiction check and uploads are limited per demo, and a
+new demo is a new allowance, so the dollar caps were the only bound, and
+none was per visitor. Now a third budget: `VISITOR_DAILY_BUDGET` ($1 a
+day), keyed by the visitor's address as the rate limits read it
+(`ratelimit.client_address`, so a made-up X-Forwarded-For isn't a new
+visitor), across every demo it starts. A tester spends 5 to 10 cents, so a
+shared Wi-Fi has room. After: that visitor stops at about $1 with "You've
+used your share of the demo assistant for today", another visitor's demo
+answers, the all-demos day is untouched. `budget_test.py` (+11),
+mutation-tested 4 ways.
+
 ## Visitor counting (2026-10-24)
 
 Cloudflare Web Analytics (`analytics.py`): cookieless, a beacon script that

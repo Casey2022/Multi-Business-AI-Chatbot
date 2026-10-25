@@ -91,8 +91,14 @@ app_module.sms_turn = lambda business, phone, message: one_call_per_message(
     message, phone, business["id"], None, "sms")
 
 
+_ADDRESSES = iter(f"198.18.{n // 250}.{n % 250 + 1}" for n in range(10_000))
+
+
 def visitor(template="sunrise_bakery_and_cafe"):
+    """A new demo, from a visitor's own address: each its own visitor, as
+    real ones are (the per-visitor budget would otherwise pool them all)."""
     client = app.test_client()
+    client.environ_base["REMOTE_ADDR"] = next(_ADDRESSES)
     page = client.get("/demo").get_data(as_text=True)
     token = re.search(r'name="_csrf_token" value="([^"]+)"', page).group(1)
     client.post("/demo/start", data={"template": template, "_csrf_token": token})
@@ -297,17 +303,20 @@ def test_priced_by_model(demo):
     try:
         key = budget._key(demo["slug"])
         for model in (llm.MODEL, "claude-sonnet-5-5", "a-model-nobody-priced"):
-            with app.test_request_context(f"/chat/{demo['slug']}"):
+            with app.test_request_context(f"/chat/{demo['slug']}",
+                                          environ_base={"REMOTE_ADDR": "198.18.99.1"}):
                 app.preprocess_request()
                 before = spent(key)
                 llm._create(messages=[{"role": "user", "content": "x"}], max_tokens=5,
                             model=model)
                 charged = spent(key) - before
             want = llm.cost_of(model, FAKE_IN, FAKE_OUT)
-            check(f"{model}: charged ${want:.2f}", abs(charged - want) < 1e-6,
-                  (charged, want))
-            db.add_model_spend(key, budget._day(), -charged * 1e6)
-            db.add_model_spend(budget.ALL_DEMOS, budget._day(), -charged * 1e6)
+            visitor_key = budget._visitor_key("198.18.99.1")
+            check(f"{model}: charged ${want:.2f}, to the demo and to its visitor",
+                  abs(charged - want) < 1e-6 and abs(spent(visitor_key) - want) < 1e-6,
+                  (charged, spent(visitor_key), want))
+            for undo in (key, budget.ALL_DEMOS, visitor_key):
+                db.add_model_spend(undo, budget._day(), -charged * 1e6)
         check("Sonnet 5.5 costs 20 times Haiku 5.5's",
               abs(llm.cost_of("claude-sonnet-5-5", FAKE_IN, FAKE_OUT)
                   - 20 * llm.cost_of("claude-haiku-5-5", FAKE_IN, FAKE_OUT)) < 1e-9)
@@ -317,7 +326,133 @@ def test_priced_by_model(demo):
         budget._day = real_day
 
 
+def fresh_day(limits=False):
+    """Today's spend back to zero (the tests above leave all demos over);
+    with limits, the rate-limit counters too, so the tests after start
+    with their allowance."""
+    conn = db.get_connection()
+    conn.execute("DELETE FROM model_spend")
+    if limits:
+        conn.execute("DELETE FROM rate_limits")
+    conn.commit()
+    conn.close()
+
+
+def from_address(address, xff=None):
+    """A visitor's demo, as if from this address. With xff, the request
+    carries that X-Forwarded-For (Render's shape: what the visitor sent,
+    then the real address, then two proxies)."""
+    client = app.test_client()
+    client.environ_base["REMOTE_ADDR"] = address
+    if xff:
+        client.environ_base["HTTP_X_FORWARDED_FOR"] = xff
+    page = client.get("/demo").get_data(as_text=True)
+    token = re.search(r'name="_csrf_token" value="([^"]+)"', page).group(1)
+    r = client.post("/demo/start", data={"template": "sunrise_bakery_and_cafe",
+                                         "_csrf_token": token})
+    return client, token, r.headers["Location"].rsplit("/", 1)[-1]
+
+
+def test_one_visitor_many_demos():
+    """Measured 2026-10-24 (offline, $0.20 a call): one address starting
+    demo after demo spent the whole all-demos day with 8 demos, and every
+    other visitor got ALL_NOTE. Now each visitor has a day's budget of its
+    own, across every demo it starts."""
+    heading("one visitor starting demo after demo can't spend everyone's day")
+    import ratelimit
+    fresh_day()
+    saved = (ratelimit.DEMO_PER_MINUTE, ratelimit.DEMO_PER_HOUR)
+    ratelimit.DEMO_PER_MINUTE = ratelimit.DEMO_PER_HOUR = 1000
+    try:
+        replies = []
+        for n in range(12):
+            client, _, slug = from_address("198.51.100.7")
+            for i in range(2):
+                replies.append(chat(client, slug, f"hi {n} {i}").get_json()["reply"])
+        check("the visitor is stopped at their own day's budget, with their own note",
+              budget.VISITOR_NOTE in replies, replies[-3:])
+        check("…having spent about $1, not $5",
+              budget.VISITOR_DAILY <= spent(budget._visitor_key("198.51.100.7"))
+              <= budget.VISITOR_DAILY + CALL * 2
+              and spent(budget.ALL_DEMOS) < budget.DEMOS_DAILY,
+              (spent(budget._visitor_key("198.51.100.7")), spent(budget.ALL_DEMOS)))
+        other, _, slug = from_address("203.0.113.50")
+        check("another visitor's demo still answers",
+              chat(other, slug).get_json()["reply"] == "a fake reply")
+        # Render's X-Forwarded-For: whatever the visitor wrote comes first.
+        # A new made-up first entry each time is still the same visitor.
+        faked = [chat(*from_address("10.24.90.146",
+                                    xff=f"192.0.2.{n}, 198.51.100.7, 162.159.114.27, 10.24.90.146")[0::2]
+                      ).get_json()["reply"] for n in range(3)]
+        check("a made-up X-Forwarded-For doesn't make a new visitor",
+              all(r == budget.VISITOR_NOTE for r in faked), faked)
+        check("a real business is never counted against a visitor",
+              chat(app.test_client(), "bobs_plumbing").get_json()["reply"] == "a fake reply")
+    finally:
+        ratelimit.DEMO_PER_MINUTE, ratelimit.DEMO_PER_HOUR = saved
+        fresh_day(limits=True)
+
+
+def test_upload_doors():
+    """The sweep's form has no file and no fetchable page, so the upload
+    routes stopped before their budget check and it was never exercised
+    (backlog, 2026-10-23). With real inputs: under budget each reaches the
+    model; over it, none does, and each says why."""
+    heading("the upload routes check the budget, with real uploads")
+    import io
+    import ratelimit
+    import web_import
+    from PIL import Image
+    fresh_day()
+    saved = (ratelimit.UPLOAD_PER_MINUTE, ratelimit.UPLOAD_PER_HOUR,
+             ratelimit.DEMO_PER_MINUTE, ratelimit.DEMO_PER_HOUR, web_import.read_page)
+    ratelimit.UPLOAD_PER_MINUTE = ratelimit.UPLOAD_PER_HOUR = 1000
+    ratelimit.DEMO_PER_MINUTE = ratelimit.DEMO_PER_HOUR = 1000
+    web_import.read_page = lambda config, url: ("Blueberry muffins $3.50", "web page", [], url)
+    image = io.BytesIO()
+    Image.new("RGB", (40, 40), "white").save(image, "PNG")
+
+    def attempts(over):
+        out = {}
+        for n, route in enumerate(("photo", "web page", "re-suggest")):
+            client, token, demo = visitor()
+            fresh_day()                      # each route on its own day's budget
+            if over:
+                db.add_model_spend(budget._key(demo["slug"]), budget._day(), 10_000_000)
+            base = f"/admin/business/{demo['id']}/knowledge/upload"
+            before = len(SENT)
+            if route == "photo":
+                r = client.post(base, data={"_csrf_token": token,
+                                            "photo": (io.BytesIO(image.getvalue()), "menu.png")},
+                                content_type="multipart/form-data", follow_redirects=True)
+            elif route == "web page":
+                r = client.post(base + "/url", data={"_csrf_token": token,
+                                                     "url": "https://example.com/menu"},
+                                follow_redirects=True)
+            else:
+                db.save_upload_proposal(demo["id"], "Muffins $3", [], created_by="x",
+                                        source="photo", hidden=[])
+                r = client.post(base + "/resuggest", data={"_csrf_token": token,
+                                                           "transcription": "Muffins $3.25"},
+                                follow_redirects=True)
+            out[route] = (len(SENT) - before, budget.NOTE in r.get_data(as_text=True))
+        return out
+    try:
+        under, over = attempts(False), attempts(True)
+        for route in under:
+            check(f"{route}: under budget it reaches the model (the test has teeth)",
+                  under[route][0] > 0, under[route])
+            check(f"{route}: over budget, no model call, and the note",
+                  over[route] == (0, True), over[route])
+    finally:
+        (ratelimit.UPLOAD_PER_MINUTE, ratelimit.UPLOAD_PER_HOUR, ratelimit.DEMO_PER_MINUTE,
+         ratelimit.DEMO_PER_HOUR, web_import.read_page) = saved
+        fresh_day(limits=True)
+
+
 def main():
+    test_upload_doors()
+    test_one_visitor_many_demos()
     client, demo = test_counting_and_caps()
     test_crossing_message()
     test_the_call_itself(demo)

@@ -8,9 +8,15 @@
 # account limit, and when that was reached on 2026-10-20 the bot stopped for
 # everyone, real businesses included.
 #
-# Two budgets, demos only (a real business is never capped):
+# Three budgets, demos only (a real business is never capped):
 #   each demo   DEMO_DAILY_BUDGET   $0.50 a day, keyed by its slug (random,
 #               never reused; ids are, after a sweep)
+#   each visitor VISITOR_DAILY_BUDGET $1 a day, keyed by the visitor's
+#               address (ratelimit.client_address), across every demo they
+#               start. Without it, one visitor starting demo after demo spent
+#               the whole all-demos day, and everyone else got ALL_NOTE (2026-
+#               10-24, offline: 8 demos). A tester spends 5-10 cents, so $1
+#               leaves room for a classroom on one Wi-Fi.
 #   all demos   DEMOS_DAILY_BUDGET  $5 a day, so a crowd can't spend the
 #               account down to where real businesses lose their bot
 #
@@ -46,11 +52,15 @@ log = logging.getLogger("budget")
 
 DEMO_DAILY = float(os.environ.get("DEMO_DAILY_BUDGET", "0.50"))
 DEMOS_DAILY = float(os.environ.get("DEMOS_DAILY_BUDGET", "5.00"))
+VISITOR_DAILY = float(os.environ.get("VISITOR_DAILY_BUDGET", "1.00"))
 
 ALL_DEMOS = "all-demos"
 
 NOTE = ("This demo has used its share of the assistant for today. Start a "
         "fresh demo tomorrow, or send us feedback: we read every message.")
+VISITOR_NOTE = ("You've used your share of the demo assistant for today. "
+                "Please come back tomorrow, or send us feedback: we read every "
+                "message.")
 ALL_NOTE = ("The demos have used their share of the assistant for today. "
             "Please come back tomorrow, or send us feedback: we read every "
             "message.")
@@ -68,10 +78,22 @@ def _key(slug):
     return f"demo:{slug}"
 
 
+def _visitor_key(address):
+    return f"visitor:{address}"
+
+
+def _address():
+    """The visitor's address, as the rate limits read it (not the first
+    X-Forwarded-For entry, which the visitor writes)."""
+    import ratelimit
+    return ratelimit.client_address(request.headers.get("X-Forwarded-For", ""),
+                                    request.remote_addr)
+
+
 def scope_request():
     """Before each request: which demo, if any, this request spends for, and
     the note to answer with if that demo may not use the model today."""
-    g.budget_demo = g.budget_note = None
+    g.budget_demo = g.budget_note = g.budget_visitor = None
     if request.endpoint in (None, "static"):
         return
     from db import get_business_by_id, get_business_by_slug
@@ -91,21 +113,26 @@ def scope_request():
         return
     if business and business.get("is_demo"):
         g.budget_demo = business["slug"]
-        g.budget_note = _over(business["slug"])
+        g.budget_visitor = _address()
+        g.budget_note = _over(business["slug"], g.budget_visitor)
 
 
 def _demo():
     return g.get("budget_demo") if has_request_context() else None
 
 
-def _over(demo):
-    """The note if this demo, or all demos, have spent today's budget."""
+def _over(demo, visitor=None):
+    """The note if this demo, this visitor, or all demos have spent today's
+    budget."""
     from db import get_model_spend
     day = _day()
     try:
         if get_model_spend(ALL_DEMOS, day) >= DEMOS_DAILY * 1e6:
             log.info("All demos have spent their $%g for %s", DEMOS_DAILY, day)
             return ALL_NOTE
+        if visitor and get_model_spend(_visitor_key(visitor), day) >= VISITOR_DAILY * 1e6:
+            log.info("A visitor has spent their $%g for %s", VISITOR_DAILY, day)
+            return VISITOR_NOTE
         if get_model_spend(_key(demo), day) >= DEMO_DAILY * 1e6:
             log.info("Demo %s has spent its $%g for %s", demo, DEMO_DAILY, day)
             return NOTE
@@ -128,7 +155,8 @@ def check():
 
 
 def record(dollars):
-    """Count one model call's cost against this request's demo and all demos."""
+    """Count one model call's cost against this request's demo, its visitor,
+    and all demos."""
     demo = _demo()
     if not demo or dollars <= 0:
         return
@@ -137,5 +165,8 @@ def record(dollars):
     try:
         add_model_spend(_key(demo), day, dollars * 1e6)
         add_model_spend(ALL_DEMOS, day, dollars * 1e6)
+        visitor = g.get("budget_visitor")
+        if visitor:
+            add_model_spend(_visitor_key(visitor), day, dollars * 1e6)
     except Exception as e:
         log.warning("Couldn't record $%.5f for demo %s (%s)", dollars, demo, e)
