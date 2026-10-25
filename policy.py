@@ -333,7 +333,7 @@ def _with_variant(entry, details):
     for variant in entry.get("variants") or []:
         if not isinstance(variant, dict):
             continue
-        named = any(_phrase_in(w, details or "") for w in variant.get("words") or [])
+        named = any(_asked_for(w, details or "") for w in variant.get("words") or [])
         if named and float(variant.get("hours") or 0) > float(best.get("hours") or 0):
             best = dict(entry, hours=variant["hours"],
                         variant=variant.get("name") or variant["words"][0])
@@ -385,6 +385,48 @@ def _phrase_in(phrase, text):
     want, have = menu._words(phrase), menu._words(text)
     return bool(want) and any(have[i:i + len(want)] == want
                               for i in range(len(have) - len(want) + 1))
+
+
+# A variant's words, said the other way round (2026-10-24): "a dozen
+# muffins, not gluten free" named the gluten-free variant, and the booking
+# flow refused Thursday with "We need 4 days (96 hours) of notice for
+# gluten-free muffins" (journey, 0/3). A mention is negated when a negator
+# comes before it in the same part of the sentence with only these between
+# them ("don't need to be gluten free", "no need for gluten free"), or a
+# "not needed" right after it. Parts split at punctuation and "but", so
+# "not themed, but gluten free" is gluten free; and "can't have gluten so
+# gluten free muffins" isn't negated ("gluten so" isn't in between-words).
+_NEGATORS = {"not", "no", "nothing", "without", "dont", "doesnt", "isnt", "arent",
+             "never", "non"}
+_BETWEEN = {"need", "needed", "to", "be", "have", "ha", "for", "any", "a", "the",
+            "it", "them", "they", "really", "necessarily", "want", "do", "doe",
+            "made", "make", "get", "anything", "something"}
+_NOT_NEEDED = {"needed", "necessary", "required", "need"}
+
+
+def _asked_for(phrase, text):
+    """`phrase` appears in `text` (as _phrase_in reads it) at least once
+    without being negated."""
+    import menu
+    want = menu._words(phrase)
+    if not want:
+        return False
+    for part in re.split(r"[.,;:!?\n]|\bbut\b", text or "", flags=re.I):
+        have = menu._words(part)
+        for i in range(len(have) - len(want) + 1):
+            if have[i:i + len(want)] != want:
+                continue
+            j = i - 1
+            while j >= 0 and have[j] in _BETWEEN:
+                j -= 1
+            if j >= 0 and have[j] in _NEGATORS:
+                continue
+            after = have[i + len(want):i + len(want) + 3]
+            if any(w in ("not", "isnt", "arent") for w in after[:2]) and \
+                    any(w in _NOT_NEEDED for w in after):
+                continue
+            return True
+    return False
 
 
 def notice_from_table(arguments, texts, config):

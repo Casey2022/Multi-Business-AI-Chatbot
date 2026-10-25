@@ -115,6 +115,26 @@
       <p class="hint">Applies when the order says “{{ v.words }}”. Clear it to drop it.</p>
       {% endfor %}
 
+      <fieldset class="new-variant">
+        <legend>Add a variant</legend>
+        <p class="hint">A kind of {{ r.name }} that needs longer, like gluten-free or themed.
+          It applies when an order uses one of its words (and not when it says “not …”).</p>
+        <div class="inline-fields rule-line">
+          <label for="{{ p }}_new_name">Called</label>
+          <input type="text" id="{{ p }}_new_name" name="{{ p }}_new_name" maxlength="60"
+                 placeholder="vegan {{ r.name }}" value="{{ posted.get(p ~ '_new_name', '') if posted else '' }}">
+        </div>
+        <div class="inline-fields rule-line">
+          <label for="{{ p }}_new_words">When an order says</label>
+          <input type="text" id="{{ p }}_new_words" name="{{ p }}_new_words" maxlength="200"
+                 placeholder="vegan, dairy free" value="{{ posted.get(p ~ '_new_words', '') if posted else '' }}">
+        </div>
+        <div class="inline-fields rule-line">
+          <label for="{{ p }}_new">Needs at least</label>
+          {{ amount(p ~ '_new', '', 'days', r.name ~ ': new variant notice') }}
+        </div>
+      </fieldset>
+
       <div class="inline-fields rule-line">
         <label for="{{ p }}_section">Shown in the knowledge base under</label>
         {% set chosen = posted.get(p ~ '_section', r.section) if posted else r.section %}

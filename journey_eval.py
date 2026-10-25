@@ -1140,6 +1140,21 @@ JOURNEYS = [
     # Variants (notes/booking_notice.md, version 2): the order's own words
     # can need longer than the service. Before, the table had only the
     # service's hours, so the booking flow took these 3 in 3 (2026-10-22).
+    # A negation (2026-10-24): "not gluten free" named the gluten-free
+    # variant, so a plain dozen needing 24 hours got the 96-hour refusal.
+    {
+        "name": "notice: muffins, NOT gluten-free, for Thursday (Sunrise)",
+        "slug": "sunrise_bakery_and_cafe",
+        "clock": (2026, 9, 22, 10, 0),                                   # Tuesday
+        "why": "Plain muffins need 24 hours, met; 'not gluten free' isn't the "
+               "gluten-free variant's 96.",
+        "turns": [
+            {"say": "I'd like to order a dozen blueberry muffins for pickup Thursday at 10am, "
+                    "not gluten free",
+             "state": "collecting", "must": [NAME_ASK],
+             "must_not": [r"96 hours|4 days|gluten-free muffins need"]},
+        ],
+    },
     {
         "name": "notice: gluten-free muffins for Thursday (Sunrise)",
         "slug": "sunrise_bakery_and_cafe",

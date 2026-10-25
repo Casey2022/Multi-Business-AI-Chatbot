@@ -14,10 +14,11 @@ here, the way policy_form.py edits cancellation rules:
   published one. Publish rebuilds the index with it, because the
   generated lines are part of each section's chunk.
 - Owners edit how much notice each service needs, an order-by cutoff, the
-  section that shows the line, and how much each variant needs. Which
-  words name a variant ("gluten free") and which words name the service
-  in a question stay with the operator: they decide what the code matches,
-  and they're copied through untouched.
+  section that shows the line, and how much each variant needs, and add a
+  variant of their own (its name, the words in an order that mean it, its
+  notice; 2026-10-24). The words of the variants already there, and which
+  words name the service in a question, stay with the operator: they're
+  copied through untouched.
 """
 
 import copy
@@ -211,8 +212,6 @@ def parse(form, config):
         if order_by and not re.fullmatch(r"([01]?\d|2[0-3]):[0-5]\d", order_by):
             errors.append(f"{label}: \"{order_by}\" isn't a time")
             order_by = ""
-        if not hours and not order_by:
-            continue                                   # no notice for this one
         entry = {k: v for k, v in old.items()
                  if k not in ("hours", "order_by", "order_by_days", "section", "variants")}
         entry["hours"] = hours or 0
@@ -240,10 +239,58 @@ def parse(form, config):
                               f"notice, so it would never apply. Clear it instead")
                 continue
             variants.append(dict(v, hours=v_hours))
+        added = _new_variant(form, p, row["name"], entry["hours"], variants, errors)
+        if added:
+            variants.append(added)
+        if not hours and not order_by and not variants:
+            continue                                   # no notice for this one
         if variants:
             entry["variants"] = variants
         new[row["name"]] = entry
     return new, errors
+
+
+# A variant the owner adds (2026-10-24; before, the page could only change
+# the ones the YAML had). The words are theirs too, then: what an order
+# says to mean it, matched as whole words, a negation not counting
+# (policy._asked_for: "not gluten free" isn't gluten free).
+_WORDS_OK = re.compile(r"[a-z0-9][a-z0-9 '\-]{0,39}")
+MAX_WORDS = 5
+
+
+def _new_variant(form, p, service, service_hours, existing, errors):
+    """The variant the "Add a variant" fields describe, or None (left blank,
+    or a problem, said in `errors`)."""
+    raw_words = (form.get(f"{p}_new_words") or "").strip()
+    name = " ".join((form.get(f"{p}_new_name") or "").split())[:60]
+    amount = (form.get(f"{p}_new_amount") or "").strip()
+    if not (raw_words or name or amount):
+        return None
+    label = _cap(name or f"New variant of {service}")
+    words = [" ".join(w.lower().split()) for w in re.split(r"[,;\n]", raw_words) if w.strip()]
+    if not words:
+        errors.append(f"{label}: say which words in an order mean it (like \"gluten free\")")
+        return None
+    bad = [w for w in words if not _WORDS_OK.fullmatch(w)]
+    if bad or len(words) > MAX_WORDS:
+        errors.append(f"{label}: up to {MAX_WORDS} words or short phrases, letters and "
+                      f"numbers only" + (f" (not \"{bad[0]}\")" if bad else ""))
+        return None
+    taken = {w for v in existing for w in (v.get("words") or [])}
+    if taken & set(words):
+        errors.append(f"{label}: \"{sorted(taken & set(words))[0]}\" already names a "
+                      f"variant of {service}")
+        return None
+    hours = _hours(form, f"{p}_new", label, errors)
+    if hours is None:
+        if amount == "":
+            errors.append(f"{label}: say how much notice it needs")
+        return None
+    if hours < service_hours:
+        errors.append(f"{label}: that's shorter than {service}'s own notice, so it would "
+                      f"never apply")
+        return None
+    return {"words": words, "hours": hours, "name": name or f"{words[0]} {service}"}
 
 
 # Notice stated in a section's own words: a second copy of a number the

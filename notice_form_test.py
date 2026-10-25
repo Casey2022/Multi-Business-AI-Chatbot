@@ -183,6 +183,63 @@ def main():
     check("an empty table published is no notice at all (even though the YAML has some)",
           policy.notice_for("wedding cakes", load_config(path, 7)) is None)
 
+    # Adding a variant (2026-10-24): before, the page edited only the
+    # variants the YAML had; the form had no fields for a new one.
+    heading("an owner can add a variant")
+    form = form_from(nf.rows(sunrise))
+    form.update({"custom_birthday_cakes_new_name": "vegan cakes",
+                 "custom_birthday_cakes_new_words": "Vegan, dairy  free",
+                 "custom_birthday_cakes_new_amount": "5",
+                 "custom_birthday_cakes_new_unit": "days"})
+    new, errors = nf.parse(form, sunrise)
+    after = {"booking": {"notice": new}}
+    added = (new.get("custom birthday cakes", {}).get("variants") or [{}])[-1]
+    check("it's in the table: its name, its words (tidied), 5 days",
+          not errors and added == {"words": ["vegan", "dairy free"], "hours": 120,
+                                   "name": "vegan cakes"}, (errors, added))
+    check("the booking flow's lookup uses it",
+          policy.notice_for("custom birthday cakes", after, "a vegan birthday cake")["hours"] == 120
+          and policy.notice_for("custom birthday cakes", after, "dairy-free please")["hours"] == 120)
+    check("…and a negation doesn't count",
+          policy.notice_for("custom birthday cakes", after, "chocolate, not vegan")["hours"] == 72)
+    check("…and the line customers are told names it",
+          any("vegan cakes: at least 5 days" in line for line in nf.describe(after)),
+          nf.describe(after))
+    back, errors = nf.parse(form_from(nf.rows(after)), after)
+    check("once saved, it's a variant like the others: the unedited form keeps it",
+          not errors and back == new, errors)
+    form = form_from(nf.rows(sunrise))
+    form.update({"pastry_trays_for_events_amount": "",
+                 "pastry_trays_for_events_new_words": "themed",
+                 "pastry_trays_for_events_new_amount": "3",
+                 "pastry_trays_for_events_new_unit": "days"})
+    new, errors = nf.parse(form, sunrise)
+    trays = new.get("pastry trays for events") or {}
+    check("a service with no notice of its own can still have a variant, named for it",
+          not errors and trays.get("hours") == 0
+          and (trays.get("variants") or [{}])[0].get("name")
+          == "themed pastry trays for events", (errors, trays))
+    blank = form_from(nf.rows(sunrise))
+    blank.update({f"{r['slug']}_new_{k}": "" for r in nf.rows(sunrise) for k in ("name", "words", "amount")})
+    check("left blank, nothing is added: the table it showed, exactly",
+          nf.parse(blank, sunrise) == (nf.table(sunrise), []))
+    for name, changes, said in (
+            ("no words", {"custom_birthday_cakes_new_name": "vegan cakes",
+                          "custom_birthday_cakes_new_amount": "5"}, "which words"),
+            ("no notice", {"custom_birthday_cakes_new_words": "vegan"}, "how much notice"),
+            ("shorter than the service", {"custom_birthday_cakes_new_words": "vegan",
+                                          "custom_birthday_cakes_new_amount": "1",
+                                          "custom_birthday_cakes_new_unit": "days"}, "never apply"),
+            ("words already a variant's", {"muffins_by_the_dozen_new_words": "gluten free",
+                                           "muffins_by_the_dozen_new_amount": "5",
+                                           "muffins_by_the_dozen_new_unit": "days"}, "already names"),
+            ("not words", {"custom_birthday_cakes_new_words": "<script>",
+                           "custom_birthday_cakes_new_amount": "5"}, "letters and numbers"),
+            ("too many", {"custom_birthday_cakes_new_words": "a, b, c, d, e, f",
+                          "custom_birthday_cakes_new_amount": "5"}, "up to 5")):
+        errs = errors_for(**changes)
+        check(f"refused, in words: {name}", any(said in e for e in errs), errs)
+
     heading("the page")
     import app as app_module
     import vector_boot
@@ -200,6 +257,10 @@ def main():
     check("…with a card per service and what customers are told now",
           "Custom birthday cakes" in html and "3 days (72 hours)" in html
           and 'name="muffins_by_the_dozen_v0_amount"' in html, html[:300])
+    check("…with an \"Add a variant\" box on each card",
+          html.count("<legend>Add a variant</legend>") == len(nf.rows(load_config(
+              db.get_business_by_id(biz)["config_path"], biz)))
+          and 'name="custom_birthday_cakes_new_words"' in html)
     check("…and Settings links to it",
           f"/admin/business/{biz}/notice" in client.get(
               f"/admin/business/{biz}/settings").get_data(as_text=True))
@@ -221,7 +282,26 @@ def main():
     check("a bad value: the page again, the reason, nothing saved",
           r.status_code == 200 and "isn&#39;t a number" in r.get_data(as_text=True)
           and nf.draft(biz)["custom birthday cakes"]["hours"] == 96)
-    form["custom_birthday_cakes_amount"] = "3"
+    form.update({"custom_birthday_cakes_amount": "3", "custom_birthday_cakes_new_name": "vegan cakes",
+                 "custom_birthday_cakes_new_words": "vegan", "custom_birthday_cakes_new_amount": ""})
+    r = client.post(f"/admin/business/{biz}/notice", data=form)
+    body = r.get_data(as_text=True)
+    check("a new variant with no notice: the page again, the reason, what was typed kept",
+          r.status_code == 200 and "how much notice" in body and 'value="vegan cakes"' in body)
+    form.update({"custom_birthday_cakes_new_amount": "5", "custom_birthday_cakes_new_unit": "days"})
+    client.post(f"/admin/business/{biz}/notice", data=form)
+    check("with its notice: saved in the draft",
+          ((nf.draft(biz) or {}).get("custom birthday cakes", {}).get("variants") or [{}])[-1]
+          .get("name") == "vegan cakes")
+    html = client.get(f"/admin/business/{biz}/notice").get_data(as_text=True)
+    check("…and shown as a variant, with its words, the add box empty again",
+          "Vegan cakes: at least" in html and "Applies when the order says “vegan”" in html
+          and re.search(r'name="custom_birthday_cakes_new_words"[^>]*value=""', html))
+    for k in ("custom_birthday_cakes_new_name", "custom_birthday_cakes_new_words",
+              "custom_birthday_cakes_new_amount", "custom_birthday_cakes_new_unit"):
+        form.pop(k, None)
+    form = form_from(nf.rows(load_config(db.get_business_by_id(biz)["config_path"], biz)))
+    form["_csrf_token"] = token
     client.post(f"/admin/business/{biz}/notice", data=form)
     check("saving what's already live clears the draft", nf.draft(biz) is None)
     del form["_csrf_token"]

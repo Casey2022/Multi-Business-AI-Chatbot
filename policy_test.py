@@ -297,6 +297,27 @@ def main():
           and policy.notice_for("muffins by the dozen", variants)["hours"] == 24)
     check("notice_for: a variant shorter than the service never lowers it",
           policy.notice_for("wedding cakes", variants, "gluten free")["hours"] == 336)
+    # A negation isn't the variant (2026-10-24: "not gluten free" got the
+    # 96-hour refusal in the booking flow, journey 0/3; after, 3/3).
+    for said, hours in (("a dozen muffins, not gluten free", 24),
+                        ("they don't need to be gluten free", 24),
+                        ("no need for gluten free", 24),
+                        ("regular muffins, nothing gluten-free", 24),
+                        ("doesn't have to be gluten free", 24),
+                        ("gluten free isn't needed", 24),
+                        ("gluten-free is not necessary", 24),
+                        ("themed cupcakes but nothing gluten free", 24),
+                        ("not themed, but gluten free", 96),
+                        ("gluten free, not themed", 96),
+                        ("I can't have gluten, so gluten free muffins", 96),
+                        ("I cant have gluten so gluten free muffins", 96),
+                        ("no nuts, gluten free please", 96),
+                        ("no nuts and gluten free please", 96),     # "no" is about nuts
+                        ("not too sweet and gluten free", 96),
+                        ("no, gluten free please", 96)):            # "no" answers something else
+        check(f"notice_for: {said!r} -> {hours} hours",
+              policy.notice_for("muffins by the dozen", variants, said)["hours"] == hours,
+              policy.notice_for("muffins by the dozen", variants, said))
     filled = lambda what, hours, said="", cfg=sun: policy.notice_from_table(
         {"what": what, "notice_hours": hours, "order_by": None}, [said], cfg)
     check("check_notice: a missing number comes from the table",
