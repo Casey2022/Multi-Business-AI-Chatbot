@@ -30,9 +30,11 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
 
 Receptionist on Claude Haiku 5.5 (a tenth of Haiku 4.5's price), judge on
 Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
---all 154/156, owner assistant 26/29 x3, judge_test 34/34 twice. Left:
-- Owner assistant offers support after refusing "publish it yourself and
-  make it 24/7", 1-2 runs in 3 (harmless; the eval calls it unnecessary).
+--all 154/156, owner assistant 26/29 x3, judge_test 34/34 twice. Both
+leftovers closed 2026-10-25: the Crosstown tray after closing was a real
+bug (an explicit "11pm" parsed as 11:00; `llm.stated_time`), and the owner
+assistant's support offer after "publish it yourself, make it 24/7" didn't
+recur (5/5 clean, assistant_eval).
 
 ## Answer quality
 
