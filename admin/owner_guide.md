@@ -15,7 +15,7 @@ Every business page has the same row of tabs:
 - **Calendar**: this week's bookings, hour by hour.
 - **Knowledge base**: everything the assistant knows about your business. It answers customer questions from here.
 - **Menu**: your items and prices. Only businesses that keep prices on a menu have this tab. No Menu tab? You can switch it on yourself: in Settings, set **Prices on a menu?** to yes and press **Save settings**.
-- **Settings**: business details, how the assistant sounds, services, booking questions.
+- **Settings**: business details, opening hours, how the assistant sounds, services, booking questions, and links to your cancellation rules and booking notice.
 
 At the top of every page, **Chat as a customer** opens your chat in a new
 tab, so you can ask the assistant something and hear exactly what a
@@ -81,6 +81,14 @@ shows what's coming up. **Remove** unblocks one. If appointments are
 already booked inside a block, you're told which; they aren't cancelled,
 so move or cancel them yourself if you need to.
 
+### Holidays
+
+Under **Holidays we close**, tick the public holidays you close for and
+press **Save holidays**. The assistant treats them as closed every year:
+no bookings, and they don't count as business days when it works out a
+date ("three business days after the visit"). It assumes nothing about
+the ones you leave unticked.
+
 ## Knowledge base
 
 The assistant answers customer questions only from these sections.
@@ -99,6 +107,15 @@ What makes the assistant answer well:
 - Put the words customers actually use in the title.
 - State prices, timeframes and policies plainly and specifically.
 - Say what you don't offer, and put that in the title too ("Septic tanks (not offered)").
+
+### Check for contradictions
+
+**Check for contradictions** reads every section, and the facts kept in
+your settings (opening hours, menu prices, booking notice, cancellation
+rules), and lists any two places that say different things: a price, a
+time, a yes or no. Each is shown with both quotes and where they are, so
+you can decide which is right and fix the other. It checks the sections
+as they are now, saved but unpublished changes included.
 
 ### Preview answers
 
@@ -200,6 +217,27 @@ The assistant works out the timing and the amounts from these itself.
 - **Remove these rules** (also a draft) means the assistant stops quoting any charges for cancelling.
 - If your knowledge base also talks about cancelling, the page names those sections: once your rules are published, take the cancelling part out of them, so customers aren't told two different things.
 
+### Booking notice
+
+How far ahead each service must be booked. Press **Change booking notice**
+on Settings (or **Set up booking notice** if nothing needs notice yet). The
+assistant won't book a time inside the notice: it says why and offers the
+earliest time that works, and it answers "how much notice do you need?"
+from these numbers.
+
+- For each service: how many hours or days of notice it needs (leave it blank for none), and optionally a same-day order-by time on some days ("party trays ordered by 4pm on Fridays and Saturdays").
+- Some kinds of an order need longer than the rest (gluten-free, themed). Each shows under its service with its own notice; clear it to drop it. To add one, fill in **Add a variant** on the service: what it's called, the words in an order that mean it ("vegan, dairy free"), and how much notice it needs. An order that says the opposite ("not vegan") doesn't count. A variant can't need less notice than its service: the longer one always applies.
+- Choose which knowledge-base section shows each notice, so the assistant reads it with that section.
+- Press **Save as draft**. Like cancellation rules, it's a draft until you press **Publish changes**, and the page shows what customers are told now and after.
+
+## Your password
+
+**Password**, at the top of every page (not on a demo, which has no password
+of its own), is where you change your password:
+type your current one, then the new one twice (at least 12 characters).
+You stay signed in where you changed it; anywhere else you were signed in,
+you'll need the new one.
+
 ## Things only your operator can change
 
 For any of these, ask the assistant on the Help page: it drafts a message
@@ -210,7 +248,7 @@ to support for you to check and send. Or write one yourself under
 - Your texting phone number.
 - Connecting or changing your Google Calendar, and the hours bookings can be made in.
 - Address checking for the service area.
-- Logins: adding a person, or changing a password.
+- Logins: adding a person.
 - Anything that looks broken.
 
 ## Help

@@ -1347,3 +1347,19 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   .tour-tip { transform: translateY(6px); transition: opacity .2s ease, transform .2s ease; }
   .tour-tip.is-shown { transform: none; }
 }
+
+/* The owner guide page (admin/guide.py): the guide's own Markdown, with a
+   contents list beside it on a wide screen and above it on a phone. */
+.guide-layout { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) {
+  .guide-layout { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+  .guide-contents { position: sticky; top: var(--s4); }
+}
+.guide-contents ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.guide { max-width: 72ch; line-height: 1.6; }
+.guide h2 { font-size: 1.5rem; margin: var(--s5, 28px) 0 var(--s2); scroll-margin-top: var(--s4); }
+.guide h2:first-child { margin-top: 0; }
+.guide h3 { font-size: 1.15rem; margin: var(--s4) 0 var(--s2); scroll-margin-top: var(--s4); }
+.guide ul { padding-left: 1.3em; }
+.guide li + li { margin-top: 6px; }
+.guide code { font-size: 0.9em; }

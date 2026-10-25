@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Owner guide{% endblock %}
+
+{% block content %}
+{% if business %}
+<div class="breadcrumb">{{ business.name }} › Owner guide</div>
+{% endif %}
+
+<div class="page-header">
+  <h1>Owner guide</h1>
+  <div class="subtitle">How to use the portal, page by page. The assistant on the
+    <a href="{{ url_for('admin.help_page') }}">Help</a> page answers from this same guide,
+    so you can also just ask it.</div>
+</div>
+
+<div class="guide-layout">
+  <nav class="card guide-contents" aria-label="Contents">
+    <div class="card-title">Contents</div>
+    <ol class="card-pad">
+      {% for id, title in contents %}<li><a href="#{{ id }}">{{ title }}</a></li>{% endfor %}
+    </ol>
+  </nav>
+  <article class="card card-pad guide">
+    {{ body }}
+  </article>
+</div>
+{% endblock %}

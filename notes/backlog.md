@@ -58,9 +58,6 @@ config_check_test.py holds every shipped YAML to none; 2026-10-23). Next:
 - **Persistence on Render** before a real business: the disk is wiped on
   each deploy, so owner overrides vanish.
 
-## Owner portal
-
-- A guide page owners can read.
 
 ## Uploads
 

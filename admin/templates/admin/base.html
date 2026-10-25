@@ -74,6 +74,9 @@
       {% endif %}
     {% endif %}
 
+    {% if viewer %}
+      <a class="nav-link" href="{{ url_for('admin.guide') }}">Guide</a>
+    {% endif %}
     {% if viewer and not viewer.email.endswith('@demo.invalid') %}
       <a class="nav-link" href="{{ url_for('admin.change_password') }}">Password</a>
     {% endif %}
