@@ -33,8 +33,6 @@ Claude Sonnet 5.5. Final, Sonnet 5.5 judging: journeys 54/55 x3, rag_eval
 --all 154/156, owner assistant 26/29 x3, judge_test 34/34 twice. Left:
 - Owner assistant offers support after refusing "publish it yourself and
   make it 24/7", 1-2 runs in 3 (harmless; the eval calls it unnecessary).
-- "Opening hours: a party tray after closing" (Crosstown), 2/3: one reply
-  in three doesn't say "closed" in a way the check reads; read it first.
 
 ## Answer quality
 

@@ -110,6 +110,33 @@ def main():
             usage=types.SimpleNamespace(input_tokens=0, output_tokens=0))
         check("an impossible date (Feb 31) gives None",
               llm.parse_datetime("feb 31", config) is None)
+
+        # The hour the customer wrote is kept (2026-10-25): "Thursday at
+        # 11pm" at Crosstown came back as 11:00 four times in ten, the
+        # model pulling it inside business hours, and the order was taken.
+        def answering(stamp):
+            return lambda **c: types.SimpleNamespace(
+                content=[types.SimpleNamespace(type="text", text=stamp)],
+                stop_reason="end_turn",
+                usage=types.SimpleNamespace(input_tokens=0, output_tokens=0))
+        llm.client.messages.create = answering("2026-09-24 11:00")
+        check("'Thursday at 11pm' read as 11:00: the date kept, the hour the customer's (23:00)",
+              llm.parse_datetime("Thursday at 11pm", config) == "2026-09-24 23:00")
+        check("…'11:30 p.m.' too", llm.parse_datetime("Thursday 11:30 p.m.", config)
+              == "2026-09-24 23:30")
+        llm.client.messages.create = answering("2026-09-24 19:30")
+        check("an ambiguous '7:30' stays the model's to place (19:30 for dinner)",
+              llm.parse_datetime("Thursday at 7:30", config) == "2026-09-24 19:30")
+        check("two times ('between 2pm and 4pm'): the model's answer stands",
+              llm.parse_datetime("Thursday between 2pm and 4pm", config) == "2026-09-24 19:30")
+        for text, want in (("11pm", (23, 0)), ("11:30 p.m.", (23, 30)), ("12am", (0, 0)),
+                           ("12pm", (12, 0)), ("noon", (12, 0)), ("9 AM", (9, 0)),
+                           ("15:30", (15, 30)), ("07:30", (7, 30)), ("at 7", None),
+                           ("7:30", None), ("12:30", None), ("Friday", None),
+                           ("between 2pm and 4pm", None), ("9/24 at 3pm", (15, 0)),
+                           ("for 20 people at 6pm", (18, 0))):
+            check(f"stated_time({text!r}) is {want}", llm.stated_time(text) == want,
+                  llm.stated_time(text))
         llm.client.messages.create = real_create
 
         heading("the system prompt agrees with parse_datetime")

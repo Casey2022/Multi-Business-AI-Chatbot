@@ -174,6 +174,13 @@ def main():
               "so our office would need to confirm what happens next.", gave, cfg)
     check("Ridgeline's 'our office would need to confirm' gets a way forward too",
           "Give us a call" in got, got)
+    got = way("I'm not able to confirm anything about parking, since our documents don't "
+              "cover it. Our address is 47 Park Ave, Rochester NY.", gave, cfg)
+    check("'I'm not able to confirm…' (Haiku 5.5's wording, 2026-10-25) gets a way forward",
+          got.endswith("Give us a call and the team can tell you."), got)
+    for first in ("I'm unable to say whether there's parking.",
+                  "Our documents don't mention parking near the shop."):
+        check(f"…and so does {first[:30]!r}", "Give us a call" in way(first, gave, cfg))
     for reply in ("I'm not sure about parking. Please call us.",
                   "I can't confirm that, so text 'order' and the team will check.",
                   "I don't have that listed; contact the office."):
