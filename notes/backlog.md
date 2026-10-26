@@ -123,4 +123,3 @@ Wi-Fi) and the 50-demo ceiling are fine as they are.
   customers ("Booking under Casey again?").
 - **Customer self-service cancellation:** blocked on how a web customer
   proves who they are.
-- **Optional dark mode:** colour tokens exist, no switch.

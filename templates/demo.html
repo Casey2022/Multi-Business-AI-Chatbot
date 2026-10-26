@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600;700&display=swap">
+  {% include "_theme_head.html" %}
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   {% if is_demo %}{% include "_analytics.html" %}{% endif %}
 </head>
@@ -25,6 +26,7 @@
       <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': '/chat/' ~ business.slug}) }}#support"{{ ui.tip(is_demo, 10, "Tell us what you think",
          "Something confusing, broken or impressive? This goes straight to the person who built Simon Says.") }}>Send feedback</a>
     {% endif %}
+    {% include "_theme_toggle.html" %}
   </span>
 </nav>
 

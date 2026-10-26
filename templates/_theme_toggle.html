@@ -1,0 +1,6 @@
+{# The switch between Night glass and Daylight. Hidden in the markup and
+   shown by static/theme.js, so without JavaScript there's no button that
+   does nothing. #}
+<button type="button" class="nav-link theme-toggle" data-theme-toggle hidden
+        aria-pressed="false" aria-label="Use the light theme">Light</button>
+<script src="{{ url_for('static', filename='theme.js') }}" defer></script>

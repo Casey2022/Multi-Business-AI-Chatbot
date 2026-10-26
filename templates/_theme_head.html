@@ -1,0 +1,7 @@
+{# The theme the visitor chose (static/theme.js), applied before the page
+   draws, so a Daylight visitor never sees a flash of Night glass. Night
+   glass is the default for everyone; without JavaScript, or with storage
+   blocked, that's what shows. #}
+<script nonce="{{ csp_nonce() }}">
+  try { if (localStorage.getItem("simon-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
+</script>

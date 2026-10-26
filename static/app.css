@@ -61,6 +61,43 @@
   --refused:      #F6AC9F;
   --refused-wash: rgba(244,161,147,.12);
 
+  /* The rest of the look, as tokens (2026-10-25, for the Daylight theme):
+     before, these were typed into the rules, and a second theme would have
+     missed them. */
+  --backdrop:
+    radial-gradient(circle at 12% 16%, #1A4280 0%, transparent 42%),
+    radial-gradient(circle at 88% 22%, #0C5670 0%, transparent 46%),
+    radial-gradient(circle at 55% 96%, #22388C 0%, transparent 44%),
+    radial-gradient(circle at 30% 62%, #12305E 0%, transparent 38%),
+    linear-gradient(145deg, #081020 0%, #0C1830 50%, #0A1A2A 100%);
+  --glow-brightest: #1A4280;                /* the brightest the backdrop gets (contrast is checked against it) */
+  --ink-strong:   #FFFFFF;                  /* text at its strongest: hover, the wordmark */
+  --on-fill:      #FFFFFF;                  /* text on a filled accent */
+  --placeholder:  rgba(255,255,255,.42);
+  --tint-soft:    rgba(255,255,255,.05);    /* lifts a control off the glass, softest to strongest */
+  --tint:         rgba(255,255,255,.08);
+  --tint-strong:  rgba(255,255,255,.13);
+  --rule-mid:     rgba(255,255,255,.18);
+  --rule-bold:    rgba(255,255,255,.38);
+  --bar:          rgba(0,0,0,.30);          /* the top bar */
+  --bar-soft:     rgba(0,0,0,.18);          /* the chat's message bar */
+  --panel:        rgba(12,22,40,.82);       /* sticky panels over a form */
+  --panel-dense:  rgba(10,19,34,.93);       /* floating panels over a page of text */
+  --shade-1:      rgba(0,0,0,.25);          /* shadows, lightest to darkest */
+  --shade-2:      rgba(0,0,0,.35);
+  --shade-3:      rgba(0,0,0,.5);
+  --brand-a:      #B4D6F6;                  /* the wordmark's gradient */
+  --brand-b:      #6FD3C0;
+  --pen-fill-hover:   #3579C2;
+  --pen-fill-2-hover: #1B7690;               /* white on #218AA6 was 4.0:1; now 5.2 (theme_contrast.py) */
+  --pen-wash-strong:  rgba(142,192,238,.24);
+  --pen-glow:     rgba(43,108,176,.35);
+  --booked-bright:#9FF0D6;
+  --pending-fill:       #F3C47E;            /* amber as a fill, carrying --on-light */
+  --pending-fill-hover: #F7D39C;
+  --pending-stripe:       rgba(243,196,126,.16);
+  --pending-stripe-faint: rgba(243,196,126,.04);
+
   --radius:    14px;
   --radius-sm: 10px;
   --shadow: 0 8px 32px rgba(0,0,0,.28);
@@ -85,6 +122,70 @@
           Helvetica, Arial, sans-serif;
 }
 
+/* Daylight (2026-10-25): the light theme, chosen with the switch in the
+   top bar (static/theme.js; Night glass stays the default for everyone).
+   The same four meanings, darker so they read on a pale ground; frosted
+   white glass over a pale sky. Only what differs is restated; every text
+   colour is measured against the card it sits on (theme_contrast.py). */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --paper:        #EEF3F9;
+  --surface:      rgba(255,255,255,.62);
+  --smoke:        rgba(255,255,255,.30);
+  --surface-sunk: rgba(15,35,65,.04);
+  --surface-solid:#FFFFFF;
+  --field:        rgba(255,255,255,.80);
+  --ink:          #0F1B2D;
+  --ink-soft:     #33435A;
+  --ink-faint:    #4F5E72;
+  --rule:         rgba(15,35,65,.12);
+  --rule-strong:  rgba(15,35,65,.24);
+
+  --pen:          #1D5FA3;
+  --pen-bright:   #174C85;
+  --pen-wash:     rgba(29,95,163,.10);
+
+  --booked:       #13694A;
+  --booked-wash:  rgba(19,105,74,.10);
+  --pending:      #875400;
+  --pending-wash: rgba(200,140,40,.14);
+  --refused:      #B02A20;
+  --refused-wash: rgba(176,42,32,.08);
+
+  --shadow: 0 8px 32px rgba(15,35,65,.10);
+
+  --backdrop:
+    radial-gradient(circle at 12% 16%, #D2E3F6 0%, transparent 42%),
+    radial-gradient(circle at 88% 22%, #CFEDEE 0%, transparent 46%),
+    radial-gradient(circle at 55% 96%, #DCE1F7 0%, transparent 44%),
+    radial-gradient(circle at 30% 62%, #E0EAF6 0%, transparent 38%),
+    linear-gradient(145deg, #F4F7FB 0%, #EEF3F9 50%, #F1F6F8 100%);
+  --glow-brightest: #D2E3F6;
+  --ink-strong:   #08111E;
+  --placeholder:  rgba(15,35,65,.45);
+  --tint-soft:    rgba(15,35,65,.04);
+  --tint:         rgba(15,35,65,.06);
+  --tint-strong:  rgba(15,35,65,.10);
+  --rule-mid:     rgba(15,35,65,.18);
+  --rule-bold:    rgba(15,35,65,.36);
+  --bar:          rgba(255,255,255,.65);
+  --bar-soft:     rgba(255,255,255,.55);
+  --panel:        rgba(255,255,255,.88);
+  --panel-dense:  rgba(255,255,255,.96);
+  --shade-1:      rgba(15,35,65,.10);
+  --shade-2:      rgba(15,35,65,.16);
+  --shade-3:      rgba(15,35,65,.22);
+  --brand-a:      #1D5FA3;
+  --brand-b:      #12827A;
+  --pen-fill-hover:   #235E9C;
+  --pen-wash-strong:  rgba(29,95,163,.16);
+  --pen-glow:     rgba(43,108,176,.22);
+  --booked-bright:#2FBF8F;
+  --pending-stripe:       rgba(200,140,40,.20);
+  --pending-stripe-faint: rgba(200,140,40,.06);
+}
+
 /* ---------------------------------------------------------------------- *
  * Base
  * ---------------------------------------------------------------------- */
@@ -99,12 +200,7 @@ body {
   min-height: 100vh;
   /* The night: four soft glows over a deep gradient, fixed so the glass
      panels have something to show through as the page scrolls. */
-  background:
-    radial-gradient(circle at 12% 16%, #1A4280 0%, transparent 42%),
-    radial-gradient(circle at 88% 22%, #0C5670 0%, transparent 46%),
-    radial-gradient(circle at 55% 96%, #22388C 0%, transparent 44%),
-    radial-gradient(circle at 30% 62%, #12305E 0%, transparent 38%),
-    linear-gradient(145deg, #081020 0%, #0C1830 50%, #0A1A2A 100%);
+  background: var(--backdrop);
   background-color: var(--paper);
   background-attachment: fixed;
   display: flex;
@@ -127,7 +223,7 @@ select option { background: var(--surface-solid); color: var(--ink); }
  * ---------------------------------------------------------------------- */
 
 .topnav {
-  background: rgba(0,0,0,.30);
+  background: var(--bar);
   backdrop-filter: blur(30px) saturate(1.2); -webkit-backdrop-filter: blur(30px) saturate(1.2);
   border-bottom: 1px solid var(--rule);
   color: var(--ink-soft);
@@ -146,21 +242,23 @@ select option { background: var(--surface-solid); color: var(--ink); }
   font-family: var(--display);
   font-weight: 500;
   font-size: 26px;
-  color: #fff;
+  color: var(--ink-strong);
   letter-spacing: -.01em;
 }
 /* The second word takes the accent, so renaming the product is one line of
    markup and the colour follows. */
 .wordmark em {
   font-style: italic;
-  background: linear-gradient(135deg, #B4D6F6 0%, #6FD3C0 100%);
+  background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: var(--pen-bright);
 }
 
 .nav-links { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .nav-link { font-size: var(--text-sm); padding: 6px var(--s3); border-radius: 999px; }
-.nav-link:hover { color: #fff; background: rgba(255,255,255,.09); }
+.nav-link:hover { color: var(--ink-strong); background: var(--tint); }
+/* The theme switch (static/theme.js) is a button that looks like a nav link. */
+.theme-toggle { font-family: inherit; color: inherit; border: 0; background: transparent; cursor: pointer; }
 
 /* ---------------------------------------------------------------------- *
  * Page shell
@@ -273,16 +371,16 @@ tbody tr:hover td { background: var(--surface-sunk); }
   /* A plain button (Discard, Preview answers) is frosted glass; the tiers
      below replace this. Without it, the browser's own grey showed through. */
   border: 1px solid var(--rule-strong);
-  background: rgba(255,255,255,.08);
+  background: var(--tint);
   color: var(--ink);
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
   white-space: nowrap;
 }
-.btn:hover { background: rgba(255,255,255,.13); color: #fff; }
-.btn-primary { border-color: transparent; background: linear-gradient(135deg, var(--pen-fill), var(--pen-fill-2)); color: #fff; }
-.btn-primary:hover { background: linear-gradient(135deg, #3579C2, #218AA6); color: #fff; }
+.btn:hover { background: var(--tint-strong); color: var(--ink-strong); }
+.btn-primary { border-color: transparent; background: linear-gradient(135deg, var(--pen-fill), var(--pen-fill-2)); color: var(--on-fill); }
+.btn-primary:hover { background: linear-gradient(135deg, var(--pen-fill-hover), var(--pen-fill-2-hover)); color: var(--on-fill); }
 /* Three tiers, not two, because there are three kinds of thing here.
  *
  *   btn-primary  the one action on this page          filled accent
@@ -296,17 +394,17 @@ tbody tr:hover td { background: var(--surface-sunk); }
  * take the accent in ink and border and only a wash of it in fill: clearly
  * a control, clearly not the primary. */
 .btn-nav {
-  background: rgba(255,255,255,.06);
+  background: var(--tint-soft);
   color: var(--ink-soft);
   border-color: var(--rule-strong);
 }
 .btn-nav:hover {
-  background: rgba(255,255,255,.12);
-  color: #fff;
-  border-color: rgba(255,255,255,.38);
+  background: var(--tint-strong);
+  color: var(--ink-strong);
+  border-color: var(--rule-bold);
 }
 
-.btn-quiet { background: rgba(255,255,255,.05); color: var(--ink); border-color: var(--rule-strong); }
+.btn-quiet { background: var(--tint-soft); color: var(--ink); border-color: var(--rule-strong); }
 .btn-quiet:hover { border-color: var(--ink-faint); color: var(--ink); }
 .btn-danger { background: transparent; color: var(--refused); border-color: var(--refused); }
 .btn-danger:hover { background: var(--refused-wash); color: var(--refused); }
@@ -314,7 +412,7 @@ tbody tr:hover td { background: var(--surface-sunk); }
 .btn:disabled { opacity: .5; cursor: default; }
 
 /* In the dark nav bar a primary button is the one bright thing. */
-.topnav .btn-primary { box-shadow: 0 0 24px rgba(43,108,176,.35); }
+.topnav .btn-primary { box-shadow: 0 0 24px var(--pen-glow); }
 
 /* ---------------------------------------------------------------------- *
  * State chips — stamped, not filled
@@ -394,12 +492,12 @@ input[type="datetime-local"], input[type="date"], select, textarea {
   color: var(--ink);
   width: 100%;
 }
-input::placeholder, textarea::placeholder { color: rgba(255,255,255,.42); }
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
 input[type="file"] { font-family: var(--body); font-size: var(--text-sm); color: var(--ink-soft); }
 input[type="file"]::file-selector-button {
   font: inherit; font-weight: 500; color: var(--ink); cursor: pointer;
   padding: 6px 14px; margin-right: var(--s3);
-  border: 1px solid var(--rule-strong); border-radius: 999px; background: rgba(255,255,255,.08);
+  border: 1px solid var(--rule-strong); border-radius: 999px; background: var(--tint);
 }
 textarea { line-height: 1.5; resize: vertical; }
 input:focus, select:focus, textarea:focus {
@@ -577,8 +675,8 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 /* The destination you're already on: same size and shape as its siblings so
    the row doesn't shift, but inert and clearly current. */
 .btn-here {
-  background: rgba(142,192,238,.24);
-  color: #fff;
+  background: var(--pen-wash-strong);
+  color: var(--ink-strong);
   border-color: var(--pen);
   cursor: default;
 }
@@ -647,7 +745,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   border-radius: 14px 14px 14px 4px;
 }
 .msg-from-bot .bubble {
-  background: var(--pen-fill); color: #fff;
+  background: var(--pen-fill); color: var(--on-fill);
   border-radius: 14px 14px 4px 14px;
 }
 .bubble time { display: block; font-size: 12px; opacity: .65; margin-top: 4px; text-align: right; }
@@ -690,15 +788,15 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .slot {
   display: block; border-radius: 4px; padding: 3px 6px; margin-bottom: 2px;
   font-size: 13px; line-height: 1.3; text-decoration: none;
-  background: var(--pen-fill); color: #fff; overflow: hidden;
+  background: var(--pen-fill); color: var(--on-fill); overflow: hidden;
 }
-.slot:hover { background: #3579C2; color: #fff; }
+.slot:hover { background: var(--pen-fill-hover); color: var(--on-fill); }
 .slot .at { opacity: .8; }
 .slot .what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slot .who { display: block; opacity: .85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Arrived here from a link that named one appointment — say which. */
-.slot.is-highlighted { background: var(--pending); color: var(--on-light); box-shadow: 0 0 0 2px var(--pending-wash); }
-.slot.is-highlighted:hover { background: var(--pending); color: var(--on-light); }
+.slot.is-highlighted { background: var(--pending-fill); color: var(--on-light); box-shadow: 0 0 0 2px var(--pending-wash); }
+.slot.is-highlighted:hover { background: var(--pending-fill); color: var(--on-light); }
 
 .footnote { font-size: var(--text-sm); color: var(--ink-faint); }
 
@@ -738,9 +836,9 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   font-size: 15px;
 }
 .banner { backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass); }
-.banner .btn-primary { background: var(--pending); border-color: var(--pending); color: var(--on-light); }
-.banner .btn-primary:hover { background: #F7D39C; color: var(--on-light); }
-.banner .btn:not(.btn-primary) { background: rgba(255,255,255,.08); color: var(--ink); border-color: var(--rule-strong); }
+.banner .btn-primary { background: var(--pending-fill); border-color: var(--pending-fill); color: var(--on-light); }
+.banner .btn-primary:hover { background: var(--pending-fill-hover); color: var(--on-light); }
+.banner .btn:not(.btn-primary) { background: var(--tint); color: var(--ink); border-color: var(--rule-strong); }
 /* Preview: the phrases in "After you publish" that carry a changed fact. */
 .fact-change {
   background: var(--pending-wash); color: inherit;
@@ -813,7 +911,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .section-conflict form { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .conflict-text {
   width: 100%; font: inherit; font-size: var(--text-sm); color: var(--ink);
-  background: rgba(0,0,0,.25); border: 1px solid var(--rule-strong);
+  background: var(--field); border: 1px solid var(--rule-strong);
   border-radius: var(--radius-sm); padding: var(--s2) var(--s3); resize: vertical;
 }
 
@@ -881,7 +979,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 .qwhen-note  { font-size: var(--text-sm); color: var(--ink-faint); margin-left: var(--s1); }
 .chip-check { display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px; border: 1px solid var(--rule-strong); border-radius: 999px;
-  font-size: var(--text-sm); cursor: pointer; background: rgba(255,255,255,.05); }
+  font-size: var(--text-sm); cursor: pointer; background: var(--tint-soft); }
 .chip-check:has(input:checked) { border-color: var(--pen); color: var(--pen);
   background: var(--pen-wash); }
 .chip-check input { margin: 0; }
@@ -909,11 +1007,11 @@ table[data-resizable] th { overflow-wrap: anywhere; }
   padding: var(--s3) var(--s4);
   /* Sticky over the form: glass dense enough that the fields scrolling
      under it don't show through as clutter. */
-  background: rgba(12,22,40,.82);
+  background: var(--panel);
   backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  box-shadow: 0 -8px 24px rgba(0,0,0,.25);
+  box-shadow: 0 -8px 24px var(--shade-1);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -959,7 +1057,7 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 
 .chatform {
   display: flex; gap: var(--s2); padding: var(--s3);
-  border-top: 1px solid var(--rule); background: rgba(0,0,0,.18);
+  border-top: 1px solid var(--rule); background: var(--bar-soft);
 }
 .chatform input { border-radius: 999px; padding-inline: var(--s4); }
 .chatform .btn { border-radius: 999px; }
@@ -967,10 +1065,10 @@ table[data-resizable] th { overflow-wrap: anywhere; }
 /* The bot is the one being spoken to here, so it takes the quiet side and
    the customer takes the accent — the reverse of the admin thread, where
    the owner is reading their own assistant's replies. */
-.chatcard .msg-from-customer .bubble { background: var(--pen-fill); color: #fff; border: 0;
+.chatcard .msg-from-customer .bubble { background: var(--pen-fill); color: var(--on-fill); border: 0;
   border-radius: 14px 14px 4px 14px; }
 .chatcard .msg-from-customer { justify-content: flex-end; }
-.chatcard .msg-from-bot .bubble { background: rgba(255,255,255,.08); color: var(--ink);
+.chatcard .msg-from-bot .bubble { background: var(--tint); color: var(--ink);
   border: 1px solid var(--rule); border-radius: 14px 14px 14px 4px; }
 .chatcard .msg-from-bot { justify-content: flex-start; }
 .bubble.typing { color: var(--ink-faint); font-style: italic; }
@@ -1059,7 +1157,7 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-family: var(--b
 .menu-order { white-space: nowrap; }
 .menu-table .menu-order input[type=text] { width: 3rem; min-width: 3rem; }
 .menu-order .btn { padding: 2px var(--s2); font-size: var(--text-md); line-height: 1.4;
-                   border: 1px solid var(--rule-strong); background: rgba(255,255,255,.05); }
+                   border: 1px solid var(--rule-strong); background: var(--tint-soft); }
 
 
 /* ---------------------------------------------------------------------- *
@@ -1068,7 +1166,7 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-family: var(--b
 
 .nav-count {
   display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
-  border-radius: 999px; background: var(--pending); color: var(--on-light);
+  border-radius: 999px; background: var(--pending-fill); color: var(--on-light);
   font-size: var(--text-xs); font-weight: 700; text-align: center; line-height: 18px;
 }
 .attached {
@@ -1133,14 +1231,14 @@ details.menu-item > summary .menu-reads { flex-basis: 100%; font-family: var(--b
   position: fixed; right: 20px; bottom: 20px; z-index: 40;
   display: inline-flex; align-items: center; gap: var(--s2);
   padding: 11px 18px; border-radius: 999px;
-  font-size: var(--text-sm); font-weight: 600; text-decoration: none; color: #fff;
+  font-size: var(--text-sm); font-weight: 600; text-decoration: none; color: var(--on-fill);
   background: linear-gradient(135deg, var(--pen-fill), var(--pen-fill-2));
-  border: 1px solid rgba(255,255,255,.18);
-  box-shadow: 0 8px 28px rgba(0,0,0,.35), 0 0 24px rgba(43,108,176,.35);
+  border: 1px solid var(--rule-mid);
+  box-shadow: 0 8px 28px var(--shade-2), 0 0 24px var(--pen-glow);
 }
-.assistant-fab:hover { color: #fff; }
-.assistant-fab-dot { width: 8px; height: 8px; border-radius: 50%; background: #9FF0D6;
-                     box-shadow: 0 0 8px #6FD3C0; }
+.assistant-fab:hover { color: var(--on-fill); }
+.assistant-fab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--booked-bright);
+                     box-shadow: 0 0 8px var(--brand-b); }
 /* Room under the last thing on a page, so it can always be scrolled clear of
    the corner button (it covered the Calendar's last "Remove", 2026-10-14). */
 body:has(.assistant-fab) .page { padding-bottom: 96px; }
@@ -1153,10 +1251,10 @@ body:has(.savebar) .assistant-fab { bottom: 88px; }
   height: min(600px, calc(100vh - 110px));
   display: flex; flex-direction: column;
   /* Denser than a card: it floats over a page full of text. */
-  background: rgba(10,19,34,.93);
+  background: var(--panel-dense);
   backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
   border: 1px solid var(--rule-strong); border-radius: var(--radius);
-  box-shadow: 0 18px 60px rgba(0,0,0,.5);
+  box-shadow: 0 18px 60px var(--shade-3);
   overflow: hidden;
 }
 .assistant-pop[hidden] { display: none; }
@@ -1194,6 +1292,8 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
 
 /* ---------------------------------------------------------------------- *
  * The text-message simulator (templates/text.html, /textsim)
+ * theme: fixed. A drawn phone looks like a phone in both themes, so its
+ * colours are its own, not tokens (theme_test.py skips to "end fixed").
  * ---------------------------------------------------------------------- *
  * A phone, drawn in CSS: the SMS channel as a customer meets it. Outgoing
  * texts are text-message green (deep enough to carry white text at AA);
@@ -1286,12 +1386,14 @@ body:has(.savebar) .assistant-pop { bottom: 144px; height: min(560px, calc(100vh
   .phone { width: 100%; height: calc(100vh - 140px); border-radius: 24px; border-width: 6px; }
 }
 
+/* theme: end fixed */
+
 /* ---------------------------------------------------------------------- *
  * Blocked time (Calendar page; booking_control.py)
  * ---------------------------------------------------------------------- */
 .weekgrid td.blocked {
-  background: repeating-linear-gradient(135deg, rgba(243,196,126,.16) 0 6px,
-              rgba(243,196,126,.04) 6px 12px);
+  background: repeating-linear-gradient(135deg, var(--pending-stripe) 0 6px,
+              var(--pending-stripe-faint) 6px 12px);
 }
 .block-allday { margin-top: var(--s2); align-self: flex-start; }
 /* With "Whole day" ticked the times don't apply, so they step out of the
