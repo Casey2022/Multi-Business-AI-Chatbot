@@ -50,12 +50,13 @@ I = re.I
 CASES = [
     {"name": "large pizza price (Crosstown)", "slug": "crosstown_pizza",
      "ask": "How do I change the price of a large pizza?",
-     "must": [r"\bmenu\b", r"publish"], "handoff": False},
+     # The page is "Prices" since 2026-11-04 (it was "Menu").
+     "must": [r"\bprices\b", r"publish"], "handoff": False},
     {"name": "new topping (Crosstown)", "slug": "crosstown_pizza",
      "ask": "How do I add a new topping?",
-     # Either way is right: where on the Menu page, or "I can add it as a
+     # Either way is right: where on the Prices page, or "I can add it as a
      # draft" (Claude Haiku 5.5 offers to, 2026-10-22).
-     "must": [r"\bmenu\b|\bdraft\b", r"extra|topping"], "handoff": False},
+     "must": [r"\bprices\b|\bdraft\b", r"extra|add-on|topping"], "handoff": False},
     {"name": "make a price change (Crosstown)", "slug": "crosstown_pizza",
      "ask": "Can you raise the large pizza to $24 for me?",
      "actions": [r"^18-inch large pizza: \$22 → \$24$"], "must": [r"publish"],
@@ -86,7 +87,8 @@ CASES = [
      "must": [r"publish"]},
     {"name": "menu prices without a menu (Bob's)", "slug": "bobs_plumbing",
      "ask": "How do I add a price list to my menu?",
-     "must": [r"prices on a menu", r"settings"], "handoff": False},
+     # The switch is "Keep a price list?" since 2026-11-04.
+     "must": [r"keep a price list", r"settings"], "handoff": False},
     {"name": "business hours (Bob's)", "slug": "bobs_plumbing",
      "ask": "Where do I change my business hours?",
      "must": [r"settings", r"hours"], "must_not": [r"knowledge base.*hours"], "handoff": None},

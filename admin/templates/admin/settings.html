@@ -182,7 +182,7 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Menu</div>
+    <div class="card-title">Prices</div>
     <div class="field">
       <label for="menu-on">{{ fields['menu_enabled'].label }}</label>
       {# Locked while the menu has items: switching off would make every
@@ -197,12 +197,12 @@
       {% if menu_lock %}
         <span class="hint hint-blocked">{{ menu_lock }}</span>
       {% elif choice_values['menu_enabled'] == 'yes' %}
-        <span class="hint">The <a href="{{ url_for('admin.menu_page', business_id=business.id) }}">Menu</a>
+        <span class="hint">The <a href="{{ url_for('admin.menu_page', business_id=business.id) }}">Prices</a>
           page holds your items and prices; the assistant quotes from it exactly.</span>
       {% else %}
-        <span class="hint">No Menu page. The assistant answers price questions from
+        <span class="hint">No Prices page. The assistant answers price questions from
           the Knowledge base, and quotes are up to you. Switch this on if you'd like
-          a menu of items and prices.</span>
+          a price list of items and prices.</span>
       {% endif %}
     </div>
   </div>

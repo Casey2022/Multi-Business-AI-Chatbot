@@ -134,9 +134,9 @@ def main():
           and "don't tell them to go to Help" in system[0]["text"])
     bob_setup = assistant.system_prompt(bob, bob_cfg)[1]["text"]
     check("Bob's setup says they can switch the menu on themselves (eval, 2026-10-12)",
-          "switch it on themselves" in bob_setup and "Prices on a menu?" in bob_setup)
-    check("Bob's: no Menu tab, and no menu items line",
-          "Prices on a menu: no" in bob_setup and "Menu items" not in bob_setup, bob_setup)
+          "switch it on themselves" in bob_setup and "Keep a price list?" in bob_setup)
+    check("Bob's: no Prices tab, and no price list items line",
+          "Keeps a price list: no" in bob_setup and "Price list items" not in bob_setup, bob_setup)
     check("an operator (no business) still gets an answer",
           "operator account" in assistant.system_prompt(None, None)[1]["text"])
     src = (ROOT / "assistant.py").read_text()

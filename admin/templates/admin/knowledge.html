@@ -106,7 +106,7 @@
     <div class="guidance">
       Two places saying different things (a price, a time, a yes or no) leave the
       assistant to pick one. This reads every section, as it is now, and the facts
-      in your settings (hours, menu prices, booking notice, cancellation rules),
+      in your settings (hours, prices, booking notice, cancellation rules),
       and lists anything that disagrees.
     </div>
     <form method="POST" action="{{ url_for('admin.knowledge_contradictions', business_id=business.id) }}"
@@ -125,7 +125,7 @@
         {% endfor %}
       </ul>
       <div class="guidance mt-4">Change whichever is wrong, then check again. Facts from your
-        settings are changed on Settings, Menu, Booking notice or Cancellation rules.</div>
+        settings are changed on Settings, Prices, Booking notice or Cancellation rules.</div>
       {% else %}
       <p><span class="chip chip-quiet">No contradictions found</span> across {{ checked }}
         section{{ '' if checked == 1 else 's' }} and your settings.</p>
@@ -221,7 +221,7 @@
       <textarea id="body-{{ s.id }}" name="body" rows="7">{{ s.body }}</textarea>
       {% if price_lines and price_lines.get(s.id) %}
       <div class="menu-prices">
-        <div class="cell-sub">Prices, from your menu (the assistant reads these with this section):</div>
+        <div class="cell-sub">Prices, from your Prices page (the assistant reads these with this section):</div>
         <div>{{ price_lines[s.id] }}</div>
       </div>
       {% endif %}

@@ -85,12 +85,12 @@ EDITABLE_FIELDS = {
     # it go off while the menu still has items, so prices never vanish by
     # surprise; see menu.enabled for what "never set" means.
     "menu_enabled": {
-        "label": "Prices on a menu?",
+        "label": "Keep a price list?",
         "type": "select",
         "coerce": "bool",
         "options": {
-            "yes": "Yes — keep a Menu page of items and prices",
-            "no":  "No — we quote per job (no Menu page)",
+            "yes": "Yes — keep a Prices page of items and prices",
+            "no":  "No — we quote per job (no Prices page)",
         },
     },
 }

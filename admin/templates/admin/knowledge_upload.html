@@ -49,7 +49,7 @@
   {% if c.kind == "menu" %}
   <div class="card proposal">
     <div class="card-title">
-      Menu: {{ c.item }}
+      Prices: {{ c.item }}
       {% if c.flagged %}<span class="chip chip-refused">Check this</span>
       {% elif c.op == "set_price" %}<span class="chip chip-pending">Price change</span>
       {% else %}<span class="chip chip-booked">New</span>{% endif %}

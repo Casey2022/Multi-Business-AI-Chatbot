@@ -565,8 +565,8 @@ def _menu_cannot_switch_off(business):
     import menu
     config = load_config(business["config_path"], business["id"])
     if menu.has_items(config) or menu.has_items(menu.with_draft(config, business["id"])):
-        return ("The menu still has items, so it can't be switched off. Remove them "
-                "on the Menu page and publish first, so no prices vanish by surprise.")
+        return ("The price list still has items, so it can't be switched off. Remove them "
+                "on the Prices page and publish first, so no prices vanish by surprise.")
     return None
 
 
@@ -575,7 +575,7 @@ def _menu_switched_off(business):
     if menu_switched_on(business):
         return None
     flash("This business doesn't keep prices on a menu. To add one, switch "
-          "“Prices on a menu?” on here first.", "error")
+          "“Keep a price list?” on here first.", "error")
     return redirect(url_for("admin.settings", business_id=business["id"]))
 
 
@@ -940,7 +940,7 @@ def menu_discard(business_id):
     changes = unpublished_changes(get_business_by_id(business_id))
     if not (changes["edited"] or changes["new"] or changes["deleted"]):
         set_documents_clean(business_id)
-    flash("Menu changes discarded — customers see the published menu.", "success")
+    flash("Price changes discarded — customers hear the published prices.", "success")
     return redirect(url_for("admin.menu_page", business_id=business_id))
 
 

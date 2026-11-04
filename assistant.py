@@ -103,17 +103,17 @@ def business_facts(business, config, pending=()):
                      "cleared after a while.")
     has_menu = menu.enabled(menu.with_draft(config, business.get("id"))) \
         if business.get("id") is not None else menu.enabled(config)
-    lines.append("Prices on a menu: " + (
-        "yes (they have a Menu tab)" if has_menu else
-        "no (no Menu tab; they can switch it on themselves: Settings, “Prices on a "
-        "menu?”, Yes, “Save settings”)"))
+    lines.append("Keeps a price list: " + (
+        "yes (they have a Prices tab)" if has_menu else
+        "no (no Prices tab; they can switch it on themselves: Settings, “Keep a "
+        "price list?”, Yes, “Save settings”)"))
     if has_menu:
         draft = menu.with_draft(config, business.get("id"))
         names = [f"{it['item']} (options: {', '.join(it['options']) or 'none'}"
                  + (f"; extras: {', '.join(it['add_ons'])}" if it["add_ons"] else "")
                  + (f"; sold by the piece" if it["each"] is not None else "") + ")"
                  for it in menu.items(draft)]
-        lines.append("Menu items: " + ("; ".join(names) if names else "none yet"))
+        lines.append("Price list items: " + ("; ".join(names) if names else "none yet"))
     try:
         from db import get_documents
         titles = [d["title"] for d in get_documents(business["id"])]

@@ -28,7 +28,7 @@
     {% endfor %}
     <p class="hint assistant-pop-empty" {{ 'hidden' if ap.turns }}>Ask how to do something
       {%- if menu_switched_on(ap.business) %}, or for a menu change: “raise the large to $24”.
-      It saves menu changes as drafts for you to publish{% endif %}.</p>
+      It saves price changes as drafts for you to publish{% endif %}.</p>
   </div>
   <form method="POST" action="{{ url_for('admin.help_ask') }}" class="assistant-ask" data-assistant-form>
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">

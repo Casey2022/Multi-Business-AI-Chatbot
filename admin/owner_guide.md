@@ -14,7 +14,7 @@ Every business page has the same row of tabs:
 - **Conversations**: everything customers said to the assistant, and what it said back.
 - **Calendar**: this week's bookings, hour by hour.
 - **Knowledge base**: everything the assistant knows about your business. It answers customer questions from here.
-- **Menu**: your items and prices. Only businesses that keep prices on a menu have this tab. No Menu tab? You can switch it on yourself: in Settings, set **Prices on a menu?** to yes and press **Save settings**.
+- **Prices**: your items and prices. Only businesses that keep a price list have this tab. No Prices tab? You can switch it on yourself: in Settings, set **Keep a price list?** to yes and press **Save settings**.
 - **Settings**: business details, opening hours, how the assistant sounds, services, booking questions, and links to your cancellation rules and booking notice.
 
 At the top of every page, **Chat as a customer** opens your chat in a new
@@ -25,10 +25,10 @@ reach a person. The assistant is also on every page: press
 
 ## Drafts and Publish
 
-Changes to the Knowledge base and the Menu are drafts. Customers keep
+Changes to the Knowledge base and Prices are drafts. Customers keep
 getting answers from the published version until you press
 **Publish changes**. While something is waiting, a banner saying
-"Unpublished changes." appears on the Knowledge base, Menu and Settings
+"Unpublished changes." appears on the Knowledge base, Prices and Settings
 pages and lists what's waiting. From the banner you can:
 
 - **Publish changes**: make every waiting change live at once.
@@ -37,7 +37,7 @@ pages and lists what's waiting. From the banner you can:
 Settings are different: they take effect as soon as you press
 **Save settings**. There is nothing to publish for them.
 
-Before publishing knowledge-base or menu changes, use **Preview answers**
+Before publishing knowledge-base or price changes, use **Preview answers**
 on the Knowledge base page to see how the assistant will answer with them.
 
 ## Appointments
@@ -111,7 +111,7 @@ What makes the assistant answer well:
 ### Check for contradictions
 
 **Check for contradictions** reads every section, and the facts kept in
-your settings (opening hours, menu prices, booking notice, cancellation
+your settings (opening hours, prices, booking notice, cancellation
 rules), and lists any two places that say different things: a price, a
 time, a yes or no. Each is shown with both quotes and where they are, so
 you can decide which is right and fix the other. It checks the sections
@@ -153,7 +153,7 @@ file itself isn't kept.
 - iPhone HEIC photos can't be read yet: share the photo as a JPEG, or take
   a screenshot and upload that.
 - Something read wrong? On the review page you can type the right price
-  into a menu change's **Price to save** box, and fix a section change's
+  into a price change's **Price to save** box, and fix a section change's
   wording under "Edit the wording before saving". If the reading itself is
   wrong (a $25 read as $26), open the text that was read at the bottom, fix
   it, and press **Suggest again from this text**: the suggestions are made
@@ -162,15 +162,15 @@ file itself isn't kept.
   invisible, or hidden by the page) isn't used. The review page lists it at the top, so you can
   see what was left out.
 
-## Menu
+## Prices
 
-The assistant answers price questions from the menu and nowhere else.
-Anything not on the menu, it says isn't on the menu rather than guess.
+The assistant answers price questions from this page and nowhere else.
+Anything not on it, it says isn't listed rather than guess.
 
 - Click an item to open it and edit it, then press **Save** on that item.
 - To add an item: fill in **Add an item** at the bottom and press **Add item**.
 - To remove an item: open it and press **Remove item**. You can still discard this before publishing.
-- **Discard menu changes** throws away the menu's unpublished changes only (knowledge-base edits are kept).
+- **Discard price changes** throws away the unpublished price changes only (knowledge-base edits are kept).
 
 Each item has:
 
@@ -184,7 +184,7 @@ Each item has:
 Type a price the way you'd write it on the board: 48, from 110 (a
 starting price), 20 to 60 (a range), or words like "quoted after a trial".
 
-Saved menu changes are drafts. Preview them on the Knowledge base page,
+Saved price changes are drafts. Preview them on the Knowledge base page,
 then publish.
 
 ## Settings
@@ -200,7 +200,7 @@ Changes here take effect as soon as you press **Save settings**.
 - **Services offered**: a box per service, with empty boxes at the end to add one. These are the only services the assistant will book; anything else, it says you don't offer. Renaming a service keeps its booking notice, how long it takes, the booking questions asked of it and its own cancellation rules. Clear a box to remove a service.
 - **What you call a booking**: "appointment", "order", "reservation".
 - **Extra booking questions**: up to 5 questions the assistant asks after the service, the address and the date and time. The label is the short name you'll see on the appointment; the question is what the assistant asks. Tick services to ask a question only for those; nothing ticked means every booking. Clear both boxes on a row to drop it.
-- **Prices on a menu?**: whether you have a Menu tab. Choose no if you quote per job. It can't be switched off while the menu still has items: remove them on the Menu page and publish first, so no prices vanish by surprise.
+- **Keep a price list?**: whether you have a Prices tab. Choose no if you quote per job. It can't be switched off while the price list still has items: remove them on the Prices page and publish first, so no prices vanish by surprise.
 - Cancellation rules are shown near the bottom. To change them, press **Change cancellation rules** (or **Set up cancellation rules** if you don't have any yet); see Cancellation rules below.
 
 ### Cancellation rules
@@ -213,7 +213,7 @@ The assistant works out the timing and the amounts from these itself.
 - If you take deposits, you can change how much they are.
 - To give some services their own rules (colour needs 48 hours, everything else 24), tick them under **Different rules for some services**: each opens its own box straight away, starting the same as everything else, so change only what should differ, with its own windows, then save. **Remove** on a service's box (or unticking it) puts it back under everything else. Only the services you tick: a combined one, like a cut and colour, has its own tick, otherwise it follows the rules for everything else.
 - Notes are said as written ("A no-show is charged the same as cancelling late."), so keep any numbers in them in step with the windows.
-- Press **Save as draft**. Like a menu change, customers keep hearing the current rules until you press **Publish changes**; the page shows what they're told now and after you publish, and **Preview answers** on the Knowledge base page lets you ask the assistant about it first. **Discard all changes** undoes it.
+- Press **Save as draft**. Like a price change, customers keep hearing the current rules until you press **Publish changes**; the page shows what they're told now and after you publish, and **Preview answers** on the Knowledge base page lets you ask the assistant about it first. **Discard all changes** undoes it.
 - **Remove these rules** (also a draft) means the assistant stops quoting any charges for cancelling.
 - If your knowledge base also talks about cancelling, the page names those sections: once your rules are published, take the cancelling part out of them, so customers aren't told two different things.
 
@@ -267,11 +267,11 @@ The assistant can change your knowledge base for you: ask it ("we now
 close at 6 on Saturdays", "add that we take Apple Pay", "add a section
 about gift cards", "delete the drywall section"). It changes only the
 words that need changing and leaves the rest of the section as it was.
-It won't write a number you didn't give it, and it won't put menu prices
-or cancellation rules in a section: menu prices belong on the Menu, and
+It won't write a number you didn't give it, and it won't put prices
+or cancellation rules in a section: prices belong on the Prices page, and
 cancellation rules on the Cancellation rules page.
 
-If you have a Menu tab, it can change your menu too ("raise the large
+If you have a Prices tab, it can change your prices too ("raise the large
 pizza to $24", "add a calzone at $12", "take the gluten-free crust off"):
 prices, options, add-ons and items.
 
@@ -280,7 +280,7 @@ it's listed under "Saved as a draft" with the words before and after, the
 banner lists it, and customers don't see it until you press
 **Publish changes**. Check it with **Preview answers** first if you like. To undo
 it, ask the assistant to change it back, use the section's **History**,
-or press **Discard all changes** (or **Discard menu changes** on the Menu
+or press **Discard all changes** (or **Discard price changes** on the Prices
 page). It doesn't change settings or appointments; for those it tells you
 where to go.
 The support message carries the page you were on and the version of the

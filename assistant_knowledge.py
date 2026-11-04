@@ -291,9 +291,9 @@ def _change(name, args, business_id, config, owner_words, user_email):
                           "questions about the business. Edit it instead.")
         attached = _attached_items(config, title)
         if attached:
-            raise Refused(f"Not deleted: the menu's prices for {', '.join(attached)} are "
+            raise Refused(f"Not deleted: the prices for {', '.join(attached)} are "
                           f"shown with “{label}”, so they'd be attached to nothing. Move "
-                          f"or remove those items on the Menu first.")
+                          f"or remove those items on the Prices page first.")
         delete_document_section(section["id"])
         return f"Section deleted: “{label}”"
 

@@ -1,7 +1,7 @@
 {% extends "admin/base.html" %}
 {% import "admin/_macros.html" as ui %}
 
-{% block title %}Menu — {{ business.name }}{% endblock %}
+{% block title %}Prices — {{ business.name }}{% endblock %}
 
 {% macro item_fields(rows, sections, examples) %}
   <div class="field">
@@ -107,7 +107,7 @@
 
 <div class="page-header">
   <h1>{{ business.name }}</h1>
-  <div class="subtitle">Menu — {{ cards | length }} item{{ '' if cards | length == 1 else 's' }}.
+  <div class="subtitle">Prices — {{ cards | length }} item{{ '' if cards | length == 1 else 's' }}.
     The assistant answers price questions from here, and nowhere else.</div>
 </div>
 
@@ -117,7 +117,7 @@
   {% if waiting %}
   <form method="POST" action="{{ url_for('admin.menu_discard', business_id=business.id) }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    <button class="btn" type="submit">Discard menu changes</button>
+    <button class="btn" type="submit">Discard price changes</button>
   </form>
   {% endif %}
 {% endcall %}
@@ -127,14 +127,14 @@
     Click an item to edit it. Type a price the way you'd write it on the board: <strong>48</strong>,
     <strong>from 110</strong> (a starting price), <strong>20 to 60</strong> (a range), or
     words like <strong>quoted after a trial</strong>. Anything not on this page, the
-    assistant will say isn't on the menu rather than guess. Changes are saved as a
+    assistant will say isn't on your price list rather than guess. Changes are saved as a
     draft: preview them on the Knowledge base page, then publish.
   </div>
 </div>
 
 {% for c in cards %}
 <div class="card" id="item-{{ c.index }}"{{ ui.tip(business.is_demo and loop.first, 6, "Prices are data",
-     "Each price is stored as data, so the assistant quotes it exactly, and says so when something isn't on the menu.") }}>
+     "Each price is stored as data, so the assistant quotes it exactly, and says so when something isn't listed.") }}>
   <form method="POST" action="{{ url_for('admin.menu_item_save', business_id=business.id, index=c.index) }}" data-track-edits="any">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="original" value="{{ c.original }}">
@@ -158,7 +158,7 @@
   <div class="section-foot menu-remove">
     <span class="meta"></span>
     <form method="POST" action="{{ url_for('admin.menu_item_delete', business_id=business.id, index=c.index) }}"
-          data-confirm="Remove {{ c.original }} from the menu? You can discard this before publishing.">
+          data-confirm="Remove {{ c.original }} from your prices? You can discard this before publishing.">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="original" value="{{ c.original }}">
     <input type="hidden" name="fingerprint" value="{{ c.fingerprint }}">
@@ -167,8 +167,8 @@
   </div>
 </div>
 {% else %}
-<div class="card"><div class="empty"><p>No menu yet. Add an item below, or upload a
-  photo of your menu on the Knowledge base page.</p></div></div>
+<div class="card"><div class="empty"><p>No prices yet. Add an item below, or upload a
+  photo of your menu or price list on the Knowledge base page.</p></div></div>
 {% endfor %}
 
 <div class="card card-add" id="add-item">

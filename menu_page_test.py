@@ -89,6 +89,9 @@ def the_page():
 
     for words in TRADE_WORDS:
         check(f"no {words!r}", words not in page)
+    check("the page and its tab are called Prices (2026-11-04)",
+          "<title>Prices — " in page and 'aria-current="page">Prices<' in page
+          and ">Menu<" not in page)
     check("the generic headings", "Add-ons and upgrades" in page
           and "Priced per item or in packs" in page)
     first = menu_of("crosstown_pizza")[0]["item"]

@@ -15,7 +15,7 @@
      ('conversations', 'Conversations',  'Conversations', 'admin.conversations'),
      ('calendar',      'Calendar',       'Calendar',      'admin.calendar_view'),
      ('knowledge',     'Knowledge base', 'Knowledge',     'admin.knowledge'),
-     ('menu',          'Menu',           'Menu',          'admin.menu_page'),
+     ('menu',          'Prices',         'Prices',        'admin.menu_page'),
      ('settings',      'Settings',       'Settings',      'admin.settings')] %}
 
 {% macro destinations(business, current='') %}
@@ -64,7 +64,7 @@
       from the previous version.
       <div class="cell-sub">Waiting: {{ pending | join("; ") }}.</div>
       {% if back == 'settings' %}<div class="cell-sub">Settings on this page take effect
-        as soon as you save them; Publish is for knowledge-base and menu changes.</div>{% endif %}
+        as soon as you save them; Publish is for knowledge-base and price changes.</div>{% endif %}
     </div>
     <div class="banner-actions">
       {% if caller is defined %}{{ caller() }}{% endif %}
@@ -99,7 +99,7 @@
       {% set pages = t.actions | map(attribute='page', default='menu') | unique | list %}
       <div>Customers see it once you press “Publish changes”.
         {% if business and 'knowledge' in pages %}<a href="{{ url_for('admin.knowledge', business_id=business.id) }}">See it on the Knowledge base page</a>{% endif %}
-        {% if business and 'menu' in pages %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Menu page</a>{% endif %}</div>
+        {% if business and 'menu' in pages %}<a href="{{ url_for('admin.menu_page', business_id=business.id) }}">See it on the Prices page</a>{% endif %}</div>
     </div>
     {% endif %}
     {% if t.handoff and is_last %}
