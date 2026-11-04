@@ -4,6 +4,7 @@
     python3 journey_eval.py                  # every journey
     python3 journey_eval.py pickup           # journeys whose name matches
     python3 journey_eval.py --repeat=3 -v    # three runs each, print transcripts
+    python3 journey_eval.py --persona=sympathetic   # every business in that personality
 
 The other evals each test one layer. rag_eval and qa_eval call the Q&A step
 directly; conversation_eval drives the booking flow directly. None of them
@@ -1266,11 +1267,14 @@ def _short(value, limit=260):
     return text if len(text) <= limit else text[:limit] + "…"
 
 
-def run(journey, verbose=False):
+def run(journey, verbose=False, persona=None):
     shutil.copy(_PRISTINE, db.DB_PATH)
     # Settings an owner saved, for this journey only: overrides in this
     # run's copy of the database, read by load_config like any owner's.
     saved = dict(journey.get("overrides") or {})
+    if persona:
+        # --persona=NAME: as if the owner had picked that personality.
+        saved["bot.persona_preset"] = persona
     if journey.get("business_hours"):
         saved["calendar.scheduling.business_hours"] = {
             str(d): span for d, span in journey["business_hours"].items()}
@@ -1367,10 +1371,12 @@ def run(journey, verbose=False):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     verbose = "-v" in sys.argv
-    repeat = 1
+    repeat, persona = 1, None
     for flag in sys.argv[1:]:
         if flag.startswith("--repeat="):
             repeat = int(flag.split("=", 1)[1])
+        if flag.startswith("--persona="):
+            persona = flag.split("=", 1)[1]
 
     # The address check has its own tests; here it gets out of the way.
     geocode.check_service_area = lambda addr, cfg, business_id=None: {
@@ -1392,7 +1398,7 @@ def main():
         for journey in chosen:
             runs = []
             for _ in range(repeat):
-                runs.append(run(journey, verbose))
+                runs.append(run(journey, verbose, persona))
                 bar.update()
             clean = sum(1 for _, p in runs if not p)
             transcript, problems = next(((t, p) for t, p in runs if p), runs[0])

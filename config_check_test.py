@@ -167,6 +167,16 @@ def main():
           reversed_ and "Monday closes (09:00) before it opens (17:00)" in reversed_[0]["says"],
           reversed_)
 
+    heading("every persona preset is one a business can choose")
+    for preset in config.load_personas():
+        path = written(f"persona_{preset}", changed(BOB, at("bot", "persona_preset", value=preset)))
+        found = config_check.problems(path)
+        check(f"'{preset}': no problems", found == [], found)
+    sympathetic = " ".join(config.load_personas().get("sympathetic", "").split())
+    check("'sympathetic' is offered", sympathetic.strip(), list(config.load_personas()))
+    check("…and keeps facts exact while it softens the tone",
+          "never in the facts" in sympathetic and "exception" in sympathetic, sympathetic)
+
     heading("odd files don't crash the check")
     for name, text in (("empty", ""), ("a list", "- one\n- two\n"), ("a word", "hello\n")):
         found = config_check.problems(written(f"odd_{name.replace(' ', '_')}", text=text))
