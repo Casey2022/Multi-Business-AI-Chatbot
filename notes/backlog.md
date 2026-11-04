@@ -45,6 +45,12 @@ blocked off" and "a tray's order-by time isn't taken back". Belmont's
 balayage deposit was hedged 9/10 because the knowledge base didn't say
 balayage counts as colour; the seed now does, 10/10 plain.
 
+Owner assistant 29/29 x3 (2026-11-04). One flake left in "closing time in
+a section (Crosstown)", about 1 run in 8: it doesn't read Hours and Busy
+Times, so it asks whether to *add* the 8:45 last-orders line instead of
+changing the 9:45 one. A prompt line ("never guess what a section says:
+read it first") didn't move it (1/9 with, 2/12 without), so it wasn't kept.
+
 
 ## Config structure (YAML review, 2026-10-23)
 
