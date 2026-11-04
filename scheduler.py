@@ -224,6 +224,13 @@ def is_mid_booking(phone, business_id):
     """
     return get_state(phone, business_id)["state"] != "idle"
 
+
+def end_booking(phone, business_id):
+    """Leave the booking flow, keeping nothing: the conversation has turned
+    to something more important than the booking (an urgent rule,
+    conversation.py)."""
+    set_state(phone, business_id, "idle", pending={})
+
 def _finalize_booking(phone, business_id, pending, config):
     """Save the booking and return the confirmation.
 

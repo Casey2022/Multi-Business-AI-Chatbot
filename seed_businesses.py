@@ -61,6 +61,15 @@ BUSINESSES = [
         "twilio_number":  None,
         "config_path":    "config/crosstown_pizza.yaml",
     },
+
+    # A real business, set up for testing before it's shown to them
+    # (2026-11-04). Not a demo template: it isn't on the picker.
+    {
+        "name":           "Miller Funeral and Cremation Services",
+        "slug":           "miller_funeral",
+        "twilio_number":  None,
+        "config_path":    "config/miller_funeral.yaml",
+    },
 ]
 
 

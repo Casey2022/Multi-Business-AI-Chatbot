@@ -74,8 +74,26 @@ def get_reply(message, config):
     # booking, even if a business rule shares the word. It only matches
     # whole-message commands now, so it no longer steals sentences that
     # merely mention an order ("cancel my order" reaches its own rule).
-    rules = [BOOKING_RULE] + config.get("rules", [])
+    return _first_match(text, [BOOKING_RULE] + config.get("rules", []), config)
 
+
+def get_urgent_reply(message, config):
+    """The reply of a rule marked urgent: true, or None.
+
+    Checked before anything else, mid-booking included (conversation.py):
+    "my mother just died" in the middle of booking a consultation at the
+    funeral home gets the phone numbers, not the next booking question
+    (Miller, 2026-11-04). Only urgent rules: an ordinary rule mid-booking
+    would take an answer ("hi" as a name) away from the booking.
+    """
+    urgent = [r for r in config.get("rules", []) if r.get("urgent")]
+    if not urgent:
+        return None
+    return _first_match(message.strip().lower(), urgent, config)
+
+
+def _first_match(text, rules, config):
+    """The first rule's reply that matches the (lowercased) text, or None."""
     for rule in rules:
         matched = False
         keywords = rule.get("keywords", [])

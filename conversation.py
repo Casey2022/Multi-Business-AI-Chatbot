@@ -13,9 +13,9 @@ app.py's channel adapters call it through app.safe_process_message.
 import logging
 
 from db import save_message, get_recent_messages
-from rules import get_reply, BOOK_INTENT
+from rules import get_reply, get_urgent_reply, BOOK_INTENT
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
-from scheduler import handle_booking, is_mid_booking
+from scheduler import handle_booking, is_mid_booking, end_booking
 
 log = logging.getLogger("app")
 log_cost = logging.getLogger("cost")
@@ -41,10 +41,22 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
     reply_text = None
     source = "unknown"   # which layer produced the reply
 
+    # --- 0. Urgent rules, before everything ---
+    # A rule marked urgent: true answers even mid-booking, and ends the
+    # booking: a death that has just happened, told to the funeral home in
+    # the middle of booking a consultation, gets the phone numbers and no
+    # more booking questions (Miller, 2026-11-04).
+    urgent = get_urgent_reply(message, config)
+    if urgent:
+        if is_mid_booking(sender_id, business_id):
+            end_booking(sender_id, business_id)
+        reply_text = urgent
+        source = "rule"
+
     # --- 1. Booking state machine ---
     # If the customer is mid-booking, bypass rules entirely — every message
     # in a booking flow is an answer to the bot's last question.
-    if is_mid_booking(sender_id, business_id):
+    elif is_mid_booking(sender_id, business_id):
         reply_text = handle_booking(sender_id, message, config, business_id,
                                     channel=channel)
         source = "scheduler"

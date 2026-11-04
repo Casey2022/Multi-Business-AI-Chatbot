@@ -1,0 +1,212 @@
+# config/miller_funeral.yaml — Miller Funeral and Cremation Services
+#
+# A real business, set up for testing before it's shown to them
+# (2026-11-04). Everything here is from millerfuneralandcremationservices.com
+# (read 2026-11-02, miller_funeral_seed.md); what the website doesn't say is
+# left out, not guessed, and listed for the owner to answer.
+#
+# What this one is here to show:
+# - one business, two funeral homes (Rochester and Victor), each with its
+#   own phone number;
+# - a booking that is a conversation, not a service: the free pre-planning
+#   consultation;
+# - a message about a death that has just happened gets the phone numbers
+#   first, and no booking questions, even in the middle of a booking (the
+#   "death_just_happened" rule is urgent: conversation.py checks it before
+#   the booking flow).
+#
+# Not stated, on purpose (ask the owner): office hours, so there is no
+# weekly table and no calendar: a consultation request is taken and a
+# funeral director calls to confirm the time.
+
+business:
+  name: "Miller Funeral and Cremation Services"
+  # The identifier. Stated, not derived from the name above:
+  # the name is owner-editable and only accidentally looks
+  # like an identifier. Must match the registered slug.
+  slug: "miller_funeral"
+  # Miller of Rochester. Miller of Victor's number is (585) 924-5730; it's
+  # in the knowledge base (Locations) and in the rules below.
+  phone: "(585) 424-3700"
+  address: "3325 Winton Road South, Rochester, NY 14623"
+  service_area: "Rochester, Brighton, Pittsford, Henrietta and Rush (Miller of Rochester); Victor, Mendon, Farmington and Fairport (Miller of Victor)"
+
+services:
+  - "pre-planning consultation"
+
+# The menu: the ONLY copy of this business's prices. The knowledge-base
+# sections say what each package includes; each section's price line is
+# generated from here, and price questions are answered by the menu_price
+# tool. These are the website's sample packages, funeral home charges only.
+menu_enabled: true
+menu:
+  - item: cremation package
+    aliases: [cremation packages, cremation, cremations]
+    section: "Cremation Packages"
+    options:
+      simple cremation: 1395
+      cremation with private visitation: 2695
+      cremation with memorial visitation: 2345
+      cremation with visitation and service: 3275
+      traditional visitation with cremation: 5175
+    notes:
+      cremation with visitation and service: "visitation and service on the same day"
+      traditional visitation with cremation: "a viewing, with embalming and a rental casket"
+  - item: burial package
+    aliases: [burial packages, burial, burials, funeral package, funeral packages]
+    section: "Burial Packages"
+    options:
+      cemetery service: 2900
+      visitation and interment at cemetery: 4620
+      visitation and chapel service with interment at cemetery: 5205
+    notes:
+      cemetery service: "no embalming, no visitation"
+  # Charges paid to others: passed on at exactly the third party's rate.
+  - item: crematory fee
+    aliases: [crematory, crematory fees, crematorium fee]
+    section: "Charges Paid to Others"
+    options:
+      crematory fee: {quote: "$250, $275 or $295, depending on the crematory"}
+  - item: death certificate
+    aliases: [death certificates, certified death certificate, certified death certificates]
+    section: "Charges Paid to Others"
+    options:
+      Monroe County copy: 30
+      Ontario or Livingston County copy: 10
+    notes:
+      Monroe County copy: "per certified copy"
+      Ontario or Livingston County copy: "per certified copy"
+  - item: paid death notice
+    aliases: [death notice, obituary notice, newspaper obituary, newspaper notice]
+    section: "Charges Paid to Others"
+    options:
+      paid death notice: {from: 200, to: 450}
+    notes:
+      paid death notice: "on average, per day printed; varies by publisher"
+  - item: religious offering
+    aliases: [officiant, officiant fee, church offering, clergy]
+    section: "Charges Paid to Others"
+    options:
+      hired officiant: {quote: "about $200 on average"}
+      offering to a church: {from: 300, to: 500}
+    notes:
+      offering to a church: "on average"
+
+bot:
+  persona_preset: "sympathetic"
+  # The shared rules named below, and the channel rules, are in
+  # config/defaults.yaml; these words fill their blanks.
+  words:
+    who: "family"
+    offer: "services"
+    never_invent: |-
+      hours, inclusions, or policies you don't see here.
+  guardrails:
+    universal:
+      - rule: facts_only
+      - |
+        Never use emojis: families writing to a funeral home may be grieving
+        (rag_eval, 2026-11-04: "since 1889 ... 🙂", "Send Flowers link 💐").
+        If someone tells you a death has just happened, the first thing you
+        say is to call now, a funeral director will guide them through the
+        next steps: Rochester {phone}, Victor (585) 924-5730. Ask them
+        nothing and never start a booking in that reply.
+        Never say when the phones are answered or that they are answered
+        around the clock: that isn't stated.
+        Never state office hours: they aren't stated. Give the phone
+        numbers instead.
+        Never describe what to do when a death happens at home, in hospice,
+        or in a hospital: a funeral director says that on the phone.
+        Package prices are the funeral home's charges only. When you give
+        one, say that charges paid to others (crematory, death certificates,
+        cemetery and the like) are added, and that a casket is chosen
+        separately for burial.
+        Never say a price or a service is the same, or different, at the
+        two locations: that isn't stated.
+        For a service time or an obituary, send them to the Obituaries page
+        on our website; never state a service time yourself.
+        You cannot cancel, modify, or look up existing arrangements or
+        consultations. If someone asks to change one, tell them to call
+        {phone}.
+      - rule: unsure
+      - rule: no_engaging
+
+rules:
+  # First, and urgent: checked before anything else, mid-booking included
+  # (conversation.py). The phone numbers and nothing else: no question back.
+  # Phrases that say the death is now ("just", "this morning"), not the
+  # bare word: "my father died two years ago and I want to plan ahead" is a
+  # pre-planning question, and the unless list hands it to the model.
+  - name: "death_just_happened"
+    urgent: true
+    keywords: ["just died", "just passed", "just passed away", "has just died",
+               "has died", "has passed", "has passed away", "is dead",
+               "died this morning", "died today", "died tonight", "died last night",
+               "died an hour ago", "died a few hours ago", "died at home",
+               "passed this morning", "passed today", "passed tonight", "passed last night",
+               "passed an hour ago", "passed a few hours ago", "passed at home",
+               "passed away this morning", "passed away today", "passed away tonight",
+               "passed away last night", "passed away an hour ago",
+               "passed away a few hours ago", "passed away at home",
+               "death just happened", "death has occurred", "a death just occurred",
+               "someone just died", "hospice called", "pronounced dead"]
+    match: "any"
+    unless: ["years ago", "year ago", "last year", "months ago", "month ago",
+             "last month", "weeks ago", "pre-plan", "preplan", "pre-planning",
+             "preplanning", "plan ahead", "planning ahead"]
+    reply: "I'm so sorry. Please call us now and a funeral director will guide you through the next steps: Miller of Rochester {phone}, Miller of Victor (585) 924-5730."
+
+  - name: "greeting"
+    keywords: ["hi", "hello", "hey"]
+    match: "exact"
+    reply: "Hello, and thank you for contacting {business_name}. How can I help?"
+
+  - name: "hours"
+    # Office hours aren't on the website (ask the owner), so no times:
+    # the numbers instead.
+    keywords: ["your hours", "opening hours", "office hours", "business hours",
+               "hours of operation", "what are the hours", "you open", "are you closed"]
+    match: "any"
+    reply: "For office hours, please call Miller of Rochester at {phone} or Miller of Victor at (585) 924-5730."
+
+  - name: "location"
+    keywords: ["where are you", "your location", "your locations", "your address", "directions"]
+    match: "any"
+    reply: "We have two funeral homes: Miller of Rochester, 3325 Winton Road South, Rochester, NY 14623, {phone}; and Miller of Victor, 301 West Main Street, Victor, NY 14564, (585) 924-5730."
+
+  - name: "thanks"
+    keywords: ["thanks", "thank you", "thx"]
+    match: "any"
+    reply: "You're welcome. We're here whenever you need us: {phone}."
+
+  - name: "cancel_existing"
+    keywords: ["cancel my appointment", "change my appointment", "cancel my consultation",
+               "change my consultation", "reschedule"]
+    match: "any"
+    unless: ["charge", "charged", "charges", "fee", "fees", "cost", "costs", "pay",
+             "refund", "refunded", "deposit", "penalty", "how much", "what happens",
+             "notice", "policy", "money back"]
+    reply: "To change or cancel a consultation, please call us at {phone} and we'll take care of it."
+
+booking:
+  noun: "consultation"
+  noun_plural: "consultations"
+  greeting: "I'd be glad to set up a pre-planning consultation. There's no charge for it."
+  service_confirmation: "Thank you. A pre-planning consultation."
+  ask_datetime: "What day and time would suit you? (e.g. 'Tuesday at 10am' or 'next Thursday afternoon')"
+  final_confirmation: "Thank you. I've passed on your request for a {service} on {datetime}. A funeral director will call to confirm the time. If you need us sooner, call {phone}."
+  fallback_after_bad_date: "Sorry, I couldn't read that as a date and time. Try something like 'Tuesday at 10am' or 'June 5 in the afternoon'."
+  cancel_reply: "Of course. Nothing has been booked. Message us any time."
+  # Told to the booking-or-question classifier (llm.classify_and_extract).
+  # The urgent rule catches the words it lists; this catches the rest:
+  # "The nursing home just called, Dad is gone. We need help" started a
+  # consultation, 3 runs in 3 (journey_eval, 2026-11-04).
+  not_a_booking:
+    - "a message saying someone has just died or is dying (\"Dad is gone\",
+      \"hospice called\", \"we lost her this morning\"). That family needs
+      the phone numbers, not a consultation."
+  extra_questions:
+    - key: "location"
+      prompt: "Which funeral home would suit you better, Miller of Rochester or Miller of Victor?"
+    - key: "planning_for"
+      prompt: "Is the plan for yourself, or for someone else?"

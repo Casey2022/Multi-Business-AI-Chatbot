@@ -231,11 +231,19 @@ def _check_rules(rules, say):
         if not (isinstance(keywords, list) and keywords and all(_text(k) for k in keywords)):
             say("broken", where, f"The '{name}' shortcut's keywords should be a list: "
                                  "[\"hi\", \"hello\"].")
+        if "urgent" in rule and not isinstance(rule["urgent"], bool):
+            say("broken", where, f"The '{name}' shortcut's urgent: should be true or false "
+                                 "(true: it answers first, even mid-booking).")
 
 
 def _check_booking(booking, say):
     if not isinstance(booking, dict):
         return
+    never = booking.get("not_a_booking")
+    if never is not None and not (isinstance(never, list) and all(_text(x) for x in never)):
+        say("broken", "booking.not_a_booking",
+            "not_a_booking: should be a list of sentences, each a kind of message that "
+            "is never a booking.")
     for i, question in enumerate(booking.get("extra_questions") or []):
         if not (isinstance(question, dict) and _text(question.get("key"))
                 and _text(question.get("prompt"))):

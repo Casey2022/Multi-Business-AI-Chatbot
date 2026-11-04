@@ -542,7 +542,7 @@ Business facts:
 - Name: {business['name']}
 - Phone: {business['phone']}{emergency_text}
 - Address: {business['address']}
-- Hours: {business['hours']}{holiday_text}
+- Hours: {business.get('hours') or 'not stated (give the phone number)'}{holiday_text}
 - Service area: {business.get('service_area', 'N/A')}
 
 Services we offer:
@@ -677,6 +677,14 @@ def classify_and_extract(message, slots, config, previous_reply=None,
             f"{noun}, a reply saying what they want is a booking.\n"
             f"{as_data(previous_reply, tag='assistant_message')}\n")
 
+    # What this business says is never a booking, whatever it asks for
+    # (booking.not_a_booking). Miller, 2026-11-04: "The nursing home just
+    # called, Dad is gone. We need help" started a pre-planning
+    # consultation, 3 runs in 3 (journey_eval). Absent, the prompt is as before.
+    never = [str(x).strip() for x in (config.get("booking") or {}).get("not_a_booking") or []
+             if str(x).strip()]
+    never_text = "".join(f"\n\nNever a {noun}, whatever it asks for: {x}" for x in never)
+
     prompt = f"""A customer has messaged {business['name']}.{context}
 
 Decide whether they are trying to start a {noun}, or asking a question.
@@ -691,7 +699,7 @@ question, not a booking. Saying they want one ("I'd like a wedding cake for
 June") is a booking.
 
 Cancelling, changing or asking about an EXISTING {noun} (refunds, deposits,
-status) is a question, not a new booking, even though it mentions the {noun}.
+status) is a question, not a new booking, even though it mentions the {noun}.{never_text}
 
 If it is a booking, also extract any of these details the message provides:
 {slot_lines}

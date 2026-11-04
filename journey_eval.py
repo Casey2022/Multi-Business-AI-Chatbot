@@ -127,6 +127,14 @@ _SUNRISE_CANNED = r"call us at \S+ \S+ and we'?ll take care of it right away"
 # same ("cancelled or moved"). Mirrors policy._RESCHEDULE_INSTEAD.
 _RESCHEDULE_INSTEAD = (r"\b(?:reschedul\w*|move it|moving it)\b[^.!?]*\b(?:instead|rather than"
                        r"|avoid|work something out|see what works|no charge|for free)\b")
+# Miller Funeral: its two numbers, a booking question, and the promise of
+# round-the-clock phones the website doesn't make.
+_MILLER_ROCHESTER = r"424-3700"
+_MILLER_VICTOR = r"924-5730"
+_MILLER_BOOKING_ASK = (r"which funeral home would suit|for yourself, or for someone|"
+                       r"what day and time would suit|what name should")
+_MILLER_AROUND_THE_CLOCK = (r"24/7|24 hours a day|24 hours,|around the clock|any ?time,? day or "
+                            r"night|day or night|always (?:answer|available|someone)")
 _WAIT_ADVICE = (r"\bif you (?:can |could )?wait\b|\bwait (?:just )?(?:another|a few|an? |until|\d)"
                 r"|(?:hit|get past|reach) the \d+[- ]hour mark"
                 # …and "the good news is you've still got time — if you cancel
@@ -1206,6 +1214,97 @@ JOURNEYS = [
              "must": [r"4(?::00)?\s*pm|4:00 PM"],
              "must_not": [NAME_ASK, r"Friday, September 25 at"]},
         ],
+    },
+    # Miller Funeral and Cremation Services (2026-11-04): a real business,
+    # tested before it's shown to them. A death that has just happened gets
+    # the phone numbers first and no booking questions; what the website
+    # doesn't say (office hours, whether the phones are answered around the
+    # clock, whether the two homes charge the same) is never said.
+    {
+        "name": "a death just happened: the numbers, nothing asked (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 6, 30),
+        "why": "The first thing a family needs is a person on the phone.",
+        "turns": [{"say": "My mother just passed away at home", "state": "idle",
+                   "must": [_MILLER_ROCHESTER, _MILLER_VICTOR],
+                   "must_not": [r"\?", _MILLER_BOOKING_ASK]}],
+    },
+    {
+        "name": "a death just happened, mid-booking (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "The urgent rule is checked before the booking flow: the "
+               "booking ends and no booking question follows.",
+        "turns": [
+            {"say": "I'd like to book a pre-planning consultation", "state": "collecting"},
+            {"say": "actually my husband passed away an hour ago, what do I do", "state": "idle",
+             "must": [_MILLER_ROCHESTER, _MILLER_VICTOR],
+             "must_not": [_MILLER_BOOKING_ASK, NAME_ASK]},
+        ],
+    },
+    {
+        "name": "a death in words the rule doesn't list (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 2, 0),
+        "why": "No keyword: the classifier and the model have it. Neither may "
+               "start a booking; the numbers come first.",
+        "turns": [{"say": "The nursing home just called, Dad is gone. We need help",
+                   "state": "idle", "must": [_MILLER_ROCHESTER],
+                   "must_not": [_MILLER_BOOKING_ASK, NAME_ASK, _MILLER_AROUND_THE_CLOCK]}],
+    },
+    {
+        "name": "booking a pre-planning consultation (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "The one booking: free, at either home, confirmed by a call.",
+        "turns": [
+            {"say": "I'd like to set up a free pre-planning consultation", "state": "collecting"},
+            {"say": "Pat Jordan", "state": "collecting"},
+            {"say": "Victor", "state": "collecting"},
+        ],
+    },
+    {
+        "name": "a package price says what isn't in it (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "The price is the funeral home's charge only: the crematory "
+               "and death certificates are added.",
+        "turns": [{"say": "How much is a simple cremation?", "state": "idle",
+                   "tool": "menu_price", "must": [r"\$1,395",
+                   r"crematory|death certificate|paid to others|third[- ]party|added|additional|on top"]}],
+    },
+    {
+        "name": "office hours aren't known, so none are said (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "Office hours are an ask-the-owner item; the numbers instead.",
+        "turns": [
+            {"say": "What time does the Victor office close on Saturdays?", "state": "idle",
+             "must": [_MILLER_VICTOR + "|" + _MILLER_ROCHESTER],
+             "must_not": [r"\d\s*(?:am|pm|a\.m\.|p\.m\.)|\d:\d\d", r"\bclosed on\b"]},
+            {"say": "if someone dies in the middle of the night will anyone pick up?",
+             "state": "idle", "must": [_MILLER_ROCHESTER + "|" + _MILLER_VICTOR],
+             "must_not": [_MILLER_AROUND_THE_CLOCK]},
+        ],
+    },
+    {
+        "name": "the two homes' prices aren't compared (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "Whether Victor charges what Rochester does isn't stated.",
+        "turns": [{"say": "Is a simple cremation the same price at your Victor location?",
+                   "state": "idle",
+                   "must_not": [r"(?<!not sure )(?<!not certain )(?:yes|the same) (?:price|at both|everywhere)",
+                                r"\b(?:both|all) (?:locations|homes) (?:charge|have) the same"]}],
+    },
+    {
+        "name": "a service time goes to the Obituaries page (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 10, 0),
+        "why": "Service times are on the website; the assistant doesn't say one.",
+        "turns": [{"say": "When is Robert Hale's funeral service?", "state": "idle",
+                   "must": [r"[Oo]bituar"],
+                   "must_not": [r"\d\s*(?:am|pm)|\d:\d\d"]}],
     },
 ]
 

@@ -102,7 +102,7 @@ def main():
     heading("shared files aren't businesses")
     names = {p.name for p in business_config_paths()}
     check("business_config_paths leaves out personas.yaml and defaults.yaml",
-          not (names & SHARED_FILES) and len(names) == 5, names)
+          not (names & SHARED_FILES) and len(names) == 6, names)
 
     print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
     for name in FAILED:
