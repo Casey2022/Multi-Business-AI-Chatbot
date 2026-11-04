@@ -145,7 +145,11 @@ CASES = [
      "ask": "Put the delivery fee up a dollar.",
      # $3 + $1 is arithmetic; code refuses a number the owner didn't give,
      # so the right move is to confirm "$4?" before changing anything.
-     "actions": [], "must": [r"\?"], "handoff": False},
+     # The offer, not a question mark: "Once you confirm (for example,
+     # '$4'), I'll update the Delivery section" is right and failed on
+     # r"\?" (2026-11-04, 1 run in 3).
+     "actions": [], "must": [r"\$4(?![\d.,])", r"\?|\bconfirm|let me know|go ahead|say the word"],
+     "handoff": False},
     {"name": "a menu price asked for in the knowledge base goes on the menu (Crosstown)",
      "slug": "crosstown_pizza",
      "ask": "Update the knowledge base so it says a large pizza is $24.",
