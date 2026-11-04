@@ -831,6 +831,7 @@ def _render_menu(business, errors=None, editing=None, status=200):
     return render_template(
         "admin/menu.html", business=business, cards=cards, new_rows=new_rows,
         new_errors=(errors or {}).get("new", []), sections=sections,
+        examples=menu_form.examples(menu_list),
         waiting=(menu.differences(live, menu.with_draft(live, business["id"]))
                  if menu.draft_menu(business["id"]) is not None else []),
     ), status

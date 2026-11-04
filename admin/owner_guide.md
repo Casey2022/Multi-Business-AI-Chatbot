@@ -178,8 +178,8 @@ Each item has:
 - **Other words customers use**: comma-separated. The assistant looks the price up when a customer names the item or one of these words.
 - **Knowledge-base section these prices go with**: the section the prices are shown with, so the assistant reads them together.
 - **Options and prices**: one row per size or version. To add an option, fill in an empty row (there are always two at the bottom; save to get more). Tick **Remove** on a row to drop it. Change the **Order** numbers, or use the ↑ ↓ buttons, to put options in order.
-- **Extras**: toppings and add-ons. **On** says which option an extra can go on ("any" for all of them); an extra not listed for an option can't go on it. Tick **Each** when the price is per piece (3 toppings = 3 × the price).
-- **Sold by the piece**: for things like cupcakes or muffins, with a price each, an optional "only in multiples of", a minimum, and pack prices.
+- **Add-ons and upgrades**: anything added to an option for a price (a topping, longer hair, an extra hour). Folded away until an item has one: click it to open. **On** says which option an add-on goes with ("any" for all of them); an add-on not listed for an option can't go with it. Tick **Each** when the price is per unit (3 of them = 3 × the price).
+- **Priced per item or in packs**: for things sold by the unit, with a price each, an optional "only in multiples of", a minimum, and pack prices (a dozen for one price, say).
 
 Type a price the way you'd write it on the board: 48, from 110 (a
 starting price), 20 to 60 (a range), or words like "quoted after a trial".
@@ -273,7 +273,7 @@ cancellation rules on the Cancellation rules page.
 
 If you have a Menu tab, it can change your menu too ("raise the large
 pizza to $24", "add a calzone at $12", "take the gluten-free crust off"):
-prices, options, extras and items.
+prices, options, add-ons and items.
 
 Every change it makes is a draft, exactly as if you'd made it yourself:
 it's listed under "Saved as a draft" with the words before and after, the

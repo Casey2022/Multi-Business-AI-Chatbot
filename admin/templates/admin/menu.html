@@ -3,15 +3,15 @@
 
 {% block title %}Menu — {{ business.name }}{% endblock %}
 
-{% macro item_fields(rows, sections) %}
+{% macro item_fields(rows, sections, examples) %}
   <div class="field">
     <label>Item</label>
     <input class="section-title" type="text" name="item" value="{{ rows.item }}"
-           placeholder="e.g. pizza, haircut, cupcake">
+           placeholder="{{ examples.item }}">
   </div>
   <div class="field">
     <label>Other words customers use (comma-separated)</label>
-    <input type="text" name="aliases" value="{{ rows.aliases }}" placeholder="pizzas, pie">
+    <input type="text" name="aliases" value="{{ rows.aliases }}" placeholder="{{ examples.aliases }}">
     <span class="hint">The assistant looks prices up when a customer names the item or one of these.</span>
   </div>
   <div class="field">
@@ -49,15 +49,17 @@
     </div>
   </div>
 
-  <div class="field">
-    <label>Extras (toppings, add-ons)</label>
+  {# Folded away until an item has one, like the per-item prices below: most
+     items at a funeral home or a plumber have none (2026-11-04). #}
+  <details class="field" {% if rows.add_ons | selectattr('name') | list %}open{% endif %}>
+    <summary>Add-ons and upgrades</summary>
     <div class="tablewrap">
       <table class="menu-table">
-        <thead><tr><th>Extra</th><th>On</th><th>Price</th><th>Each</th><th>Remove</th></tr></thead>
+        <thead><tr><th>Add-on</th><th>On</th><th>Price</th><th>Each</th><th>Remove</th></tr></thead>
         <tbody>
         {% for a in rows.add_ons %}{% set i = loop.index0 %}
           <tr>
-            <td><input type="text" name="add{{ i }}_name" value="{{ a.name }}" aria-label="Extra" placeholder="{% if not a.name %}add an extra{% endif %}"></td>
+            <td><input type="text" name="add{{ i }}_name" value="{{ a.name }}" aria-label="Add-on" placeholder="{% if not a.name %}add one{% endif %}"></td>
             <td><select name="add{{ i }}_on" aria-label="Which option">
                   <option value="any" {% if a.on in ('', 'any') %}selected{% endif %}>any</option>
                   {% for o in rows.options if o.name %}
@@ -72,11 +74,11 @@
         </tbody>
       </table>
     </div>
-    <span class="hint">“Each” means per piece (3 toppings = 3 × the price). An extra not listed for an option can't go on it.</span>
-  </div>
+    <span class="hint">“Each” means priced per unit (3 of them = 3 × the price). An add-on not listed for an option can't go with it.</span>
+  </details>
 
   <details class="field" {% if rows.by_piece %}open{% endif %}>
-    <summary>Sold by the piece (cupcakes, muffins…)</summary>
+    <summary>Priced per item or in packs</summary>
     <div class="menu-piece">
       <label>Price each <input type="text" name="each" value="{{ rows.each }}" placeholder="e.g. 3.25"></label>
       <label>Only in multiples of <input type="text" name="sold_by" value="{{ rows.sold_by }}" inputmode="numeric" placeholder="e.g. 12"></label>
@@ -146,7 +148,7 @@
       {% if c.errors %}
       <div class="card-pad"><ul class="form-errors">{% for e in c.errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
       {% endif %}
-      {{ item_fields(c.rows, sections) }}
+      {{ item_fields(c.rows, sections, examples) }}
       <div class="section-foot">
         <span class="meta">Saved changes wait for Publish.</span>
         <span class="toolbar"><button class="btn btn-primary" type="submit" data-save-button>Save</button></span>
@@ -176,7 +178,7 @@
     {% if new_errors %}
     <div class="card-pad"><ul class="form-errors">{% for e in new_errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
     {% endif %}
-    {{ item_fields(new_rows, sections) }}
+    {{ item_fields(new_rows, sections, examples) }}
     <div class="section-foot"><span class="meta"></span>
       <span class="toolbar"><button class="btn btn-primary" type="submit" data-save-button>Add item</button></span></div>
   </form>

@@ -115,6 +115,21 @@ def item_rows(entry):
     }
 
 
+def examples(menu_list):
+    """The Item and other-words examples on the Menu page, taken from this
+    business's own menu. They were a pizzeria's and a bakery's ("e.g. pizza,
+    haircut, cupcake", "pizzas, pie") on every business's page, a funeral
+    home's included (Casey, 2026-11-04). An empty menu gets neutral words."""
+    entries = [e for e in menu_list or [] if isinstance(e, dict) and e.get("item")]
+    names = [str(e["item"]) for e in entries][:3]
+    aliases = next(([str(a) for a in e["aliases"]][:3] for e in entries
+                    if isinstance(e.get("aliases"), list) and e["aliases"]), [])
+    return {"item": "e.g. " + ", ".join(names) if names
+                    else "e.g. the service or product you're pricing",
+            "aliases": "e.g. " + ", ".join(aliases) if aliases
+                       else "e.g. other names customers use for it"}
+
+
 # ---------------------------------------------------------------------------
 # Form → item
 # ---------------------------------------------------------------------------
