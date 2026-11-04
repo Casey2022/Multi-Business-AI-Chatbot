@@ -25,7 +25,8 @@ What code refuses, whatever the model was told:
   the menu; cancellation, refund (and, where the rules cover them, deposit)
   rules live in the YAML, which only the operator changes. A section that
   restated either could disagree with it, and the FAQ showed which copy a
-  model believes (one_source_test.py).
+  model believes (one_source_test.py). Opening hours, the same: they
+  live in Settings (calendar.scheduling.business_hours).
 - Cutting the menu loose. Menu prices are shown with a section, chosen
   by its title (menu.price_lines_for), so deleting the section would leave
   them attached to nothing. Renaming is fine: the links follow a section's
@@ -102,6 +103,17 @@ _NUMBER_WORDS.update(thirty="30", forty="40", fifty="50", sixty="60", seventy="7
 
 _MONEY = re.compile(r"\$\s?\d|\b\d+(?:\.\d+)?\s*dollars?\b", re.I)
 _CANCELLING = r"cancel\w*|refund\w*|forfeit\w*|no[- ]shows?"
+# "We close at 9pm", "the shop opens at 7am", "open 7am to 3pm". Not "the
+# kitchen stops taking orders at 8:45pm" or "busiest between 6pm and 8pm":
+# those are the section's own facts. assistant_eval "closing time in a
+# section" wrote "and we close at 9pm" into Hours and Busy Times (1/3,
+# 2026-11-04) while the reply rightly sent the owner to Settings.
+_TIME = r"\d{1,2}(?::\d{2})?\s*(?:am|pm)\b"
+_OPENING_HOURS = re.compile(
+    r"\b(?:we(?:'re|’re| are)?|the (?:shop|store|salon|bakery|office|restaurant)(?: is)?)\s+"
+    r"(?:now\s+|usually\s+)?(?:open|opens|opening|close|closes|closing|closed)\b[^.]{0,40}?\b"
+    + _TIME + r"|\bopen(?:ing hours)?\b[^.]{0,30}?\b" + _TIME
+    + r"\s*(?:-|–|to|until|till)\s*\d", re.I)
 
 
 class Refused(Exception):
@@ -207,6 +219,14 @@ def check_text(text, *, owner_words, sections, config, section_title=None):
                 + "cancelling, refunds) are kept in one place, so customers are never told "
                 "two different things: the Cancellation rules page (Settings, “Change "
                 "cancellation rules”). Tell the owner to change them there.")
+
+    said = _OPENING_HOURS.search(text)
+    if said:
+        raise Refused(
+            f"Not changed: “{said.group(0)}” states opening hours, and those are kept in "
+            "one place, so customers are never told two different times: Settings, "
+            "“Opening hours”. Leave the hours out of the section (make the rest of the "
+            "change without them) and tell the owner to change them there.")
 
     items = menu.items(config)
     if items and _MONEY.search(text):

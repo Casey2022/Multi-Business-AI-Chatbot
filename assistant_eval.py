@@ -125,8 +125,14 @@ CASES = [
      "must": [r"tick|ask for"], "handoff": False},
     {"name": "closing time in a section (Crosstown)", "slug": "crosstown_pizza",
      "ask": "We're closing at 9pm now instead of 10, and the kitchen stops orders at 8:45.",
-     "actions": [r"^Hours and Busy Times: .*→ .*\b9 ?pm\b", r"^Hours and Busy Times: .*→ .*8:45"],
-     "actions_not": [r"→ .*10 ?pm"], "must": [r"publish"], "handoff": False},
+     # Until 2026-11 this wanted 9pm written into the section too. Opening
+     # hours live only in Settings now, and the seed section states only the
+     # kitchen's last orders (9:45pm), so the right answer changes that line
+     # and sends the closing time to Settings > Opening hours (eval
+     # 2026-11-04, 0/3 on that answer).
+     "actions": [r"^Hours and Busy Times: .*→ .*8:45"],
+     "actions_not": [r"→ .*\b(?:9|10) ?pm\b"],
+     "must": [r"publish", r"opening hours"], "handoff": False},
     {"name": "add a fact to a section (Belmont)", "slug": "belmont_hair_studio",
      "ask": "Add that we take Apple Pay.",
      "actions": [r"^Payment and Hours: .*Apple Pay"], "must": [r"publish"], "handoff": False},

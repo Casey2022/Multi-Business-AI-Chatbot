@@ -636,6 +636,23 @@ def knowledge_checks(assistant, cross, cfg, bob, bob_cfg, Block, llm):
     check("…while Sunrise's rules do, so a deposit sentence there is refused",
           error and "“deposit”" in text, text)
 
+    # assistant_eval "closing time in a section" (2026-11-04): "and we close
+    # at 9pm" went into Hours and Busy Times, a second copy of Settings.
+    def hrun(tool, **args):
+        return ak.run(tool, args, cross, cfg, "o@x.com",
+                      owner_words="closing at 9pm, kitchen stops orders at 8:45, 11am to 9pm")
+    text, _, error = hrun("add_to_section", section="Delivery",
+                          text="The kitchen stops taking orders at 8:45pm, and we close at 9pm.")
+    check("a closing time in a section is refused, pointing to Opening hours",
+          error and "Opening hours" in text and "“we close at 9pm”" in text, text)
+    text, _, error = hrun("add_to_section", section="Delivery",
+                          text="The kitchen stops taking orders at 8:45pm.")
+    check("…but the kitchen's last orders are the section's own fact", not error, text)
+    text, _, error = hrun("add_section", title="When We're Open",
+                          text="We're open 11am to 9pm, Tuesday to Sunday.")
+    check("…and a new section stating the hours is refused too",
+          error and "Opening hours" in text, text)
+
     heading("knowledge-base changes in the conversation loop")
     db.clear_assistant_turns(business_id=8, user_email="o@x.com")
     real_create = llm._create
