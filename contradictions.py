@@ -121,7 +121,7 @@ def check(config, sections, model=None):
     if model:
         call["model"] = model
     try:
-        response = _create(**call)
+        response = _create(purpose="contradiction_check", **call)
         _note_usage(response, "contradiction check")
         # The first whole object, whatever comes before or after it (once in
         # 15, Sonnet 5.5 wrote a second one: "Extra data"). llm.json_object.

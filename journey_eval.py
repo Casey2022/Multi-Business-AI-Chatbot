@@ -30,6 +30,11 @@ graded by the judge (judge.py). Start the app once first so the knowledge
 collections exist.
 """
 
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
+
 import re
 import shutil
 import sys
@@ -1252,6 +1257,43 @@ JOURNEYS = [
                    "state": "idle", "must": [_MILLER_ROCHESTER],
                    "must_not": [_MILLER_BOOKING_ASK, NAME_ASK, _MILLER_AROUND_THE_CLOCK]}],
     },
+    # Over budget (budget.py, 2026-11-04): the business has spent its month's
+    # model budget. The customer still gets the phone number, with no model
+    # call, no tool and no booking question ("over_budget" fills the ledger;
+    # "no_model" fails a turn that read, ran a tool or recorded a call).
+    {
+        "name": "over budget: a mother just died (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 23, 0),
+        "over_budget": True,
+        "why": "At its cap a funeral home must still give a family the number.",
+        "turns": [{"say": "My mother just died", "state": "idle", "no_model": True,
+                   "must": [_MILLER_ROCHESTER],
+                   "must_not": [r"\?", _MILLER_BOOKING_ASK, NAME_ASK]}],
+    },
+    {
+        "name": "over budget: a death in words the rule doesn't list (Miller)",
+        "slug": "miller_funeral",
+        "clock": (2026, 11, 4, 23, 0),
+        "over_budget": True,
+        "why": "No keyword answers it, so the over-budget reply must: the phone.",
+        "turns": [{"say": "The hospice just called, my mother is gone. What do we do?",
+                   "state": "idle", "no_model": True, "must": [_MILLER_ROCHESTER],
+                   "must_not": [r"\?", _MILLER_BOOKING_ASK, NAME_ASK]}],
+    },
+    {
+        "name": "over budget: mid-booking, the phone and no more questions (Bob's)",
+        "slug": "bobs_plumbing",
+        "clock": (2026, 11, 4, 10, 0),
+        "over_budget_from_turn": 2,
+        "why": "A customer mid-booking when the cap is reached isn't left "
+               "without a way out.",
+        "turns": [
+            {"say": "I need to book a drain cleaning", "state": "collecting"},
+            {"say": "Tuesday morning works", "no_model": True,
+             "must": [r"\(585\)|\d{3}-\d{4}"], "must_not": [r"\?", NAME_ASK]},
+        ],
+    },
     {
         "name": "booking a pre-planning consultation (Miller)",
         "slug": "miller_funeral",
@@ -1421,10 +1463,17 @@ def run(journey, verbose=False, persona=None):
 
     transcript, problems = [], []
     previous = None
+    start_id = db.last_usage_id()
     for n, turn in enumerate(journey["turns"], 1):
         TRACE.clear()
+        if journey.get("over_budget") or journey.get("over_budget_from_turn") == n:
+            spend_budget(business_id, config)
+        before_id = db.last_usage_id()
         reply = process_message(turn["say"], sender, business_id, config,
                                 channel="webchat")
+        if turn.get("no_model") and (TRACE or db.last_usage_id() != before_id):
+            problems.append((f"turn {n}", "the model was used: "
+                             + "; ".join(TRACE or ["a call in the ledger"])))
         current = get_state(sender, business_id)
         transcript.append((turn["say"], reply, current["state"], list(TRACE)))
         where = f"turn {n}"
@@ -1464,7 +1513,52 @@ def run(journey, verbose=False, persona=None):
             passed, reason = judge.judge(turn["say"], reply, rubric)
             if not passed:
                 problems.append((where, f"judge: {reason}"))
+    # What the conversation cost: its own calls (recorded as evals, so not
+    # billable), not the judge's (label "eval") or spend_budget's filler.
+    COSTS.append((journey["slug"], journey["name"],
+                  [r for r in db.usage_rows(start_id)
+                   if not r["billable"] and r["label"] != "eval"]))
     return transcript, problems
+
+
+def spend_budget(business_id, config):
+    """The business's month's budget, all spent (as earlier customers left it)."""
+    import budget
+    import usage
+    hard, _ = budget.limits(business_id, config)
+    db.add_usage(business_id=business_id, month=usage.month_for(business_id, config),
+                 created_at=clock.utc_now().isoformat(), purpose="customer_reply",
+                 label="customer_reply", billable=1, model="claude-haiku-5-5",
+                 input_tokens=0, output_tokens=0, cache_read_tokens=0,
+                 cache_write_tokens=0, micro_dollars=round(hard * 1e6))
+
+
+# (slug, journey name, the ledger rows of its calls) per run, for the cost
+# summary main() prints.
+COSTS = []
+
+
+def cost_summary():
+    """What a customer conversation cost, per business: median and max of
+    the runs, from the ledger (the tokens the API reported)."""
+    import statistics
+    lines = ["", "What a conversation cost (the ledger; the judge's calls left out):"]
+    by_business = {}
+    for slug, _, rows in COSTS:
+        by_business.setdefault(slug, []).append(rows)
+    for slug, runs in sorted(by_business.items()):
+        dollars = [sum(r["micro_dollars"] for r in rows) / 1e6 for rows in runs]
+        calls = [len(rows) for rows in runs]
+        cached = sum(r["cache_read_tokens"] for rows in runs for r in rows)
+        lines.append(f"  {slug:26s} {len(runs):3d} conversations  median ${statistics.median(dollars):.5f}"
+                     f"  max ${max(dollars):.5f}  calls median {statistics.median(calls):g}"
+                     f" max {max(calls)}  cache reads {cached:,} tokens")
+    every = [sum(r["micro_dollars"] for r in rows) / 1e6 for _, _, rows in COSTS]
+    if every:
+        lines.append(f"  {'all':26s} {len(every):3d} conversations  median "
+                     f"${statistics.median(every):.5f}  max ${max(every):.5f}"
+                     f"  total ${sum(every):.4f}")
+    return "\n".join(lines)
 
 
 def main():
@@ -1522,6 +1616,8 @@ def main():
     spent = judge.cost_summary()
     if spent:
         say(spent)
+    if COSTS:
+        say(cost_summary())
     return 1 if failed else 0
 
 

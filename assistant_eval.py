@@ -20,6 +20,11 @@ words) and whether it offered to pass the question to support. Read a
 failing reply before believing the failure.
 """
 
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
+
 import progress
 from progress import say
 import re

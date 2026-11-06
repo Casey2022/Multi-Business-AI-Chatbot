@@ -472,7 +472,18 @@ def settings(business_id):
         pause = pause,
         paused_message = booking_control.message_template(config),
         menu_lock = _menu_cannot_switch_off(business),
+        ai_use = _ai_use(business_id, config),
     )
+
+
+def _ai_use(business_id, config):
+    """This month's model spend against the budget (budget.py), or None
+    when it can't be read: the page doesn't depend on it."""
+    try:
+        return budget.month_state(business_id, config)
+    except Exception as e:
+        log.warning("Couldn't read business %s's AI use (%s)", business_id, e)
+        return None
 
 @admin_bp.route("/business/<int:business_id>/knowledge")
 @login_required

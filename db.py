@@ -269,6 +269,44 @@ def init_db():
         )
     """)
 
+    # usage_ledger — one row per model call (usage.py, notes/spend_caps.md):
+    # who it was for, what it was for, the tokens the API reported and what
+    # they cost, in millionths of a dollar. One row per call rather than a
+    # running total, so a conversation's cost can be read back and a spike
+    # traced to when it happened. No message text, names or numbers.
+    # billable = 0 for evals: recorded, never counted against a budget.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS usage_ledger (
+            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_id        INTEGER,
+            month              TEXT    NOT NULL,
+            created_at         TEXT    NOT NULL,
+            purpose            TEXT    NOT NULL,
+            label              TEXT    NOT NULL,
+            billable           INTEGER NOT NULL DEFAULT 1,
+            model              TEXT    NOT NULL,
+            input_tokens       INTEGER NOT NULL DEFAULT 0,
+            output_tokens      INTEGER NOT NULL DEFAULT 0,
+            cache_read_tokens  INTEGER NOT NULL DEFAULT 0,
+            cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+            micro_dollars      INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS usage_ledger_month "
+                 "ON usage_ledger (business_id, month)")
+
+    # usage_alerts — each alert sent, so "once a month" (or "once an hour")
+    # is a primary key, not a hope. business_id 0 is the whole account.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS usage_alerts (
+            business_id INTEGER NOT NULL,
+            period      TEXT    NOT NULL,
+            kind        TEXT    NOT NULL,
+            created_at  TEXT    NOT NULL,
+            PRIMARY KEY (business_id, period, kind)
+        )
+    """)
+
     # rate_limits — fixed-window counters for public endpoints. In SQLite
     # rather than memory because gunicorn workers don't share memory and the
     # container restarts; a counter that resets with the process is not a
@@ -748,6 +786,8 @@ _TENANT_TABLES = (
     ("upload_proposals",   "business_id"),
     ("assistant_turns",    "business_id"),
     ("time_blocks",        "business_id"),
+    ("usage_ledger",       "business_id"),
+    ("usage_alerts",       "business_id"),
     ("users",              "business_id"),
 )
 
@@ -1905,6 +1945,78 @@ def get_model_spend(spend_key, day):
     ).fetchone()
     conn.close()
     return row["micro_dollars"] if row else 0
+
+
+_LEDGER_COLUMNS = ("business_id", "month", "created_at", "purpose", "label",
+                   "billable", "model", "input_tokens", "output_tokens",
+                   "cache_read_tokens", "cache_write_tokens", "micro_dollars")
+
+
+def add_usage(**row):
+    """One model call in the ledger (usage.record). Returns the row's id."""
+    conn = get_connection()
+    cur = conn.execute(
+        f"INSERT INTO usage_ledger ({', '.join(_LEDGER_COLUMNS)}) "
+        f"VALUES ({', '.join('?' * len(_LEDGER_COLUMNS))})",
+        tuple(row.get(c) for c in _LEDGER_COLUMNS))
+    conn.commit()
+    new_id = cur.lastrowid
+    conn.close()
+    return new_id
+
+
+def month_spend(business_id, month):
+    """Millionths of a dollar a business's billable calls cost this month."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COALESCE(SUM(micro_dollars), 0) AS spent FROM usage_ledger "
+        "WHERE business_id = ? AND month = ? AND billable = 1",
+        (business_id, month)).fetchone()
+    conn.close()
+    return row["spent"]
+
+
+def month_spend_by_business(month):
+    """{business_id: micro-dollars} of billable calls for one month."""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT business_id, SUM(micro_dollars) AS spent FROM usage_ledger "
+        "WHERE month = ? AND billable = 1 GROUP BY business_id", (month,)).fetchall()
+    conn.close()
+    return {r["business_id"]: r["spent"] for r in rows}
+
+
+def usage_rows(after_id=0, business_id=None):
+    """Ledger rows newer than an id, oldest first (journey_eval's costs)."""
+    conn = get_connection()
+    sql, args = "SELECT * FROM usage_ledger WHERE id > ?", [after_id]
+    if business_id is not None:
+        sql += " AND business_id = ?"
+        args.append(business_id)
+    rows = conn.execute(sql + " ORDER BY id", args).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def last_usage_id():
+    conn = get_connection()
+    row = conn.execute("SELECT COALESCE(MAX(id), 0) AS id FROM usage_ledger").fetchone()
+    conn.close()
+    return row["id"]
+
+
+def claim_usage_alert(business_id, period, kind):
+    """True the first time (business, period, kind) is claimed, False after.
+    One INSERT OR IGNORE, so two threads crossing the line together send
+    one alert, not two."""
+    from datetime import datetime as _dt
+    conn = get_connection()
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO usage_alerts (business_id, period, kind, created_at) "
+        "VALUES (?, ?, ?, ?)", (business_id, period, kind, _dt.now().isoformat()))
+    conn.commit()
+    conn.close()
+    return cur.rowcount == 1
 
 
 # ---------------------------------------------------------------------------

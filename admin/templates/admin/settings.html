@@ -18,6 +18,23 @@
 
 {{ ui.unpublished_banner(business, 'settings') }}
 
+{% if ai_use %}
+<div class="card" id="ai-use">
+  <div class="card-title">AI use this month</div>
+  <p class="guidance card-pad">
+    ${{ '%.2f' % ai_use.spent }} of your ${{ '%.2f' % ai_use.budget }} monthly limit
+    ({{ (ai_use.share * 100)|round|int }}%).
+    {% if ai_use.over %}
+      The limit is reached: customers who write are given your phone number, and the
+      portal's AI features are paused until next month. Ask us through Help to raise it.
+    {% else %}
+      Every answer the assistant writes uses a little. If it reaches the limit,
+      customers are given your phone number instead until next month.
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+
 <form method="POST" class="stack">
   <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 

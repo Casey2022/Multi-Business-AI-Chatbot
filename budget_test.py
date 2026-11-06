@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""budget_test.py — a demo's model spend is capped per day; a business's isn't.
+"""budget_test.py — a demo's model spend is capped per day; a business's isn't (by day).
 
 Run it:  python3 budget_test.py
 
 budget.py: each demo may spend DEMO_DAILY_BUDGET ($0.50) a day on the model,
-all demos together DEMOS_DAILY_BUDGET ($5). Real businesses are never capped.
+all demos together DEMOS_DAILY_BUDGET ($5). Real businesses have no daily cap
+(their monthly one, and what any business gets over it, is usage_test.py).
 Two layers: each route that uses the model asks budget.refusal() first and
 answers with a friendly note; llm._create refuses any call past the budget
 (budget.Spent), so a route that forgot to ask still can't spend.
@@ -143,7 +144,7 @@ def test_counting_and_caps():
     reply = chat(other_client, other["slug"]).get_json()["reply"]
     check("another demo still answers", reply == "a fake reply", reply)
 
-    heading("a real business is never capped or counted")
+    heading("a real business has no daily cap and isn't counted as a demo")
     template = db.get_business_by_slug("sunrise_bakery_and_cafe")
     total = spent(budget.ALL_DEMOS)
     reply = chat(app.test_client(), template["slug"]).get_json()["reply"]

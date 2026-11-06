@@ -245,6 +245,12 @@ def main():
                           role="owner", content="How do I add a menu item?")
     # And the time it blocked off on the Calendar page.
     db.add_time_block(clone["id"], "2099-01-05 00:00", "2099-01-06 00:00", all_day=True)
+    # And what its model calls cost, and the alert it set off (usage.py).
+    db.add_usage(business_id=clone["id"], month="2099-01", created_at="2099-01-05",
+                 purpose="customer_reply", label="customer_reply", billable=1,
+                 model="claude-haiku-5-5", input_tokens=10, output_tokens=5,
+                 cache_read_tokens=0, cache_write_tokens=0, micro_dollars=4)
+    db.claim_usage_alert(clone["id"], "2099-01", "soft")
     before = row_counts(clone["id"])
     check("the clone had rows worth deleting", all(before.values()), before)
 

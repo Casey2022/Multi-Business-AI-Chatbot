@@ -29,6 +29,11 @@ a document changes, these change with it — a test asserting a price the
 business no longer charges is worse than no test, because it passes.
 """
 
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
+
 import sys
 from dotenv import load_dotenv
 load_dotenv()

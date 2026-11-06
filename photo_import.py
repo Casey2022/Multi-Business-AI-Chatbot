@@ -424,7 +424,7 @@ def _call(**call):
     from llm import _create
     if UPLOAD_MODEL:
         call.setdefault("model", UPLOAD_MODEL)
-    return _create(**call)
+    return _create(purpose="upload", **call)
 
 
 def transcribe(config, data, media_type):

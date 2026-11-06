@@ -356,7 +356,7 @@ def answer(user_email, business, config, question, pending=(), page=None):
     actions, texts, handoff, changes = [], [], None, 0
     for _round in range(MAX_ROUNDS):
         try:
-            response = _create(**call)
+            response = _create(purpose="owner_assistant", **call)
         except Exception:
             if not actions:
                 raise           # nothing happened: the owner just asks again

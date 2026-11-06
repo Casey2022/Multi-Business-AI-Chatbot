@@ -15,6 +15,11 @@ another section or with a setting (hours, menu prices, booking notice).
                 true things disagree, which is how a warning gets ignored.
 """
 
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
+
 import sys
 from dotenv import load_dotenv
 load_dotenv()

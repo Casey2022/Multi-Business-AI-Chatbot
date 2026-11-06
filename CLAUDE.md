@@ -135,6 +135,12 @@ The live model isn't pinned, so model-facing changes get `--repeat=3`.
   default) and Daylight on `[data-theme="light"]` (`static/theme.js` is the
   switch). A new colour is a token in both blocks; `theme_test.py` refuses a
   colour typed into a rule and checks 4.5:1 contrast (`theme_contrast.py`).
+- `usage.py`: the one place a request goes to the model (`usage.send`),
+  and the `usage_ledger` (one row per call, micro-dollars, `purpose`);
+  evals call `usage.mark_eval_run()`. `budget.py`: demos' daily caps and
+  every business's monthly one (`budget.monthly_usd`); over it, customers
+  get the phone number. Every `_create(` names a `purpose`
+  (`usage_test.py` scans). `notes/spend_caps.md`.
 - `analytics.py`: Cloudflare Web Analytics on the demo sandbox only, when
   `CF_WEB_ANALYTICS_TOKEN` is set (`analytics_test.py` holds where).
 - `rag.py`, `import_documents.py`, `db.py`, `config.py`, `demo.py`.

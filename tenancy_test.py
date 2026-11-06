@@ -177,7 +177,7 @@ def main():
             "url": "http://127.0.0.1/", "question": "hi", "message": "hi",
             "confirm": "1", "action": "save"}
     # Pages with no id that only the operator may see.
-    operator_only = {"admin.support_inbox"}
+    operator_only = {"admin.support_inbox", "admin.usage_page"}
 
     heading("visitor A, with B's ids, on every admin route")
     original = snapshot(B)

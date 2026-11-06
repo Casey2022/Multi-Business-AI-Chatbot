@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent
 # Every top-level section the code reads. Anything else is ignored, so a
 # misspelled section ("buisness") is said, with the likely one.
 SECTIONS = {"business", "services", "menu_enabled", "menu", "calendar", "bot",
-            "rules", "booking", "policies"}
+            "rules", "booking", "policies", "budget"}
 DAYS = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split()
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -127,6 +127,7 @@ def _check_file(raw, say):
     _check_cancellation(((raw.get("policies") or {}).get("cancellation")
                          if isinstance(raw.get("policies"), dict) else None), say)
     _check_menu(raw.get("menu"), say)
+    _check_budget(raw.get("budget"), say)
 
 
 def _check_calendar(calendar, say):
@@ -234,6 +235,29 @@ def _check_rules(rules, say):
         if "urgent" in rule and not isinstance(rule["urgent"], bool):
             say("broken", where, f"The '{name}' shortcut's urgent: should be true or false "
                                  "(true: it answers first, even mid-booking).")
+
+
+def _check_budget(budget, say):
+    """budget: monthly_usd (the hard limit) and alert_at (dollars, below it).
+    Read by budget.limits; a bad one is ignored there, so say so here."""
+    if budget is None:
+        return
+    if not isinstance(budget, dict):
+        say("warning", "budget", "budget: should have monthly_usd (and alert_at): "
+                                 "it's ignored, so the default limit applies.")
+        return
+    for key in budget:
+        if key not in ("monthly_usd", "alert_at"):
+            say("warning", f"budget.{key}", f"budget: has no '{key}'; it's ignored.")
+    for key in ("monthly_usd", "alert_at"):
+        value = budget.get(key)
+        if value is not None and not (_is_number(value) and value > 0):
+            say("warning", f"budget.{key}", f"{key} should be dollars above 0 (it's "
+                                            f"{value!r}); the default is used instead.")
+    hard, soft = budget.get("monthly_usd"), budget.get("alert_at")
+    if _is_number(hard) and _is_number(soft) and soft > hard:
+        say("warning", "budget.alert_at", "alert_at is above monthly_usd, so the alert "
+                                          "comes with the limit, not before it.")
 
 
 def _check_booking(booking, say):

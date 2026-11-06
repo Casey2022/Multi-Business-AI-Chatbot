@@ -69,6 +69,7 @@
         {% set open_count = open_support_count() %}
         <a class="nav-link" href="{{ url_for('admin.support_inbox') }}">Support{% if open_count %}
           <span class="nav-count">{{ open_count }}</span>{% endif %}</a>
+        <a class="nav-link" href="{{ url_for('admin.usage_page') }}">AI spend</a>
       {% else %}
         <a class="nav-link" href="{{ url_for('admin.help_page', **{'from': request.path}) }}"{{ ui.tip(business is defined and business and business.is_demo, 10, "Tell us what you think",
            "Something confusing, broken or impressive? This goes straight to the person who built Simon Says.") }}>{{ 'Help & feedback' if business is defined and business and business.is_demo else 'Help' }}</a>

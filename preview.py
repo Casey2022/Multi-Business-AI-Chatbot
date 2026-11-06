@@ -23,6 +23,7 @@ business's information contains is marked "not in your information", so a
 made-up fact is caught before a customer acts on it.
 """
 
+import contextvars
 import copy
 import logging
 import os
@@ -119,7 +120,7 @@ def suggest_questions(config, changed, removed=()):
         + " One question per line, nothing else.\n\n"
         + as_data(shown, tag="sections"))
     try:
-        response = _create(max_tokens=250,
+        response = _create(purpose="preview", max_tokens=250,
                            messages=[{"role": "user", "content": prompt}])
         _note_usage(response, "preview questions")
         return parse_questions(text_of(response))
@@ -213,7 +214,7 @@ def compare_facts(question, now, after):
         + as_data(now, tag="reply_now") + "\n"
         + as_data(after, tag="reply_after"))
     try:
-        response = _create(max_tokens=400, temperature=0,
+        response = _create(purpose="preview", max_tokens=400, temperature=0,
                            messages=[{"role": "user", "content": prompt}])
         _note_usage(response, "preview fact check")
         # The object, wherever it is in the reply (llm.json_object): a
@@ -271,7 +272,7 @@ def _answer(question, config, sources=None):
     extra = {} if sources is None else {"sources": sources}
     try:
         return get_llm_reply(question, [], config, channel="webchat",
-                             temperature=0, **extra)
+                             temperature=0, purpose="preview", **extra)
     except Exception as e:
         log.warning("Preview answer failed: %s", e)
         return f"(Couldn't get an answer: {type(e).__name__})"
@@ -307,14 +308,21 @@ def run_preview(config, business_id, questions):
         if draft:
             draft_config.setdefault("business", {})["collection"] = draft
         with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
+            # Each job runs in a copy of this request's context, so it's
+            # charged to this business (usage.serving). Without it, the
+            # pool's calls were charged to nobody: the demo cap and the
+            # ledger never saw Preview's answers or its Sonnet checks
+            # (notes/spend_caps.md, 2026-11-04).
+            def submit(*job):
+                return pool.submit(contextvars.copy_context().run, *job)
             read = [[] for _ in questions]
-            now = [pool.submit(_answer, q, config) for q in questions]
-            after = [pool.submit(_answer, q, draft_config, r)
+            now = [submit(_answer, q, config) for q in questions]
+            after = [submit(_answer, q, draft_config, r)
                      for q, r in zip(questions, read)]
             answers = [(q, n.result(), a.result())
                        for q, n, a in zip(questions, now, after)]
-            checks = [pool.submit(compare_facts, q, n, a) for q, n, a in answers]
-            grounded = [pool.submit(_unsupported, a, r)
+            checks = [submit(compare_facts, q, n, a) for q, n, a in answers]
+            grounded = [submit(_unsupported, a, r)
                         for (_, _, a), r in zip(answers, read)]
             results = []
             for (q, n, a), c, g in zip(answers, checks, grounded):

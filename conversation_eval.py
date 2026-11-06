@@ -24,6 +24,11 @@
 # sentence twice in a row" survives rewording; "reply == 'What service do you
 # need?'" breaks the first time someone improves the copy.
 
+
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
 import sys
 import tempfile
 from pathlib import Path

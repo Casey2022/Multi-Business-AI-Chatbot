@@ -140,7 +140,8 @@ def main():
     fake.get_or_create_collection("test_pizza").add(live, ["a", "b", "c"], [{}, {}, {}])
     asked = []
     def fake_reply(message, history=None, config=None, channel="sms",
-                   mid_booking=False, temperature=None, now=None, sources=None):
+                   mid_booking=False, temperature=None, now=None, sources=None,
+                   purpose=None):
         coll = config["business"]["collection"]
         if sources is not None:
             sources.append("Gluten-free crust: $3 extra on a 10-inch personal only. "
@@ -200,7 +201,8 @@ def main():
           and fake.collections["test_pizza"].docs == live)
     heading("a fact nothing it read says is marked (grounding.py)")
     def making_up(message, history=None, config=None, channel="sms",
-                  mid_booking=False, temperature=None, now=None, sources=None):
+                  mid_booking=False, temperature=None, now=None, sources=None,
+                  purpose=None):
         if sources is not None:
             sources.append("Gluten-free crust: $3 extra on a 10-inch personal only.")
         return "Only the 10-inch, $3 extra, or $5 on a large, and free garlic knots."

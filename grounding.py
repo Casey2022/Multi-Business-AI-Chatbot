@@ -220,7 +220,7 @@ def claim_flags(reply, sources, model=None):
     if model:
         call["model"] = model
     try:
-        response = _create(**call)
+        response = _create(purpose="grounding", **call)
         _note_usage(response, "grounding check")
         # The object, wherever it is: a reply that put a sentence before it
         # failed to parse, once in 60 (2026-10-23). llm.json_object.

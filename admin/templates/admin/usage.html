@@ -1,0 +1,62 @@
+{% extends "admin/base.html" %}
+
+{% block title %}AI spend{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>AI spend</h1>
+  <div class="subtitle">What each business's model calls cost this month, against its
+    monthly limit. Over the limit, customers are given the phone number and the
+    portal's AI features pause until next month. Unset, a limit is
+    ${{ '%.2f' % default }} (DEFAULT_MONTHLY_BUDGET_USD) and the alert 80% of it.</div>
+</div>
+
+<div class="card">
+  <div class="tablewrap">
+    <table class="table-stack" data-resizable="usage">
+      <thead>
+        <tr>
+          <th>Business</th>
+          <th>This month</th>
+          <th>Used</th>
+          <th>Limit and alert</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        {% set s = row.state %}
+        <tr>
+          <td data-label="Business">
+            <span class="cell-strong">{{ row.business.name }}</span>
+            <div class="cell-sub">{{ row.business.slug }} · #{{ row.business.id }} · {{ s.month }}</div>
+          </td>
+          <td data-label="This month">${{ '%.4f' % s.spent }}</td>
+          <td data-label="Used">
+            {% if s.over %}<span class="chip chip-refused">Over: {{ (s.share * 100)|round|int }}%</span>
+            {% elif s.spent >= s.alert_at %}<span class="chip chip-warn">{{ (s.share * 100)|round|int }}%</span>
+            {% else %}<span class="chip chip-booked">{{ (s.share * 100)|round|int }}%</span>{% endif %}
+          </td>
+          <td data-label="Limit and alert">
+            <form method="POST" action="{{ url_for('admin.usage_budget', business_id=row.business.id) }}" class="inline-form">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+              <label>Limit $ <input name="monthly_usd" inputmode="decimal" size="7"
+                     value="{{ row.chosen.monthly_usd or '' }}" placeholder="{{ '%.2f' % s.budget }}"></label>
+              <label>Alert $ <input name="alert_at" inputmode="decimal" size="7"
+                     value="{{ row.chosen.alert_at or '' }}" placeholder="{{ '%.2f' % s.alert_at }}"></label>
+              <button class="btn" type="submit">Save</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+        <tr>
+          <td data-label="Business"><span class="cell-strong">Demos</span>
+            <div class="cell-sub">{{ demos.count }} live; each also has its daily caps</div></td>
+          <td data-label="This month">${{ '%.4f' % demos.spent }}</td>
+          <td data-label="Used">—</td>
+          <td data-label="Limit and alert"><span class="cell-sub">Each demo: its own monthly limit, the default</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

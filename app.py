@@ -243,10 +243,11 @@ if app.config["SESSION_COOKIE_SECURE"]:
 init_db()          # tables only — no ChromaDB access before fork
 app.register_blueprint(admin_bp)
 
-# Which demo, if any, each request spends for: budget.py caps demos' model
-# spend per day, and needs to know before the view runs.
+# Which business each request spends for: budget.py caps demos per day and
+# every business per month, and needs to know before the view runs.
 import budget
 app.before_request(budget.scope_request)
+app.teardown_request(budget.end_request)
 
 # Run the startup sequence.
 #
@@ -353,7 +354,15 @@ def safe_process_message(message, sender_id, business_id, config, channel):
     try:
         return process_message(message, sender_id, business_id, config,
                                channel=channel)
-    except Exception:
+    except Exception as e:
+        import budget
+        import usage
+        if isinstance(e, (budget.Spent, usage.OutOfCredit)):
+            # Refused for money somewhere process_message didn't expect:
+            # still the phone number, not "try again in a minute".
+            log.warning("A turn for business %s was refused for money (%s)",
+                        business_id, type(e).__name__)
+            return budget.over_budget_reply(config)
         log.exception("Unhandled error answering %s on %s (business %s)",
                       sender_id, channel, business_id)
         from llm import unavailable_reply

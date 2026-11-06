@@ -25,6 +25,11 @@ real document search, so run it on the Mac with the app's collections
 built (start the app once first).
 """
 
+# An eval: its model calls are recorded as purpose "eval" and never
+# count against a business's budget (usage.py).
+import usage
+usage.mark_eval_run()
+
 import re
 import sys
 

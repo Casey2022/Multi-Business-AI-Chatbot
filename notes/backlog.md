@@ -9,6 +9,16 @@ Open work, as of 2026-10-20. Done items are removed; their history is in
   "Help & feedback" (portal); messages land in the operator's Support inbox.
   Feedback is saved whether or not email works.
 
+## Spend caps per business (2026-11-04)
+
+Design in `spend_caps_task.md`; record and costs in `notes/spend_caps.md`.
+Every model call goes through one wrapper into a `usage_ledger`; each
+business has a monthly budget (hard) and an alert (soft); over budget, the
+customer is given the phone number, never an empty reply. Left for Casey,
+in the Claude Console (not code): workspaces for production, demo and
+evals, a key each, a spend limit and notification on each, and auto-reload
+or a low-balance alert (steps in `notes/spend_caps.md`).
+
 ## Costs money (decided 2026-10-24: later)
 
 - **Email on Render.** The SMTP settings are on Render (`SMTP_HOST`

@@ -170,19 +170,15 @@ def _call(prompt):
     except ImportError:
         Anthropic = None
 
+    # Through usage.py like every model call (purpose "eval": recorded,
+    # never counted against a business).
+    import usage as ledger
     if Anthropic is not None:
-        response = Anthropic(api_key=key).messages.create(**_request(prompt))
+        response = ledger.send(Anthropic(api_key=key), _request(prompt), purpose="eval")
         text = text_of(response.content)
         tokens_in, tokens_out = response.usage.input_tokens, response.usage.output_tokens
     else:
-        import urllib.request
-        request = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=json.dumps(_request(prompt)).encode(),
-            headers={"x-api-key": key or "", "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"})
-        with urllib.request.urlopen(request, timeout=60) as r:
-            body = json.load(r)
+        body = ledger.send_http(_request(prompt), key, purpose="eval")
         text = text_of(body["content"])
         tokens_in, tokens_out = body["usage"]["input_tokens"], body["usage"]["output_tokens"]
 

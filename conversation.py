@@ -12,6 +12,7 @@ app.py's channel adapters call it through app.safe_process_message.
 
 import logging
 
+import budget
 from db import save_message, get_recent_messages
 from rules import get_reply, get_urgent_reply, BOOK_INTENT
 from llm import get_llm_reply, start_turn_accounting, turn_cost_summary
@@ -36,7 +37,10 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
     Returns the reply text string.
     """
     # Open the books for this turn; turn_cost_summary() closes them below.
+    # And name who pays for it (usage.py): this business, nothing refused yet.
     start_turn_accounting()
+    import usage
+    usage.serving(business_id, config, refused=False)
 
     reply_text = None
     source = "unknown"   # which layer produced the reply
@@ -52,6 +56,14 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
             end_booking(sender_id, business_id)
         reply_text = urgent
         source = "rule"
+
+    # --- 0b. The monthly budget (budget.py) ---
+    # After the urgent rules, which never call the model, and before the
+    # booking flow, so a customer mid-booking isn't left without a way
+    # out: the phone number, no model call, no booking question.
+    elif not budget.admit_turn(business_id, config):
+        reply_text = budget.over_budget_reply(config)
+        source = "budget"
 
     # --- 1. Booking state machine ---
     # If the customer is mid-booking, bypass rules entirely — every message
@@ -110,6 +122,14 @@ def process_message(message, sender_id, business_id, config, channel="sms"):
 
         else:
             source = "rule"
+
+    # A call this turn was refused for money (the account out of credit, or
+    # the guarantee in budget.check): whatever the code around it made of
+    # the error ("try again in a minute", a booking question built on a
+    # failed extraction), the customer gets the phone number.
+    if budget.turn_refused():
+        reply_text = budget.over_budget_reply(config)
+        source = "budget"
 
     # Save after all logic — preserves the fetch-before-save ordering above.
     save_message(sender_id, "user",      message,    business_id, source ="customer")
