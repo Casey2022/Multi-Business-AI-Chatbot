@@ -449,6 +449,11 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
     # and never contradicts what the business actually collects.
     booking = config.get("booking", {})
     booking_text = ""
+    # How a customer starts one on this channel. "Text 'consultation'" in a
+    # web chat (Miller, 2026-11-12: 12 web-chat replies in 45) asks for an
+    # SMS nobody is sending. SMS keeps its words exactly.
+    verb, verbing = {"webchat": ("type", "typing"),
+                     "voice": ("say", "saying")}.get(channel, ("text", "texting"))
     if booking:
         noun = booking.get("noun", "appointment")
         extras = booking.get("extra_questions", [])
@@ -470,7 +475,7 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
                 f"you — is collecting their details right now and will ask "
                 f"its next question immediately after your reply.{extras_text}\n"
                 f"Answer their question and nothing more. Do NOT tell them to "
-                f"text '{noun}', 'book', or any other command to start — they "
+                f"{verb} '{noun}', 'book', or any other command to start — they "
                 f"have started. Do NOT ask them for a date, a time, an "
                 f"address or any other booking detail; the flow is already "
                 f"asking. Do NOT state or imply that anything has been "
@@ -479,19 +484,19 @@ def build_system_prompt(config, channel="sms", mid_booking=False, now=None):
             )
         else:
             booking_text = (
-                f"\n\nBooking: customers can start a {noun} by texting 'book' or "
+                f"\n\nBooking: customers can start a {noun} by {verbing} 'book' or "
                 f"'{noun}' as a short command. The booking flow — a separate system, "
                 f"not you — collects the service, date/time, and any details "
                 f"below.{extras_text}\n"
                 f"To the customer, you and the booking flow are one chat. If "
                 f"they ask whether they can {noun} or book here, the answer is "
-                f"yes: tell them to text '{noun}' and it starts right here. "
+                f"yes: tell them to {verb} '{noun}' and it starts right here. "
                 f"Never tell them you can't take a {noun}, and never mention a "
                 f"separate system.\n"
                 f"CRITICAL: You cannot place, schedule, confirm, or cancel {noun}s "
                 f"yourself. You have no access to the {noun} system. If a customer "
                 f"describes what they want, acknowledge it warmly and tell them to "
-                f"text '{noun}' to start — do NOT collect booking details (dates, "
+                f"{verb} '{noun}' to start — do NOT collect booking details (dates, "
                 f"times, names) yourself, and NEVER state or imply that a {noun} "
                 f"has been placed, confirmed, or scheduled. A {noun} only exists "
                 f"once the booking flow has run."
@@ -1314,7 +1319,7 @@ def get_llm_reply(message, history=None, config=None, channel="sms",
                   and menu.mentions_item(message, config))
     if wants_menu:
         tools = tools + [menu.tool(config)]
-        system_for_call += "\n\n" + menu.PROMPT_RULE
+        system_for_call += "\n\n" + menu.prompt_rule(config)
 
     # And the excerpts behind the customer's earlier questions, so earlier
     # answers aren't taken back for want of them. Only with history: a first

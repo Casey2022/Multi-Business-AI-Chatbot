@@ -114,6 +114,7 @@ MISTAKES = [
      "broken", "rules.greeting"),
     ("not_a_booking on one line", BOB, at("booking", "not_a_booking", value="a death"),
      "broken", "booking.not_a_booking"),
+    ("menu_name left empty", BOB, at("menu_name", value=""), "broken", "menu_name"),
     ("a length 'an hour'", BOB, at("calendar", "default_duration_minutes", value="an hour"),
      "broken", "calendar.default_duration_minutes"),
     ("a buffer '45 min'", BOB, at("calendar", "scheduling", "buffer_minutes", value="45 min"),

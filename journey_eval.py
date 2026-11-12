@@ -729,8 +729,9 @@ JOURNEYS = [
              "must": [r"Wednesday|October 7|Oct\.? 7(?!\d)"],
              "must_not": [r"Monday|Tuesday|Thursday"]},
             {"say": "and if it hasn't come by then?", "state": "idle",
-             # "contact our office" is an answer too (Haiku 5.5, 2026-10-22).
-             "must": [r"call|\(585\)|reach|contact"], "must_not": [_RETRACTS]},
+             # "contact our office" is an answer too (Haiku 5.5, 2026-10-22),
+             # and so is "just let us know by phone" (2026-11-12).
+             "must": [r"call|\(585\)|reach|contact|\bphone\b"], "must_not": [_RETRACTS]},
         ],
     },
     # Holidays (backlog, 2026-10-20). Before: Ridgeline's three business days

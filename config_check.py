@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parent
 
 # Every top-level section the code reads. Anything else is ignored, so a
 # misspelled section ("buisness") is said, with the likely one.
-SECTIONS = {"business", "services", "menu_enabled", "menu", "calendar", "bot",
-            "rules", "booking", "policies", "budget"}
+SECTIONS = {"business", "services", "menu_enabled", "menu", "menu_name", "calendar",
+            "bot", "rules", "booking", "policies", "budget"}
 DAYS = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split()
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -127,6 +127,9 @@ def _check_file(raw, say):
     _check_cancellation(((raw.get("policies") or {}).get("cancellation")
                          if isinstance(raw.get("policies"), dict) else None), say)
     _check_menu(raw.get("menu"), say)
+    if "menu_name" in raw and not _text(raw["menu_name"]):
+        say("broken", "menu_name", "menu_name: should be a few words for what this business "
+                                   "calls its menu, like \"price list\".")
     _check_budget(raw.get("budget"), say)
 
 

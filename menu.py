@@ -522,7 +522,49 @@ def _per_piece(it, count):
 # The tool
 # ---------------------------------------------------------------------------
 
+# What this business calls its menu, where it isn't one (menu_name in the
+# YAML). Miller Funeral, 2026-11-12: the tool's "isn't on the menu" came
+# back to families as "Green burial isn't listed on our menu", 12 replies
+# in 90. Unset, every word stays as it was.
+_MENU_WORD = re.compile(r"\bmenu\b")
+_MENU_WORD_CAP = re.compile(r"\bMenu\b")
+
+
+def called(config):
+    """The business's word for its menu: "menu" unless menu_name says."""
+    name = str((config or {}).get("menu_name") or "").strip()
+    return name or "menu"
+
+
+def named(value, config):
+    """value (a string, or a dict or list of them) with "menu" said in this
+    business's own word. Lists under "enum" are item names, left alone."""
+    word = called(config)
+    if word == "menu":
+        return value
+    if isinstance(value, str):
+        value = _MENU_WORD.sub(word, value)
+        return _MENU_WORD_CAP.sub(word[:1].upper() + word[1:], value)
+    if isinstance(value, dict):
+        return {named(k, config): (v if k == "enum" else named(v, config))
+                for k, v in value.items()}
+    if isinstance(value, list):
+        return [named(v, config) for v in value]
+    return value
+
+
+def prompt_rule(config):
+    """PROMPT_RULE in this business's word for its menu."""
+    return named(PROMPT_RULE, config)
+
+
 def menu_price(config, order):
+    """Price what the customer asked for (see _menu_price), in the
+    business's own word for its menu."""
+    return named(_menu_price(config, order), config)
+
+
+def _menu_price(config, order):
     """Price what the customer asked for. `order` is a list of
     {"item", "asked_for", "quantity", "add_ons": [{"name", "count"}]}.
 
@@ -725,7 +767,7 @@ def tool(config):
     extras = ("extras, by the menu's own names" + (f" ({listed[0]})" if listed[0] else "")
               + "; anything else they ask for goes here too, in their words, and "
               "the tool says if it isn't listed")
-    return {
+    return named({
         "name": "menu_price",
         "description": (
             "Look up menu prices and add them up. Pass what the customer asked "
@@ -761,7 +803,7 @@ def tool(config):
             },
             "required": ["order"],
         },
-    }
+    }, config)
 
 
 def mentions_item(message, config):

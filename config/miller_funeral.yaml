@@ -39,6 +39,10 @@ services:
 # generated from here, and price questions are answered by the menu_price
 # tool. These are the website's sample packages, funeral home charges only.
 menu_enabled: true
+# A funeral home has a price list, not a menu: the price tool's "isn't on
+# the menu" reached families as "isn't listed on our menu" (12 replies in
+# 90, 2026-11-12). menu.named says this word instead.
+menu_name: "price list"
 menu:
   - item: cremation package
     aliases: [cremation packages, cremation, cremations]
@@ -104,9 +108,19 @@ bot:
   guardrails:
     universal:
       - rule: facts_only
+      # Evidence for the lines below, kept out of the prompt itself:
+      # emojis (rag_eval, 2026-11-04: "since 1889 ... 🙂", "💐"); the
+      # consultation offered after a price or Medicaid question, 9 replies
+      # in 72, and "our services are human funeral and cremation services"
+      # for pet cremation, 3 in 6 (2026-11-12).
       - |
-        Never use emojis: families writing to a funeral home may be grieving
-        (rag_eval, 2026-11-04: "since 1889 ... 🙂", "Send Flowers link 💐").
+        Never use emojis: families writing to a funeral home may be grieving.
+        Offer a pre-planning consultation only when they ask about planning
+        ahead, a consultation, or booking one. After any other answer, stop:
+        no invitation to start one.
+        When asked about a service the documents don't mention, say you
+        can't confirm it and give the phone numbers. Don't describe who or
+        what our services are for in words the documents don't use.
         If someone tells you a death has just happened, the first thing you
         say is to call now, a funeral director will guide them through the
         next steps: Rochester {phone}, Victor (585) 924-5730. Ask them
